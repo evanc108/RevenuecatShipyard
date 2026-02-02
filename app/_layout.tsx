@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
@@ -17,9 +18,25 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
 });
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+function AuthRedirect({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!isSignedIn && !inAuthGroup) {
+      router.replace('/(auth)/sign-in');
+    } else if (isSignedIn && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [isSignedIn, isLoaded, segments]);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -32,10 +49,13 @@ export default function RootLayout() {
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
         <GluestackUIProvider mode="dark">
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
+            <AuthRedirect>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+              </Stack>
+            </AuthRedirect>
             <StatusBar style="auto" />
           </ThemeProvider>
         </GluestackUIProvider>
