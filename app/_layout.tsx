@@ -62,12 +62,15 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   // Auth routing — reads segments inside effect, not in deps (avoids redirect loops)
   useEffect(() => {
     if (!isLoaded) return;
-    // When signed in, wait for Convex user data before routing
-    if (isSignedIn && convexUser === undefined) return;
+    // When signed in, wait for Convex user record to load before routing.
+    // convexUser can be undefined (loading) or null (token not yet propagated)
+    // before resolving to the actual user object — don't route until we have it.
+    if (isSignedIn && !convexUser) return;
 
     const firstSegment = segments[0];
     const inAuthGroup = firstSegment === '(auth)';
     const inTabsGroup = firstSegment === '(tabs)';
+    const inOnboardingGroup = firstSegment === '(onboarding)';
 
     if (!isSignedIn) {
       // Not signed in — only block access to (tabs)
@@ -92,6 +95,27 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           } else {
             router.replace('/(onboarding)/goals');
           }
+        }
+      } else if (inOnboardingGroup) {
+        // Signed in and in onboarding group
+        const screen = segments[1];
+        const preAuthScreens = ['welcome', 'info', 'sign-up', 'sign-up-email'];
+        const onPreAuthScreen = typeof screen === 'string' && preAuthScreens.includes(screen);
+
+        if (hasOnboarded) {
+          // Returning user — skip straight to tabs
+          if (!hasNavigated.current) {
+            hasNavigated.current = true;
+            router.replace('/(tabs)');
+          }
+        } else if (onPreAuthScreen) {
+          // New user still on a sign-up/intro screen — advance to goals
+          if (!hasNavigated.current) {
+            hasNavigated.current = true;
+            router.replace('/(onboarding)/goals');
+          }
+        } else {
+          hasNavigated.current = false;
         }
       } else if (!hasOnboarded && inTabsGroup) {
         // Not onboarded but trying to access tabs

@@ -16,26 +16,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
+import { getClerkErrorMessage } from '@/utils/clerk-error';
+
 // Illustration: Nature illustrations by Storyset (https://storyset.com/nature)
 
 type ScreenMode = 'email' | 'verify';
 
 const CODE_LENGTH = 6;
-
-function getClerkErrorMessage(err: unknown, fallback: string): string {
-  if (typeof err === 'object' && err !== null && 'errors' in err) {
-    const errors = err.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      const first: unknown = errors[0];
-      if (typeof first === 'object' && first !== null && 'message' in first) {
-        if (typeof first.message === 'string') {
-          return first.message;
-        }
-      }
-    }
-  }
-  return fallback;
-}
 
 export default function SignUpEmailScreen() {
   const router = useRouter();
@@ -73,7 +60,7 @@ export default function SignUpEmailScreen() {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
-        router.replace('/(onboarding)/goals');
+        // AuthGuard handles post-auth routing
       }
     } catch (err: unknown) {
       setError(getClerkErrorMessage(err, copy.errorFallback));
@@ -181,6 +168,7 @@ export default function SignUpEmailScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable
+            accessibilityRole="button"
             onPress={() => codeInputRef.current?.focus()}
             style={styles.codeContainer}
             accessibilityLabel={copy.codePlaceholder}
