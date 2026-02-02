@@ -1,10 +1,10 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import 'react-native-reanimated';
 
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
 import { ConvexReactClient } from 'convex/react';
@@ -22,6 +22,7 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const hasNavigated = useRef(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -29,11 +30,19 @@ function AuthRedirect({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === '(auth)';
 
     if (!isSignedIn && !inAuthGroup) {
-      router.replace('/(auth)/sign-in');
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace('/(auth)/sign-in');
+      }
     } else if (isSignedIn && inAuthGroup) {
-      router.replace('/(tabs)');
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace('/(tabs)');
+      }
+    } else {
+      hasNavigated.current = false;
     }
-  }, [isSignedIn, isLoaded, segments]);
+  }, [isSignedIn, isLoaded]);
 
   return <>{children}</>;
 }
@@ -46,20 +55,22 @@ export default function RootLayout() {
       tokenCache={tokenCache}
       publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
     >
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <GluestackUIProvider mode="dark">
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AuthRedirect>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
-              </Stack>
-            </AuthRedirect>
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </GluestackUIProvider>
-      </ConvexProviderWithClerk>
+      <ClerkLoaded>
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <GluestackUIProvider mode="dark">
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AuthRedirect>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+                </Stack>
+              </AuthRedirect>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </GluestackUIProvider>
+        </ConvexProviderWithClerk>
+      </ClerkLoaded>
     </ClerkProvider>
   );
 }

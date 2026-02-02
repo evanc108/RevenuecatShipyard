@@ -967,6 +967,26 @@ export function useFeatureName() {
 
 ---
 
+## API Rate Limits & Loop Prevention
+
+External services (Clerk, Convex, etc.) enforce rate limits. Code that triggers excessive API calls will cause `429 Too Many Requests` errors and degrade the user experience.
+
+### Rules
+- **Never include rapidly-changing values in `useEffect` dependency arrays** if the effect triggers navigation or API calls. For example, `segments` from `useSegments()` changes on every route change — including it as a dependency alongside `router.replace()` creates an infinite loop.
+- **Auth redirect effects** should only depend on auth state (`isSignedIn`, `isLoaded`), not navigation state.
+- **Debounce or gate API calls** that can fire on every render (search inputs, polling, etc.).
+- **Avoid redundant provider re-renders** — initialize clients (e.g. `new ConvexReactClient()`) outside components, not inside render functions.
+- **Test auth flows** by signing in/out and watching the network tab — if you see repeated identical requests, there's a loop.
+
+### Known Pitfalls
+| Pattern | Problem | Fix |
+|---------|---------|-----|
+| `useEffect([segments])` + `router.replace()` | Infinite redirect loop | Remove `segments` from deps, read it inside the effect |
+| `useQuery()` with changing args on every render | Excessive Convex reads | Memoize args or use `'skip'` when not ready |
+| OAuth/SSO flow retries on error | Clerk rate limit hit | Show error to user, don't auto-retry |
+
+---
+
 ## Before Committing Checklist
 
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
