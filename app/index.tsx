@@ -58,7 +58,7 @@ export default function SplashScreen() {
     <View style={styles.container}>
       <Animated.View style={[styles.logoContainer, animatedStyle]}>
         <PlaceholderAsset width={100} height={100} label="Logo" borderRadius={20} />
-        <Text style={styles.appName}>RecipeFlow</Text>
+        <Text style={styles.appName}>Nom</Text>
       </Animated.View>
     </View>
   );

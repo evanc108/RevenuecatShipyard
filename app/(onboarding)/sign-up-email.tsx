@@ -5,6 +5,9 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -18,9 +21,7 @@ import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
 import { getClerkErrorMessage } from '@/utils/clerk-error';
 
-// Illustration: Nature illustrations by Storyset (https://storyset.com/nature)
-
-type ScreenMode = 'email' | 'verify';
+type ScreenMode = 'form' | 'verify';
 
 const CODE_LENGTH = 6;
 
@@ -30,19 +31,21 @@ export default function SignUpEmailScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
   const insets = useSafeAreaInsets();
   const codeInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
-  const [mode, setMode] = useState<ScreenMode>('email');
+  const [mode, setMode] = useState<ScreenMode>('form');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [isLoading, setIsLoading] = useState<'email' | 'verify' | null>(null);
+  const [isLoading, setIsLoading] = useState<'submit' | 'verify' | null>(null);
   const [error, setError] = useState('');
 
-  const handleEmailSubmit = async () => {
+  const handleFormSubmit = async () => {
     if (!isLoaded || !signUp) return;
     try {
-      setIsLoading('email');
+      setIsLoading('submit');
       setError('');
-      await signUp.create({ emailAddress: email });
+      await signUp.create({ emailAddress: email, password });
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setMode('verify');
     } catch (err: unknown) {
@@ -53,14 +56,22 @@ export default function SignUpEmailScreen() {
   };
 
   const handleVerify = async () => {
-    if (!isLoaded || !signUp || !setActive) return;
+    if (!isLoaded || !signUp || !setActive) {
+      setError('Authentication not ready. Please try again.');
+      return;
+    }
     try {
       setIsLoading('verify');
       setError('');
       const result = await signUp.attemptEmailAddressVerification({ code });
-      if (result.status === 'complete' && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
-        // AuthGuard handles post-auth routing
+
+      if (result.status === 'complete') {
+        if (result.createdSessionId) {
+          await setActive({ session: result.createdSessionId });
+        }
+        router.replace('/(onboarding)/goals');
+      } else {
+        setError(`Verification incomplete. Status: ${result.status}`);
       }
     } catch (err: unknown) {
       setError(getClerkErrorMessage(err, copy.errorFallback));
@@ -81,7 +92,7 @@ export default function SignUpEmailScreen() {
 
   const handleBack = () => {
     if (mode === 'verify') {
-      setMode('email');
+      setMode('form');
       setCode('');
       setError('');
     } else {
@@ -94,173 +105,204 @@ export default function SignUpEmailScreen() {
   };
 
   const isValidEmail = email.includes('@') && email.includes('.');
+  const isValidPassword = password.length >= 8;
+  const canSubmit = isValidEmail && isValidPassword;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        onPress={handleBack}
-        hitSlop={8}
-        style={styles.backButton}
-      >
-        <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
-      </Pressable>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={handleBack}
+          hitSlop={8}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+        </Pressable>
 
-      <Animated.View
-        entering={FadeInDown.delay(0).duration(400)}
-        style={styles.headlineContainer}
-      >
-        <Text style={styles.headline}>
-          {mode === 'verify' ? copy.verifyHeadline : copy.headline}
-        </Text>
-        {mode === 'verify' && (
-          <Text style={styles.subhead}>
-            {copy.verifySubtitle} {email}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            key={`headline-${mode}`}
+            entering={FadeInDown.delay(0).duration(400)}
+            style={styles.headlineContainer}
+          >
+            <Text style={styles.headline}>
+              {mode === 'verify' ? copy.verifyHeadline : copy.headline}
+            </Text>
+            {mode === 'verify' && (
+              <Text style={styles.subhead}>
+                {copy.verifySubtitle} {email}
+              </Text>
+            )}
+          </Animated.View>
+
+          {mode === 'form' && (
+            <Animated.View
+              key="form"
+              entering={FadeInDown.delay(50).duration(400)}
+              style={styles.formSection}
+            >
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              <TextInput
+                style={styles.textInput}
+                placeholder={copy.emailPlaceholder}
+                placeholderTextColor={Colors.text.tertiary}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoFocus
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+                accessibilityLabel={copy.emailPlaceholder}
+              />
+
+              <TextInput
+                ref={passwordInputRef}
+                style={styles.textInput}
+                placeholder="Password (min 8 characters)"
+                placeholderTextColor={Colors.text.tertiary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                textContentType="oneTimeCode"
+                autoComplete="off"
+                returnKeyType="done"
+                onSubmitEditing={canSubmit ? handleFormSubmit : undefined}
+                accessibilityLabel="Password"
+              />
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Continue"
+                style={[styles.primaryButton, !canSubmit && styles.buttonDisabled]}
+                onPress={handleFormSubmit}
+                disabled={isLoading !== null || !canSubmit}
+              >
+                {isLoading === 'submit' ? (
+                  <ActivityIndicator color={Colors.text.inverse} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Continue</Text>
+                )}
+              </Pressable>
+            </Animated.View>
+          )}
+
+          {mode === 'verify' && (
+            <Animated.View
+              key="verify"
+              entering={FadeInDown.delay(50).duration(400)}
+              style={styles.formSection}
+            >
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => codeInputRef.current?.focus()}
+                style={styles.codeContainer}
+                accessibilityLabel={copy.codePlaceholder}
+              >
+                {Array.from({ length: CODE_LENGTH }).map((_, index) => {
+                  const isActive = index === code.length && code.length < CODE_LENGTH;
+                  const isFilled = index < code.length;
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.codeBox,
+                        isActive && styles.codeBoxActive,
+                        isFilled && styles.codeBoxFilled,
+                      ]}
+                    >
+                      <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
+                    </View>
+                  );
+                })}
+              </Pressable>
+
+              <TextInput
+                ref={codeInputRef}
+                value={code}
+                onChangeText={handleCodeChange}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                maxLength={CODE_LENGTH}
+                caretHidden
+                autoFocus
+                style={styles.hiddenInput}
+                accessibilityLabel={copy.codePlaceholder}
+              />
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={copy.verify}
+                style={[
+                  styles.primaryButton,
+                  code.length < CODE_LENGTH && styles.buttonDisabled,
+                ]}
+                onPress={handleVerify}
+                disabled={isLoading !== null || code.length < CODE_LENGTH}
+              >
+                {isLoading === 'verify' ? (
+                  <ActivityIndicator color={Colors.text.inverse} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>{copy.verify}</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={copy.resend}
+                onPress={handleResend}
+                hitSlop={8}
+              >
+                <Text style={styles.linkText}>{copy.resend}</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
+          <View style={styles.illustrationContainer}>
+            <Image
+              source={require('@/assets/images/sign-up-email-icon.png')}
+              style={styles.illustration}
+              contentFit="contain"
+            />
+          </View>
+        </ScrollView>
+
+        <View
+          style={[
+            styles.legalContainer,
+            { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+          ]}
+        >
+          <Text style={styles.legalText}>
+            {copy.legalPrefix}
+            <Text style={styles.legalLink}>{copy.terms}</Text>
+            {copy.and}
+            <Text style={styles.legalLink}>{copy.privacy}</Text>
           </Text>
-        )}
-      </Animated.View>
-
-      {mode === 'email' && (
-        <Animated.View
-          key="email"
-          entering={FadeInDown.delay(50).duration(400)}
-          style={styles.formSection}
-        >
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <TextInput
-            style={styles.textInput}
-            placeholder={copy.emailPlaceholder}
-            placeholderTextColor={Colors.text.tertiary}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoFocus
-            accessibilityLabel={copy.emailPlaceholder}
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.sendCode}
-            style={[styles.primaryButton, !isValidEmail && styles.buttonDisabled]}
-            onPress={handleEmailSubmit}
-            disabled={isLoading !== null || !isValidEmail}
-          >
-            {isLoading === 'email' ? (
-              <ActivityIndicator color={Colors.text.inverse} />
-            ) : (
-              <Text style={styles.primaryButtonText}>{copy.sendCode}</Text>
-            )}
-          </Pressable>
-        </Animated.View>
-      )}
-
-      {mode === 'verify' && (
-        <Animated.View
-          key="verify"
-          entering={FadeInDown.delay(50).duration(400)}
-          style={styles.formSection}
-        >
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => codeInputRef.current?.focus()}
-            style={styles.codeContainer}
-            accessibilityLabel={copy.codePlaceholder}
-          >
-            {Array.from({ length: CODE_LENGTH }).map((_, index) => {
-              const isActive = index === code.length && code.length < CODE_LENGTH;
-              const isFilled = index < code.length;
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.codeBox,
-                    isActive && styles.codeBoxActive,
-                    isFilled && styles.codeBoxFilled,
-                  ]}
-                >
-                  <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
-                </View>
-              );
-            })}
-          </Pressable>
-
-          <TextInput
-            ref={codeInputRef}
-            value={code}
-            onChangeText={handleCodeChange}
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            maxLength={CODE_LENGTH}
-            caretHidden
-            autoFocus
-            style={styles.hiddenInput}
-            accessibilityLabel={copy.codePlaceholder}
-          />
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.verify}
-            style={[
-              styles.primaryButton,
-              code.length < CODE_LENGTH && styles.buttonDisabled,
-            ]}
-            onPress={handleVerify}
-            disabled={isLoading !== null || code.length < CODE_LENGTH}
-          >
-            {isLoading === 'verify' ? (
-              <ActivityIndicator color={Colors.text.inverse} />
-            ) : (
-              <Text style={styles.primaryButtonText}>{copy.verify}</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.resend}
-            onPress={handleResend}
-            hitSlop={8}
-          >
-            <Text style={styles.linkText}>{copy.resend}</Text>
-          </Pressable>
-        </Animated.View>
-      )}
-
-      <Animated.View
-        entering={FadeInDown.delay(100).duration(400)}
-        style={styles.illustrationContainer}
-      >
-        <Image
-          source={require('@/assets/images/sign-up-email-icon.png')}
-          style={styles.illustration}
-          contentFit="contain"
-        />
-      </Animated.View>
-
-      <View
-        style={[
-          styles.legalContainer,
-          { paddingBottom: Math.max(insets.bottom, Spacing.md) },
-        ]}
-      >
-        <Text style={styles.legalText}>
-          {copy.legalPrefix}
-          <Text style={styles.legalLink}>{copy.terms}</Text>
-          {copy.and}
-          <Text style={styles.legalLink}>{copy.privacy}</Text>
-        </Text>
-      </View>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary,
@@ -270,6 +312,9 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     alignSelf: 'flex-start' as const,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   headlineContainer: {
     paddingHorizontal: Spacing.lg,
@@ -360,6 +405,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+    minHeight: 200,
   },
   illustration: {
     width: 280,

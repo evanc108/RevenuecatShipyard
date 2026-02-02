@@ -2,7 +2,7 @@ import type { GoalOption } from '@/types/onboarding';
 
 export const ONBOARDING_COPY = {
   welcome: {
-    headline: 'Welcome to\nRecipeFlow!',
+    headline: 'Welcome to\nNom!',
   },
   info: {
     headline: "Don't Let Your\nRecipes Collect Dust",
@@ -32,7 +32,7 @@ export const ONBOARDING_COPY = {
     errorFallback: 'Something went wrong. Please try again.',
   },
   goals: {
-    headline: 'What brings you to\nRecipeFlow?',
+    headline: 'What brings you to\nNom?',
     subhead: 'This helps us personalize your experience',
     skip: 'Skip',
   },
@@ -51,7 +51,7 @@ export const ONBOARDING_COPY = {
     orText: 'or',
     shareTitle: 'Share from app',
     shareDescription:
-      'Open TikTok or Instagram and share a recipe to RecipeFlow',
+      'Open TikTok or Instagram and share a recipe to Nom',
     skip: 'Skip for now',
     start: 'Start',
     errorTitle: 'Oops',
