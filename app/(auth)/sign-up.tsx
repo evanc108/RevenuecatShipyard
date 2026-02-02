@@ -1,10 +1,23 @@
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSSO, useSignUp } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Text, TextInput, TouchableOpacity, View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { COPY } from '@/constants/copy';
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
+  const { startSSOFlow } = useSSO();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -25,8 +38,9 @@ export default function SignUpScreen() {
 
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
-    } catch (err: any) {
-      setError(err.errors?.[0]?.message ?? 'Something went wrong');
+    } catch (err: unknown) {
+      const clerkError = err as { errors?: Array<{ message: string }> };
+      setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
     }
   };
 
@@ -41,10 +55,28 @@ export default function SignUpScreen() {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)');
       }
-    } catch (err: any) {
-      setError(err.errors?.[0]?.message ?? 'Something went wrong');
+    } catch (err: unknown) {
+      const clerkError = err as { errors?: Array<{ message: string }> };
+      setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
     }
   };
+
+  const onSSOSignUp = useCallback(
+    async (strategy: 'oauth_apple' | 'oauth_google') => {
+      setError('');
+      try {
+        const { createdSessionId, setActive: setOAuthActive } = await startSSOFlow({ strategy });
+        if (createdSessionId && setOAuthActive) {
+          await setOAuthActive({ session: createdSessionId });
+          router.replace('/(tabs)');
+        }
+      } catch (err: unknown) {
+        const clerkError = err as { errors?: Array<{ message: string }> };
+        setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
+      }
+    },
+    [startSSOFlow, router],
+  );
 
   if (pendingVerification) {
     return (
@@ -52,25 +84,35 @@ export default function SignUpScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.inner}>
-          <Text style={styles.title}>Verify Email</Text>
-          <Text style={styles.subtitle}>We sent a code to {email}</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>{COPY.auth.verifyTitle}</Text>
+            <Text style={styles.subtitle}>
+              {`We sent a verification code to ${email}`}
+            </Text>
+          </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <TextInput
-            style={styles.input}
-            placeholder="Verification code"
-            placeholderTextColor="#888"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-          />
+          <View style={styles.form}>
+            <TextInput
+              style={styles.input}
+              placeholder={COPY.auth.verificationCode}
+              placeholderTextColor={Colors.text.tertiary}
+              value={code}
+              onChangeText={setCode}
+              keyboardType="number-pad"
+            />
 
-          <TouchableOpacity style={styles.button} onPress={onVerify}>
-            <Text style={styles.buttonText}>Verify</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.primaryButton} onPress={onVerify} activeOpacity={0.8}>
+              <Text style={styles.primaryButtonText}>{COPY.auth.verify}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     );
   }
@@ -80,43 +122,78 @@ export default function SignUpScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.inner}>
-        <Text style={styles.title}>Create Account</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>{COPY.auth.signUpTitle}</Text>
+          <Text style={styles.subtitle}>{COPY.auth.signUpSubtitle}</Text>
+        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#888"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
+        <View style={styles.oauthSection}>
+          <TouchableOpacity
+            style={styles.oauthButton}
+            onPress={() => onSSOSignUp('oauth_apple')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="logo-apple" size={20} color={Colors.text.primary} />
+            <Text style={styles.oauthButtonText}>{COPY.auth.continueWithApple}</Text>
+          </TouchableOpacity>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#888"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+          <TouchableOpacity
+            style={styles.oauthButton}
+            onPress={() => onSSOSignUp('oauth_google')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="logo-google" size={20} color={Colors.text.primary} />
+            <Text style={styles.oauthButtonText}>{COPY.auth.continueWithGoogle}</Text>
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity style={styles.button} onPress={onSignUp}>
-          <Text style={styles.buttonText}>Sign Up</Text>
-        </TouchableOpacity>
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>{COPY.auth.orContinueWithEmail}</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder={COPY.auth.email}
+            placeholderTextColor={Colors.text.tertiary}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder={COPY.auth.password}
+            placeholderTextColor={Colors.text.tertiary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <TouchableOpacity style={styles.primaryButton} onPress={onSignUp} activeOpacity={0.8}>
+            <Text style={styles.primaryButtonText}>{COPY.auth.signUp}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
+          <Text style={styles.footerText}>{COPY.auth.hasAccount}</Text>
           <Link href="/(auth)/sign-in" asChild>
             <TouchableOpacity>
-              <Text style={styles.link}>Sign In</Text>
+              <Text style={styles.footerLink}>{COPY.auth.signIn}</Text>
             </TouchableOpacity>
           </Link>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -124,63 +201,103 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: Colors.background.primary,
   },
-  inner: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    paddingVertical: Spacing.xxl,
+  },
+  header: {
+    marginBottom: Spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    ...Typography.h1,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#888',
-    marginBottom: 24,
-  },
-  input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 16,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  button: {
-    backgroundColor: '#6C47FF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...Typography.body,
+    color: Colors.text.secondary,
   },
   error: {
-    color: '#ff4444',
-    marginBottom: 12,
-    fontSize: 14,
+    ...Typography.bodySmall,
+    color: Colors.semantic.error,
+    marginBottom: Spacing.md,
+  },
+  oauthSection: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  oauthButton: {
+    height: 52,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.background.primary,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  oauthButtonText: {
+    ...Typography.body,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    ...Typography.caption,
+    color: Colors.text.tertiary,
+    marginHorizontal: Spacing.md,
+  },
+  form: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  input: {
+    height: 52,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.background.secondary,
+    paddingHorizontal: Spacing.md,
+    ...Typography.body,
+    color: Colors.text.primary,
+  },
+  primaryButton: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+  },
+  primaryButtonText: {
+    ...Typography.body,
+    fontWeight: '600',
+    color: Colors.text.inverse,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    alignItems: 'center',
   },
   footerText: {
-    color: '#888',
-    fontSize: 14,
+    ...Typography.body,
+    color: Colors.text.secondary,
   },
-  link: {
-    color: '#6C47FF',
-    fontSize: 14,
+  footerLink: {
+    ...Typography.body,
     fontWeight: '600',
+    color: Colors.accent,
   },
 });

@@ -2,11 +2,11 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 
-export default function HomeScreen() {
+export default function DiscoverScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
-        <Text style={styles.title}>Home</Text>
+        <Text style={styles.title}>Discover</Text>
       </View>
     </SafeAreaView>
   );
