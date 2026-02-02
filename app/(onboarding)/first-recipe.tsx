@@ -2,13 +2,14 @@ import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,7 +34,8 @@ export default function FirstRecipeScreen() {
     dietary: string;
     dislikes: string;
   }>();
-  const { user } = useUser();
+  const completeOnboarding = useMutation(api.users.completeOnboarding);
+  const saveRecipe = useMutation(api.recipes.save);
   const copy = ONBOARDING_COPY.firstRecipe;
   const insets = useSafeAreaInsets();
 
@@ -53,26 +55,40 @@ export default function FirstRecipeScreen() {
     checkClipboard();
   }, []);
 
-  const saveOnboardingData = async (recipeUrl: string | null) => {
-    await user?.update({
-      unsafeMetadata: {
-        hasCompletedOnboarding: true,
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleContinue = async () => {
+    try {
+      setIsSaving(true);
+      const preferences = {
         goals: JSON.parse(params.goals || '[]'),
         dietaryRestrictions: JSON.parse(params.dietary || '[]'),
         ingredientDislikes: JSON.parse(params.dislikes || '[]'),
-        firstRecipeUrl: recipeUrl,
-      },
-    });
-  };
-
-  const handleContinue = async () => {
-    await saveOnboardingData(linkValue);
-    router.replace('/(tabs)');
+      };
+      await completeOnboarding(preferences);
+      await saveRecipe({ url: linkValue });
+      router.replace('/(tabs)');
+    } catch {
+      Alert.alert(copy.errorTitle, copy.errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSkip = async () => {
-    await saveOnboardingData(null);
-    router.replace('/(tabs)');
+    try {
+      setIsSaving(true);
+      await completeOnboarding({
+        goals: JSON.parse(params.goals || '[]'),
+        dietaryRestrictions: JSON.parse(params.dietary || '[]'),
+        ingredientDislikes: JSON.parse(params.dislikes || '[]'),
+      });
+      router.replace('/(tabs)');
+    } catch {
+      Alert.alert(copy.errorTitle, copy.errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const hasValidLink = isValidRecipeUrl(linkValue);
@@ -121,6 +137,7 @@ export default function FirstRecipeScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           multiline
+          accessibilityLabel={copy.inputPlaceholder}
         />
 
         <Text style={styles.orText}>{copy.orText}</Text>
@@ -148,14 +165,20 @@ export default function FirstRecipeScreen() {
           style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
         >
           <PageIndicator current={6} />
-          <Pressable onPress={handleSkip} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.skip}
+            onPress={handleSkip}
+            hitSlop={8}
+            disabled={isSaving}
+          >
             <Text style={styles.skipText}>{copy.skip}</Text>
           </Pressable>
         </View>
         <PageTurnButton
-          label="Start"
+          label={copy.start}
           onPress={handleContinue}
-          disabled={!hasValidLink}
+          disabled={!hasValidLink || isSaving}
         />
       </Animated.View>
     </SafeAreaView>

@@ -1,8 +1,11 @@
-export type OnboardingData = {
+/**
+ * Matches the preference fields on the Convex `users` table.
+ * Used to type onboarding params and the future profile editor.
+ */
+export type UserPreferences = {
   goals: string[];
   dietaryRestrictions: string[];
   ingredientDislikes: string[];
-  firstRecipeUrl: string | null;
 };
 
 export type GoalOption = {

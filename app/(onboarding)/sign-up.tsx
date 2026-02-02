@@ -9,22 +9,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
-// Illustration: People illustrations by Storyset (https://storyset.com/people)
+import { getClerkErrorMessage } from '@/utils/clerk-error';
 
-function getClerkErrorMessage(err: unknown, fallback: string): string {
-  if (typeof err === 'object' && err !== null && 'errors' in err) {
-    const errors = err.errors;
-    if (Array.isArray(errors) && errors.length > 0) {
-      const first: unknown = errors[0];
-      if (typeof first === 'object' && first !== null && 'message' in first) {
-        if (typeof first.message === 'string') {
-          return first.message;
-        }
-      }
-    }
-  }
-  return fallback;
-}
+// Illustration: People illustrations by Storyset (https://storyset.com/people)
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -48,7 +35,7 @@ export default function SignUpScreen() {
 
         if (createdSessionId && setActive) {
           await setActive({ session: createdSessionId });
-          router.replace('/(onboarding)/goals');
+          // AuthGuard handles post-auth routing
         }
       } catch (err: unknown) {
         setError(getClerkErrorMessage(err, copy.errorFallback));
@@ -56,7 +43,7 @@ export default function SignUpScreen() {
         setIsLoading(null);
       }
     },
-    [startSSOFlow, router, copy.errorFallback],
+    [startSSOFlow, copy.errorFallback],
   );
 
   return (

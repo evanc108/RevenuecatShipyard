@@ -53,6 +53,9 @@ export const ONBOARDING_COPY = {
     shareDescription:
       'Open TikTok or Instagram and share a recipe to RecipeFlow',
     skip: 'Skip for now',
+    start: 'Start',
+    errorTitle: 'Oops',
+    errorMessage: 'Something went wrong saving your preferences. Please try again.',
   },
 } as const;
 
