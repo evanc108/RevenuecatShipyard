@@ -2,8 +2,9 @@ import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,7 +34,8 @@ export default function FirstRecipeScreen() {
     dietary: string;
     dislikes: string;
   }>();
-  const { user } = useUser();
+  const completeOnboarding = useMutation(api.users.completeOnboarding);
+  const saveRecipe = useMutation(api.recipes.save);
   const copy = ONBOARDING_COPY.firstRecipe;
   const insets = useSafeAreaInsets();
 
@@ -53,25 +55,23 @@ export default function FirstRecipeScreen() {
     checkClipboard();
   }, []);
 
-  const saveOnboardingData = async (recipeUrl: string | null) => {
-    await user?.update({
-      unsafeMetadata: {
-        hasCompletedOnboarding: true,
-        goals: JSON.parse(params.goals || '[]'),
-        dietaryRestrictions: JSON.parse(params.dietary || '[]'),
-        ingredientDislikes: JSON.parse(params.dislikes || '[]'),
-        firstRecipeUrl: recipeUrl,
-      },
-    });
-  };
-
   const handleContinue = async () => {
-    await saveOnboardingData(linkValue);
+    const preferences = {
+      goals: JSON.parse(params.goals || '[]'),
+      dietaryRestrictions: JSON.parse(params.dietary || '[]'),
+      ingredientDislikes: JSON.parse(params.dislikes || '[]'),
+    };
+    await completeOnboarding(preferences);
+    await saveRecipe({ url: linkValue });
     router.replace('/(tabs)');
   };
 
   const handleSkip = async () => {
-    await saveOnboardingData(null);
+    await completeOnboarding({
+      goals: JSON.parse(params.goals || '[]'),
+      dietaryRestrictions: JSON.parse(params.dietary || '[]'),
+      ingredientDislikes: JSON.parse(params.dislikes || '[]'),
+    });
     router.replace('/(tabs)');
   };
 
