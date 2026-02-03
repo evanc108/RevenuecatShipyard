@@ -21,6 +21,13 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.75;
 
+type ProfileTab = 'cookbooks' | 'posts';
+
+const TABS: { key: ProfileTab; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { key: 'cookbooks', icon: 'book-outline', label: 'Cookbooks' },
+  { key: 'posts', icon: 'grid-outline', label: 'Posts' },
+];
+
 function SlideOutDrawer({
   visible,
   onClose,
@@ -133,6 +140,56 @@ function SlideOutDrawer({
   );
 }
 
+function ProfileTabBar({
+  activeTab,
+  onTabPress,
+}: {
+  activeTab: ProfileTab;
+  onTabPress: (tab: ProfileTab) => void;
+}): React.ReactElement {
+  return (
+    <View style={styles.tabBarWrapper}>
+      <View style={styles.tabBarContainer}>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <Pressable
+              key={tab.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+              style={styles.tabItem}
+              onPress={() => onTabPress(tab.key)}
+            >
+              <View style={styles.tabItemContent}>
+                <Ionicons
+                  name={tab.icon}
+                  size={20}
+                  color={isActive ? Colors.accent : Colors.text.tertiary}
+                />
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    isActive && styles.tabLabelActive,
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.tabUnderline,
+                  isActive && styles.tabUnderlineActive,
+                ]}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen(): React.ReactElement {
   const { signOut } = useAuth();
   const router = useRouter();
@@ -142,6 +199,7 @@ export default function ProfileScreen(): React.ReactElement {
     user ? { userId: user._id } : 'skip'
   );
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
 
   if (user === undefined) {
     return (
@@ -187,14 +245,26 @@ export default function ProfileScreen(): React.ReactElement {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[1]}
       >
+        {/* Profile Header Section */}
         <View style={styles.profileHeader}>
-          <Avatar
-            imageUrl={avatarUrl}
-            firstName={user.firstName || 'U'}
-            lastName={user.lastName || 'N'}
-            size="xl"
-          />
+          <View style={styles.avatarRow}>
+            <Avatar
+              imageUrl={avatarUrl}
+              firstName={user.firstName || 'U'}
+              lastName={user.lastName || 'N'}
+              size="xl"
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+              style={styles.editButton}
+              onPress={() => router.push('/edit-profile')}
+            >
+              <Ionicons name="pencil" size={16} color={Colors.text.inverse} />
+            </Pressable>
+          </View>
           {user.username ? (
             <Text style={styles.username}>@{user.username}</Text>
           ) : null}
@@ -208,6 +278,30 @@ export default function ProfileScreen(): React.ReactElement {
               />
             </View>
           ) : null}
+        </View>
+
+        {/* Sticky Tab Bar */}
+        <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
+
+        {/* Tab Content */}
+        <View style={styles.tabContent}>
+          {activeTab === 'cookbooks' ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
+              <Text style={styles.emptyStateTitle}>No Cookbooks Yet</Text>
+              <Text style={styles.emptyStateText}>
+                Your saved cookbook collections will appear here
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="grid-outline" size={48} color={Colors.text.tertiary} />
+              <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
+              <Text style={styles.emptyStateText}>
+                Share your first recipe to see it here
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -257,12 +351,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
   },
   profileHeader: {
     alignItems: 'center',
-    paddingVertical: Spacing.xl,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+  },
+  avatarRow: {
+    position: 'relative',
+  },
+  editButton: {
+    position: 'absolute',
+    right: -8,
+    bottom: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   username: {
     ...Typography.body,
@@ -270,7 +378,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   statsContainer: {
-    marginTop: Spacing.lg,
+    marginTop: Spacing.sm,
   },
   // Drawer styles
   drawerOverlayAbsolute: {
@@ -326,5 +434,68 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: Spacing.sm,
+  },
+  // Tab Bar styles
+  tabBarWrapper: {
+    backgroundColor: Colors.background.primary,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  tabBarContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Spacing.md,
+  },
+  tabItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingBottom: Spacing.md,
+  },
+  tabLabel: {
+    ...Typography.label,
+    color: Colors.text.tertiary,
+  },
+  tabLabelActive: {
+    color: Colors.accent,
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'transparent',
+  },
+  tabUnderlineActive: {
+    backgroundColor: Colors.accent,
+  },
+  // Tab Content styles
+  tabContent: {
+    minHeight: 400,
+    paddingTop: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyStateTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    marginTop: Spacing.md,
+  },
+  emptyStateText: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
 });

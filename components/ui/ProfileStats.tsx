@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   stat: {
     alignItems: 'center',
     paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   count: {
     ...Typography.h3,

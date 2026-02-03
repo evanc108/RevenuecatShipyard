@@ -24,6 +24,7 @@ export const COPY = {
   profile: {
     followers: 'Followers',
     following: 'Following',
+    mealsCooked: 'Meals Cooked',
     follow: 'Follow',
     following_button: 'Following',
     noFollowers: 'No followers yet',
