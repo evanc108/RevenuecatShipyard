@@ -31,7 +31,7 @@ export const create = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
-    coverImageUrl: v.optional(v.string()),
+    coverImageStorageId: v.optional(v.id('_storage')),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -44,12 +44,20 @@ export const create = mutation({
 
     if (!user) throw new Error('User not found');
 
+    let coverImageUrl: string | undefined;
+    if (args.coverImageStorageId) {
+      const url = await ctx.storage.getUrl(args.coverImageStorageId);
+      if (url) {
+        coverImageUrl = url;
+      }
+    }
+
     const now = Date.now();
     return ctx.db.insert('cookbooks', {
       userId: user._id,
       name: args.name,
       description: args.description,
-      coverImageUrl: args.coverImageUrl,
+      coverImageUrl,
       createdAt: now,
       updatedAt: now,
     });

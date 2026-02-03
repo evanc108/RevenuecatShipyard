@@ -74,7 +74,7 @@ export default function CookbookScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const cookbooks = useQuery(api.cookbooks.list);
   const createCookbook = useMutation(api.cookbooks.create);
-  const deleteCookbook = useMutation(api.cookbooks.remove);
+  const generateUploadUrl = useMutation(api.users.generateUploadUrl);
 
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,10 +160,29 @@ export default function CookbookScreen() {
   // --- Handlers ---
 
   const handleCreateCookbook = useCallback(
-    async (name: string, description?: string, _imageUri?: string) => {
+    async (name: string, description?: string, imageUri?: string) => {
       try {
         setIsCreating(true);
-        await createCookbook({ name, description });
+
+        let coverImageStorageId: Id<'_storage'> | undefined;
+
+        if (imageUri) {
+          const uploadUrl = await generateUploadUrl();
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': blob.type },
+            body: blob,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload image');
+          }
+          const { storageId } = await uploadResponse.json();
+          coverImageStorageId = storageId as Id<'_storage'>;
+        }
+
+        await createCookbook({ name, description, coverImageStorageId });
         setIsCreateModalVisible(false);
       } catch {
         Alert.alert('Error', 'Failed to create cookbook. Please try again.');
@@ -171,25 +190,7 @@ export default function CookbookScreen() {
         setIsCreating(false);
       }
     },
-    [createCookbook],
-  );
-
-  const handleDelete = useCallback(
-    (cookbookId: Id<'cookbooks'>) => {
-      Alert.alert(COPY.deleteTitle, COPY.deleteMessage, [
-        { text: COPY.cancel, style: 'cancel' },
-        {
-          text: COPY.delete,
-          style: 'destructive',
-          onPress: () => {
-            deleteCookbook({ cookbookId }).catch(() => {
-              Alert.alert('Error', 'Failed to delete cookbook.');
-            });
-          },
-        },
-      ]);
-    },
-    [deleteCookbook],
+    [createCookbook, generateUploadUrl],
   );
 
   const getKeyExtractor = useCallback(
@@ -261,7 +262,10 @@ export default function CookbookScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Sort by ${option.label}`}
               accessibilityState={{ selected: isActive }}
-              style={[styles.sortPill, isActive && styles.sortPillActive]}
+              style={[
+                styles.sortPill,
+                isActive && styles.sortPillActive,
+              ]}
               onPress={() => setSortMode(option.mode)}
             >
               <Text
@@ -366,7 +370,6 @@ export default function CookbookScreen() {
                   recipeCount={0}
                   coverImageUrl={item.data.coverImageUrl}
                   onPress={() => { }}
-                  onDelete={() => handleDelete(item.data._id)}
                 />
               )}
             </View>
@@ -461,15 +464,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.xs + 2,
     borderRadius: Radius.full,
-    backgroundColor: Colors.background.primary,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   sortPillActive: {
     backgroundColor: Colors.accentLight,
+    borderColor: Colors.accent,
   },
   sortPillText: {
     ...Typography.caption,
@@ -511,6 +512,7 @@ const styles = StyleSheet.create({
   gridItem: {
     flex: 1,
     padding: Spacing.xs,
+    minHeight: 10,
   },
 
   // Create Card (outer = shadow, inner = clip)

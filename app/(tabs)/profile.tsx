@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
-import { CookbookCard, CreateCookbookCard } from '@/components/ui/CookbookCard';
+import { CookbookCard } from '@/components/ui/CookbookCard';
 import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
@@ -345,11 +345,6 @@ export default function ProfileScreen(): React.ReactElement {
             <View style={styles.cookbooksContainer}>
               {/* Cookbook Grid */}
               <View style={styles.cookbookGrid}>
-                {/* Create new cookbook card - always first */}
-                <CreateCookbookCard
-                  onPress={() => setCreateModalVisible(true)}
-                />
-
                 {/* Existing cookbooks */}
                 {cookbooks.map((cookbook) => (
                   <CookbookCard
@@ -359,8 +354,6 @@ export default function ProfileScreen(): React.ReactElement {
                     recipeCount={cookbook.recipeCount}
                     coverImageUrl={cookbook.coverImageUrl}
                     onPress={() => handleCookbookPress(cookbook)}
-                    onEdit={() => handleEditCookbook(cookbook)}
-                    onDelete={() => handleDeleteCookbook(cookbook)}
                   />
                 ))}
               </View>
