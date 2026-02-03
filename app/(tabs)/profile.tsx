@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
+import { CookbookCard, CreateCookbookCard } from '@/components/ui/CookbookCard';
+import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
 import { Colors, Spacing, Typography } from '@/constants/theme';
+import { COPY } from '@/constants/copy';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.75;
 
@@ -190,6 +193,15 @@ function ProfileTabBar({
   );
 }
 
+// Mock cookbook data - will be replaced with Convex query
+type Cookbook = {
+  _id: string;
+  name: string;
+  description?: string | null;
+  recipeCount: number;
+  coverImageUrl?: string | null;
+};
+
 export default function ProfileScreen(): React.ReactElement {
   const { signOut } = useAuth();
   const router = useRouter();
@@ -200,6 +212,50 @@ export default function ProfileScreen(): React.ReactElement {
   );
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Mock cookbooks - replace with: useQuery(api.cookbooks.list)
+  const [cookbooks, setCookbooks] = useState<Cookbook[]>([]);
+
+  const handleCreateCookbook = useCallback(
+    async (name: string, description?: string, imageUri?: string) => {
+      setIsCreating(true);
+      try {
+        // TODO: Replace with actual Convex mutation
+        // await createCookbook({ name, description, imageUri });
+
+        // Mock creation for now
+        const newCookbook: Cookbook = {
+          _id: `cookbook-${Date.now()}`,
+          name,
+          description,
+          recipeCount: 0,
+          coverImageUrl: imageUri ?? null,
+        };
+        setCookbooks((prev) => [newCookbook, ...prev]);
+        setCreateModalVisible(false);
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    []
+  );
+
+  const handleCookbookPress = useCallback((cookbook: Cookbook) => {
+    // TODO: Navigate to cookbook detail screen
+    // router.push(`/cookbook/${cookbook._id}`);
+  }, []);
+
+  const handleEditCookbook = useCallback((cookbook: Cookbook) => {
+    // TODO: Open edit modal or navigate to edit screen
+    // router.push(`/cookbook/${cookbook._id}/edit`);
+  }, []);
+
+  const handleDeleteCookbook = useCallback((cookbook: Cookbook) => {
+    // TODO: Show confirmation dialog and delete
+    setCookbooks((prev) => prev.filter((c) => c._id !== cookbook._id));
+  }, []);
 
   if (user === undefined) {
     return (
@@ -286,12 +342,37 @@ export default function ProfileScreen(): React.ReactElement {
         {/* Tab Content */}
         <View style={styles.tabContent}>
           {activeTab === 'cookbooks' ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyStateTitle}>No Cookbooks Yet</Text>
-              <Text style={styles.emptyStateText}>
-                Your saved cookbook collections will appear here
-              </Text>
+            <View style={styles.cookbooksContainer}>
+              {/* Cookbook Grid */}
+              <View style={styles.cookbookGrid}>
+                {/* Create new cookbook card - always first */}
+                <CreateCookbookCard
+                  onPress={() => setCreateModalVisible(true)}
+                />
+
+                {/* Existing cookbooks */}
+                {cookbooks.map((cookbook) => (
+                  <CookbookCard
+                    key={cookbook._id}
+                    name={cookbook.name}
+                    description={cookbook.description}
+                    recipeCount={cookbook.recipeCount}
+                    coverImageUrl={cookbook.coverImageUrl}
+                    onPress={() => handleCookbookPress(cookbook)}
+                    onEdit={() => handleEditCookbook(cookbook)}
+                    onDelete={() => handleDeleteCookbook(cookbook)}
+                  />
+                ))}
+              </View>
+
+              {/* Empty state hint - only show when no cookbooks */}
+              {cookbooks.length === 0 && (
+                <View style={styles.emptyHint}>
+                  <Text style={styles.emptyHintText}>
+                    {COPY.cookbooks.emptySubtitle}
+                  </Text>
+                </View>
+              )}
             </View>
           ) : (
             <View style={styles.emptyState}>
@@ -310,6 +391,13 @@ export default function ProfileScreen(): React.ReactElement {
         onClose={() => setDrawerVisible(false)}
         onEditProfile={() => router.push('/edit-profile')}
         onSignOut={() => signOut()}
+      />
+
+      <CreateCookbookModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateCookbook}
+        isLoading={isCreating}
       />
     </SafeAreaView>
   );
@@ -479,8 +567,8 @@ const styles = StyleSheet.create({
   // Tab Content styles
   tabContent: {
     minHeight: 400,
-    paddingTop: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   emptyState: {
     alignItems: 'center',
@@ -497,5 +585,24 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: 'center',
     marginTop: Spacing.xs,
+  },
+  // Cookbook grid styles
+  cookbooksContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  cookbookGrid: {
+    width: '100%',
+    gap: Spacing.md,
+  },
+  emptyHint: {
+    marginTop: Spacing.lg,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  emptyHintText: {
+    ...Typography.bodySmall,
+    color: Colors.text.tertiary,
+    textAlign: 'center',
   },
 });
