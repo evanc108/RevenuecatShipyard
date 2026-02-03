@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Image } from 'expo-image';
@@ -24,6 +24,7 @@ import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
@@ -34,9 +35,17 @@ export default function ProfileSetupScreen() {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [localImageUri, setLocalImageUri] = useState<string | null>(null);
   const [storageId, setStorageId] = useState<Id<'_storage'> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const debouncedUsername = useDebounce(username, 300);
+  const usernameCheck = useQuery(
+    api.users.checkUsername,
+    debouncedUsername.length >= 3 ? { username: debouncedUsername } : 'skip'
+  );
+  const isUsernameAvailable = usernameCheck?.available ?? false;
 
   const handlePickImage = async () => {
     const result = await pickAndUploadImage();
@@ -47,13 +56,14 @@ export default function ProfileSetupScreen() {
   };
 
   const handleContinue = async () => {
-    if (!firstName.trim() || !lastName.trim()) return;
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !isUsernameAvailable) return;
 
     try {
       setIsSaving(true);
       await updateProfile({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        username: username.trim().replace(/^@/, ''),
         storageId: storageId ?? undefined,
       });
       router.push('/(onboarding)/goals');
@@ -64,7 +74,11 @@ export default function ProfileSetupScreen() {
     }
   };
 
-  const canContinue = firstName.trim().length > 0 && lastName.trim().length > 0;
+  const canContinue =
+    firstName.trim().length > 0 &&
+    lastName.trim().length > 0 &&
+    username.trim().length >= 3 &&
+    isUsernameAvailable;
   const photoLabel = localImageUri ? copy.changePhoto : copy.addPhoto;
 
   return (
@@ -159,9 +173,42 @@ export default function ProfileSetupScreen() {
               autoCapitalize="words"
               autoCorrect={false}
               textContentType="familyName"
-              returnKeyType="done"
+              returnKeyType="next"
               accessibilityLabel={copy.lastNamePlaceholder}
             />
+
+            <View style={styles.usernameContainer}>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.usernameInput,
+                  username.length >= 3 && !isUsernameAvailable && styles.inputError,
+                ]}
+                placeholder="@username"
+                placeholderTextColor={Colors.text.tertiary}
+                value={username}
+                onChangeText={(text) => setUsername(text.replace(/\s/g, ''))}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="username"
+                returnKeyType="done"
+                accessibilityLabel="Username"
+              />
+              {username.length >= 3 && (
+                <View style={styles.usernameStatus}>
+                  {usernameCheck === undefined ? (
+                    <ActivityIndicator size="small" color={Colors.text.tertiary} />
+                  ) : isUsernameAvailable ? (
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.semantic.success} />
+                  ) : (
+                    <Ionicons name="close-circle" size={20} color={Colors.semantic.error} />
+                  )}
+                </View>
+              )}
+            </View>
+            {username.length >= 3 && !isUsernameAvailable && usernameCheck !== undefined && (
+              <Text style={styles.usernameError}>Username is already taken</Text>
+            )}
           </Animated.View>
         </ScrollView>
 
@@ -258,6 +305,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     ...Typography.body,
     color: Colors.text.primary,
+  },
+  usernameContainer: {
+    position: 'relative',
+  },
+  usernameInput: {
+    paddingRight: 44,
+  },
+  usernameStatus: {
+    position: 'absolute',
+    right: Spacing.md,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: Colors.semantic.error,
+  },
+  usernameError: {
+    ...Typography.caption,
+    color: Colors.semantic.error,
+    marginTop: -Spacing.xs,
   },
   bottomBar: {
     flexDirection: 'row',

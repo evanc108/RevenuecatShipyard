@@ -16,6 +16,7 @@ export const COPY = {
     verifyTitle: 'Verify your email',
     verificationCode: 'Verification code',
     verify: 'Verify',
+    forgotPassword: 'Forgot Password?',
     errors: {
       generic: 'Something went wrong. Please try again.',
     },

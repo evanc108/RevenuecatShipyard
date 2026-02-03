@@ -1,45 +1,142 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
 import { useQuery } from 'convex/react';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
-function SectionCard({
-  title,
-  children,
+const DRAWER_WIDTH = Dimensions.get('window').width * 0.75;
+
+function SlideOutDrawer({
+  visible,
+  onClose,
+  onEditProfile,
+  onSignOut,
 }: {
-  title: string;
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </View>
-  );
-}
+  visible: boolean;
+  onClose: () => void;
+  onEditProfile: () => void;
+  onSignOut: () => void;
+}): React.ReactElement | null {
+  const slideAnim = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [shouldRender, setShouldRender] = useState(false);
 
-function ChipList({ items }: { items: string[] }): React.ReactElement {
-  if (items.length === 0) {
-    return <Text style={styles.emptyText}>None set</Text>;
-  }
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (shouldRender) {
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: DRAWER_WIDTH,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShouldRender(false);
+      });
+    }
+  }, [visible]);
+
+  const handleClose = () => {
+    onClose();
+  };
+
+  if (!shouldRender) return null;
 
   return (
-    <View style={styles.chipContainer}>
-      {items.map((item) => (
-        <View key={item} style={styles.chip}>
-          <Text style={styles.chipText}>{item}</Text>
-        </View>
-      ))}
+    <View style={styles.drawerOverlayAbsolute} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.drawerBackdropAbsolute, { opacity: fadeAnim }]}
+        pointerEvents={visible ? 'auto' : 'none'}
+      >
+        <Pressable style={styles.drawerBackdropPressable} onPress={handleClose} />
+      </Animated.View>
+      <Animated.View
+        style={[styles.drawerContent, { transform: [{ translateX: slideAnim }] }]}
+      >
+        <SafeAreaView style={styles.drawerSafeArea} edges={['top', 'right']}>
+          <View style={styles.drawerHeader}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close menu"
+              onPress={handleClose}
+              hitSlop={8}
+            >
+              <Ionicons name="close" size={28} color={Colors.text.primary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.drawerItems}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.drawerItem}
+              onPress={() => {
+                onClose();
+                setTimeout(onEditProfile, 280);
+              }}
+            >
+              <Ionicons name="person-outline" size={22} color={Colors.text.primary} />
+              <Text style={styles.drawerItemText}>Edit Profile</Text>
+            </Pressable>
+
+            <View style={styles.drawerDivider} />
+
+            <Pressable
+              accessibilityRole="button"
+              style={styles.drawerItem}
+              onPress={() => {
+                onClose();
+                setTimeout(onSignOut, 280);
+              }}
+            >
+              <Ionicons name="log-out-outline" size={22} color={Colors.semantic.error} />
+              <Text style={[styles.drawerItemText, { color: Colors.semantic.error }]}>
+                Sign Out
+              </Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </Animated.View>
     </View>
   );
 }
 
 export default function ProfileScreen(): React.ReactElement {
   const { signOut } = useAuth();
+  const router = useRouter();
   const user = useQuery(api.users.current);
+  const [drawerVisible, setDrawerVisible] = useState(false);
 
   if (user === undefined) {
     return (
@@ -55,7 +152,6 @@ export default function ProfileScreen(): React.ReactElement {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.content}>
-          <Text style={styles.title}>Profile</Text>
           <Text style={styles.errorText}>Unable to load profile</Text>
         </View>
       </SafeAreaView>
@@ -64,10 +160,22 @@ export default function ProfileScreen(): React.ReactElement {
 
   const fullName = `${user.firstName} ${user.lastName}`.trim() || 'User';
 
+  // Skip Clerk's default gradient avatars - only use custom uploaded images
+  const isClerkDefaultAvatar = user.imageUrl?.includes('img.clerk.com');
+  const avatarUrl = isClerkDefaultAvatar ? null : user.imageUrl;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.headerName}>{fullName}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+          onPress={() => setDrawerVisible(true)}
+          hitSlop={8}
+        >
+          <Ionicons name="menu" size={28} color={Colors.text.primary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -77,38 +185,23 @@ export default function ProfileScreen(): React.ReactElement {
       >
         <View style={styles.profileHeader}>
           <Avatar
-            imageUrl={user.imageUrl}
+            imageUrl={avatarUrl}
             firstName={user.firstName || 'U'}
             lastName={user.lastName || 'N'}
             size="xl"
           />
-          <Text style={styles.userName}>{fullName}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          {user.username ? (
+            <Text style={styles.username}>@{user.username}</Text>
+          ) : null}
         </View>
-
-        <SectionCard title="My Goals">
-          <ChipList items={user.goals} />
-        </SectionCard>
-
-        <SectionCard title="Dietary Preferences">
-          <ChipList items={user.dietaryRestrictions} />
-        </SectionCard>
-
-        <SectionCard title="Ingredients to Avoid">
-          <ChipList items={user.ingredientDislikes} />
-        </SectionCard>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Sign out"
-          style={styles.signOutButton}
-          onPress={() => signOut()}
-        >
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </Pressable>
-      </View>
+      <SlideOutDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        onEditProfile={() => router.push('/edit-profile')}
+        onSignOut={() => signOut()}
+      />
     </SafeAreaView>
   );
 }
@@ -123,15 +216,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-  },
-  title: {
-    ...Typography.h1,
-    color: Colors.text.primary,
-  },
   content: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
@@ -141,6 +225,18 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.text.secondary,
     marginTop: Spacing.lg,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  headerName: {
+    ...Typography.h2,
+    color: Colors.text.primary,
   },
   scrollView: {
     flex: 1,
@@ -153,68 +249,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.xl,
   },
-  userName: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    marginTop: Spacing.md,
-  },
-  userEmail: {
+  username: {
     ...Typography.body,
     color: Colors.text.secondary,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
   },
-  sectionCard: {
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    ...Shadow.surface,
-  },
-  sectionTitle: {
-    ...Typography.label,
-    color: Colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
-  },
-  chipContainer: {
+  // Drawer styles
+  drawerOverlayAbsolute: {
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    zIndex: 1000,
   },
-  chip: {
+  drawerBackdropAbsolute: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  drawerBackdropPressable: {
+    flex: 1,
+  },
+  drawerContent: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
     backgroundColor: Colors.background.primary,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  chipText: {
-    ...Typography.bodySmall,
+  drawerSafeArea: {
+    flex: 1,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+  },
+  drawerItems: {
+    paddingHorizontal: Spacing.lg,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+  },
+  drawerItemText: {
+    ...Typography.body,
+    fontWeight: '500',
     color: Colors.text.primary,
   },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.text.tertiary,
-    fontStyle: 'italic',
-  },
-  footer: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    paddingTop: Spacing.md,
-  },
-  signOutButton: {
-    height: 48,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.semantic.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signOutText: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.semantic.error,
+  drawerDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: Spacing.sm,
   },
 });

@@ -47,7 +47,7 @@ export function Avatar({
       cachePolicy="memory-disk"
     />
   ) : (
-    <View style={[styles.initialsContainer, containerStyle, { backgroundColor: Colors.accent }]}>
+    <View style={[styles.initialsContainer, containerStyle]}>
       <Text style={[styles.initials, { fontSize }]}>{initials}</Text>
     </View>
   );
@@ -78,9 +78,12 @@ const styles = StyleSheet.create({
   initialsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   initials: {
     fontWeight: '600',
-    color: Colors.text.inverse,
+    color: Colors.text.secondary,
   },
 });

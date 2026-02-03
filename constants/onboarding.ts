@@ -60,9 +60,10 @@ export const ONBOARDING_COPY = {
   },
   profileSetup: {
     headline: 'Set up your\nprofile',
-    subhead: 'Add your name and an optional photo',
+    subhead: 'Add your name, username, and an optional photo',
     firstNamePlaceholder: 'First name',
     lastNamePlaceholder: 'Last name',
+    usernamePlaceholder: '@username',
     addPhoto: 'Add photo',
     changePhoto: 'Change photo',
   },

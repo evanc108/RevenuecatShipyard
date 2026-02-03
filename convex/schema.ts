@@ -8,6 +8,7 @@ export default defineSchema({
     email: v.string(),
     firstName: v.string(),
     lastName: v.string(),
+    username: v.string(),
     imageUrl: v.optional(v.string()),
 
     // Onboarding status
@@ -21,7 +22,9 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index('by_clerk_id', ['clerkId']),
+  })
+    .index('by_clerk_id', ['clerkId'])
+    .index('by_username', ['username']),
 
   recipes: defineTable({
     userId: v.id('users'),

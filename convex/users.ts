@@ -22,6 +22,7 @@ export const updateProfile = mutation({
   args: {
     firstName: v.string(),
     lastName: v.string(),
+    username: v.string(),
     storageId: v.optional(v.id('_storage')),
   },
   handler: async (ctx, args) => {
@@ -35,6 +36,17 @@ export const updateProfile = mutation({
 
     if (!user) throw new Error('User not found');
 
+    // Check username availability (excluding current user)
+    const usernameNormalized = args.username.toLowerCase().replace(/^@/, '');
+    const existingUsername = await ctx.db
+      .query('users')
+      .withIndex('by_username', (q) => q.eq('username', usernameNormalized))
+      .unique();
+
+    if (existingUsername && existingUsername._id !== user._id) {
+      throw new Error('Username is already taken');
+    }
+
     let imageUrl: string | undefined;
     if (args.storageId) {
       imageUrl = await ctx.storage.getUrl(args.storageId) ?? undefined;
@@ -43,9 +55,38 @@ export const updateProfile = mutation({
     await ctx.db.patch(user._id, {
       firstName: args.firstName,
       lastName: args.lastName,
+      username: usernameNormalized,
       ...(imageUrl ? { imageUrl } : {}),
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Check if a username is available.
+ */
+export const checkUsername = query({
+  args: { username: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { available: false };
+
+    const usernameNormalized = args.username.toLowerCase().replace(/^@/, '');
+    if (usernameNormalized.length < 3) return { available: false };
+
+    const existing = await ctx.db
+      .query('users')
+      .withIndex('by_username', (q) => q.eq('username', usernameNormalized))
+      .unique();
+
+    // Available if no one has it, or if current user owns it
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    const isOwn = existing && currentUser && existing._id === currentUser._id;
+    return { available: !existing || isOwn };
   },
 });
 
@@ -95,6 +136,7 @@ export const createOrGet = mutation({
       email: args.email,
       firstName: args.firstName ?? '',
       lastName: args.lastName ?? '',
+      username: '',
       imageUrl: args.imageUrl,
       hasCompletedOnboarding: false,
       goals: [],
