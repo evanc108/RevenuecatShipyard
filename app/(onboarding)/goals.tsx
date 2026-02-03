@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -12,10 +12,19 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 
 export default function GoalsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const copy = ONBOARDING_COPY.goals;
   const insets = useSafeAreaInsets();
 
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(onboarding)/profile-setup');
+    }
+  };
 
   const toggleGoal = (goalId: string) => {
     setSelectedGoals((prev) =>
@@ -46,7 +55,7 @@ export default function GoalsScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Go back"
-        onPress={() => router.back()}
+        onPress={handleBack}
         hitSlop={8}
         style={styles.backButton}
       >
@@ -88,7 +97,7 @@ export default function GoalsScreen() {
         <View
           style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
         >
-          <PageIndicator current={4} />
+          <PageIndicator current={5} />
           <Pressable onPress={handleSkip} hitSlop={8}>
             <Text style={styles.skipText}>{copy.skip}</Text>
           </Pressable>

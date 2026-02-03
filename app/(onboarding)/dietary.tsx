@@ -139,7 +139,7 @@ export default function DietaryScreen() {
         <View
           style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
         >
-          <PageIndicator current={5} />
+          <PageIndicator current={6} />
           <Pressable onPress={handleSkip} hitSlop={8}>
             <Text style={styles.skipText}>{copy.skip}</Text>
           </Pressable>

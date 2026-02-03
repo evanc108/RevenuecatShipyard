@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignUp } from '@clerk/clerk-expo';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
@@ -37,8 +37,9 @@ export default function SignUpEmailScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [isLoading, setIsLoading] = useState<'submit' | 'verify' | null>(null);
+  const [isLoading, setIsLoading] = useState<'submit' | 'verify' | 'resend' | null>(null);
   const [error, setError] = useState('');
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   const handleFormSubmit = async () => {
     if (!isLoaded || !signUp) return;
@@ -69,7 +70,7 @@ export default function SignUpEmailScreen() {
         if (result.createdSessionId) {
           await setActive({ session: result.createdSessionId });
         }
-        router.replace('/(onboarding)/goals');
+        router.replace('/(onboarding)/profile-setup');
       } else {
         setError(`Verification incomplete. Status: ${result.status}`);
       }
@@ -81,14 +82,27 @@ export default function SignUpEmailScreen() {
   };
 
   const handleResend = async () => {
-    if (!isLoaded || !signUp) return;
+    if (!isLoaded || !signUp || isLoading === 'resend') return;
     try {
+      setIsLoading('resend');
       setError('');
+      setResendSuccess(false);
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      setResendSuccess(true);
     } catch (err: unknown) {
       setError(getClerkErrorMessage(err, copy.errorFallback));
+    } finally {
+      setIsLoading(null);
     }
   };
+
+  // Auto-hide resend success message after 3 seconds
+  useEffect(() => {
+    if (resendSuccess) {
+      const timer = setTimeout(() => setResendSuccess(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendSuccess]);
 
   const handleBack = () => {
     if (mode === 'verify') {
@@ -261,14 +275,26 @@ export default function SignUpEmailScreen() {
                 )}
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.resend}
-                onPress={handleResend}
-                hitSlop={8}
-              >
-                <Text style={styles.linkText}>{copy.resend}</Text>
-              </Pressable>
+              {resendSuccess ? (
+                <View style={styles.resendSuccessContainer}>
+                  <Ionicons name="checkmark-circle" size={18} color={Colors.semantic.success} />
+                  <Text style={styles.resendSuccessText}>{copy.resendSuccess}</Text>
+                </View>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.resend}
+                  onPress={handleResend}
+                  hitSlop={8}
+                  disabled={isLoading === 'resend'}
+                >
+                  {isLoading === 'resend' ? (
+                    <ActivityIndicator size="small" color={Colors.accent} />
+                  ) : (
+                    <Text style={styles.linkText}>{copy.resend}</Text>
+                  )}
+                </Pressable>
+              )}
             </Animated.View>
           )}
 
@@ -400,6 +426,17 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.accent,
     textAlign: 'center' as const,
+  },
+  resendSuccessContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: Spacing.xs,
+  },
+  resendSuccessText: {
+    ...Typography.body,
+    color: Colors.semantic.success,
+    fontWeight: '600',
   },
   illustrationContainer: {
     flex: 1,

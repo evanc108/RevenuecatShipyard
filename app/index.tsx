@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth } from '@clerk/clerk-expo';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,7 +16,7 @@ import { Colors, Typography } from '@/constants/theme';
 export default function SplashScreen() {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
-  const { user } = useUser();
+  const convexUser = useQuery(api.users.current);
 
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.9);
@@ -27,13 +29,16 @@ export default function SplashScreen() {
   useEffect(() => {
     if (!isLoaded) return;
 
+    // Wait for Convex user to load when signed in
+    if (isSignedIn && convexUser === undefined) return;
+
     const navigate = () => {
       if (isSignedIn) {
-        const hasOnboarded = user?.unsafeMetadata?.hasCompletedOnboarding;
+        const hasOnboarded = convexUser?.hasCompletedOnboarding ?? false;
         if (hasOnboarded) {
           router.replace('/(tabs)');
         } else {
-          router.replace('/(onboarding)/goals');
+          router.replace('/(onboarding)/profile-setup');
         }
       } else {
         router.replace('/(onboarding)/welcome');
@@ -47,7 +52,7 @@ export default function SplashScreen() {
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [isLoaded, isSignedIn, user]);
+  }, [isLoaded, isSignedIn, convexUser]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

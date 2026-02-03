@@ -164,7 +164,7 @@ export default function FirstRecipeScreen() {
         <View
           style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
         >
-          <PageIndicator current={6} />
+          <PageIndicator current={7} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={copy.skip}

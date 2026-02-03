@@ -53,7 +53,7 @@ export default function AuthScreen() {
           if (mode === 'signIn') {
             router.replace('/(tabs)');
           } else {
-            router.replace('/(onboarding)/goals');
+            router.replace('/(onboarding)/profile-setup');
           }
         }
       } catch (err: unknown) {
@@ -208,6 +208,14 @@ export default function AuthScreen() {
               />
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Forgot Password"
+                style={styles.forgotPasswordButton}
+                onPress={() => router.push('/(auth)/forgot-password')}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Sign in"
                 style={[styles.primaryButton, (!email || !password) && styles.buttonDisabled]}
                 onPress={handleEmailSignIn}
@@ -331,6 +339,14 @@ const styles = StyleSheet.create({
   },
   emailForm: {
     gap: Spacing.sm,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    ...Typography.bodySmall,
+    color: Colors.accent,
+    fontWeight: '500',
   },
   input: {
     height: 52,

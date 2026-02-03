@@ -6,7 +6,9 @@ export default defineSchema({
     // Identity (linked to Clerk)
     clerkId: v.string(),
     email: v.string(),
-    name: v.optional(v.string()),
+    firstName: v.string(),
+    lastName: v.string(),
+    username: v.string(),
     imageUrl: v.optional(v.string()),
 
     // Onboarding status
@@ -20,7 +22,9 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index('by_clerk_id', ['clerkId']),
+  })
+    .index('by_clerk_id', ['clerkId'])
+    .index('by_username', ['username']),
 
   recipes: defineTable({
     userId: v.id('users'),
@@ -30,4 +34,13 @@ export default defineSchema({
     source: v.optional(v.string()),
     createdAt: v.number(),
   }).index('by_user', ['userId']),
+
+  follows: defineTable({
+    followerId: v.id('users'),
+    followingId: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_follower', ['followerId'])
+    .index('by_following', ['followingId'])
+    .index('by_follower_following', ['followerId', 'followingId']),
 });

@@ -29,6 +29,7 @@ export const ONBOARDING_COPY = {
     codePlaceholder: 'Verification code',
     verify: 'Verify',
     resend: "Didn't receive a code? Resend",
+    resendSuccess: 'Code sent!',
     errorFallback: 'Something went wrong. Please try again.',
   },
   goals: {
@@ -56,6 +57,15 @@ export const ONBOARDING_COPY = {
     start: 'Start',
     errorTitle: 'Oops',
     errorMessage: 'Something went wrong saving your preferences. Please try again.',
+  },
+  profileSetup: {
+    headline: 'Set up your\nprofile',
+    subhead: 'Add your name, username, and an optional photo',
+    firstNamePlaceholder: 'First name',
+    lastNamePlaceholder: 'Last name',
+    usernamePlaceholder: '@username',
+    addPhoto: 'Add photo',
+    changePhoto: 'Change photo',
   },
 } as const;
 

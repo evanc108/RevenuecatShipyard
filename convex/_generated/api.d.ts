@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as follows from "../follows.js";
 import type * as recipes from "../recipes.js";
 import type * as users from "../users.js";
 
@@ -18,6 +19,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  follows: typeof follows;
   recipes: typeof recipes;
   users: typeof users;
 }>;

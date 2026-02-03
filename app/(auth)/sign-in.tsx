@@ -124,6 +124,14 @@ export default function SignInScreen() {
             secureTextEntry
           />
 
+          <TouchableOpacity
+            style={styles.forgotPasswordButton}
+            onPress={() => router.push('/(auth)/forgot-password')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.forgotPasswordText}>{COPY.auth.forgotPassword}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.primaryButton} onPress={onSignIn} activeOpacity={0.8}>
             <Text style={styles.primaryButtonText}>{COPY.auth.signIn}</Text>
           </TouchableOpacity>
@@ -208,6 +216,14 @@ const styles = StyleSheet.create({
   form: {
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+  },
+  forgotPasswordText: {
+    ...Typography.bodySmall,
+    color: Colors.accent,
+    fontWeight: '500',
   },
   input: {
     height: 52,
