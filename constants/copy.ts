@@ -21,6 +21,15 @@ export const COPY = {
       generic: 'Something went wrong. Please try again.',
     },
   },
+  profile: {
+    followers: 'Followers',
+    following: 'Following',
+    follow: 'Follow',
+    following_button: 'Following',
+    noFollowers: 'No followers yet',
+    noFollowing: 'Not following anyone yet',
+    userNotFound: 'User not found',
+  },
   errors: {
     generic: 'Something went wrong. Please try again.',
     network: 'Check your internet connection.',

@@ -16,7 +16,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { ProfileStats } from '@/components/ui/ProfileStats';
+import { Colors, Spacing, Typography } from '@/constants/theme';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.75;
 
@@ -136,6 +137,10 @@ export default function ProfileScreen(): React.ReactElement {
   const { signOut } = useAuth();
   const router = useRouter();
   const user = useQuery(api.users.current);
+  const stats = useQuery(
+    api.follows.stats,
+    user ? { userId: user._id } : 'skip'
+  );
   const [drawerVisible, setDrawerVisible] = useState(false);
 
   if (user === undefined) {
@@ -192,6 +197,16 @@ export default function ProfileScreen(): React.ReactElement {
           />
           {user.username ? (
             <Text style={styles.username}>@{user.username}</Text>
+          ) : null}
+
+          {stats ? (
+            <View style={styles.statsContainer}>
+              <ProfileStats
+                userId={user._id}
+                followerCount={stats.followerCount}
+                followingCount={stats.followingCount}
+              />
+            </View>
           ) : null}
         </View>
       </ScrollView>
@@ -253,6 +268,9 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.text.secondary,
     marginTop: Spacing.sm,
+  },
+  statsContainer: {
+    marginTop: Spacing.lg,
   },
   // Drawer styles
   drawerOverlayAbsolute: {

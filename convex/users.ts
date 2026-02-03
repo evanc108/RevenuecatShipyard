@@ -108,6 +108,17 @@ export const current = query({
 });
 
 /**
+ * Get a user by their Convex ID.
+ * Used for viewing other user profiles.
+ */
+export const getById = query({
+  args: { userId: v.id('users') },
+  handler: async (ctx, args) => {
+    return ctx.db.get(args.userId);
+  },
+});
+
+/**
  * Create a user record if one doesn't exist for the authenticated Clerk user.
  * Returns the user's Convex ID (existing or newly created).
  * firstName/lastName default to empty strings - will be set during profile-setup onboarding.

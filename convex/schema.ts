@@ -34,4 +34,13 @@ export default defineSchema({
     source: v.optional(v.string()),
     createdAt: v.number(),
   }).index('by_user', ['userId']),
+
+  follows: defineTable({
+    followerId: v.id('users'),
+    followingId: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_follower', ['followerId'])
+    .index('by_following', ['followingId'])
+    .index('by_follower_following', ['followerId', 'followingId']),
 });
