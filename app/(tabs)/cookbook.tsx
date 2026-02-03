@@ -58,7 +58,7 @@ const SEARCH_ICON_SIZE = 40;
 
 const COPY = {
   title: 'Cookbooks',
-  searchPlaceholder: 'Search cookbooks...',
+  searchPlaceholder: 'Search...',
   newCookbook: 'New Cookbook',
   deleteTitle: 'Delete Cookbook',
   deleteMessage: "Are you sure? This can't be undone.",
@@ -86,7 +86,7 @@ export default function CookbookScreen() {
   const inputRef = useRef<TextInput>(null);
 
   // Search expands to ~55% of header width, staying right of the title
-  const searchMaxWidth = (screenWidth - Spacing.lg * 2) * 0.55;
+  const searchMaxWidth = (screenWidth - Spacing.lg * 2) * 0.45;
 
   // --- Search Animation ---
 
@@ -208,14 +208,14 @@ export default function CookbookScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Ionicons name="book" size={24} color={Colors.text.primary} />
+          <Ionicons name="book-outline" size={32} color={Colors.text.primary} />
           <Text style={styles.title}>{COPY.title}</Text>
         </View>
 
         <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Search cookbooks"
+            accessibilityLabel="Search"
             onPress={!isSearchActive ? handleOpenSearch : undefined}
             style={styles.searchIconButton}
           >
@@ -288,6 +288,7 @@ export default function CookbookScreen() {
         </View>
       ) : (
         <FlashList
+          key={`${sortMode}-${searchQuery.trim().length > 0}`}
           data={gridData}
           numColumns={2}
           keyExtractor={getKeyExtractor}
@@ -462,15 +463,18 @@ const styles = StyleSheet.create({
   sortPill: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: Spacing.xs + 2,
+    justifyContent: 'center',
+    height: 32,
     borderRadius: Radius.full,
-    backgroundColor: Colors.background.secondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.background.primary,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   sortPillActive: {
     backgroundColor: Colors.accentLight,
-    borderColor: Colors.accent,
   },
   sortPillText: {
     ...Typography.caption,
