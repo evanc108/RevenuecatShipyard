@@ -53,7 +53,7 @@ export default function AuthScreen() {
           if (mode === 'signIn') {
             router.replace('/(tabs)');
           } else {
-            router.replace('/(onboarding)/goals');
+            router.replace('/(onboarding)/profile-setup');
           }
         }
       } catch (err: unknown) {

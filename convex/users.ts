@@ -2,6 +2,54 @@ import { query, mutation } from './_generated/server';
 import { v } from 'convex/values';
 
 /**
+ * Generate an upload URL for Convex storage.
+ * Used for profile image uploads.
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Update user profile (name and optional image).
+ * Called from the profile-setup onboarding screen.
+ */
+export const updateProfile = mutation({
+  args: {
+    firstName: v.string(),
+    lastName: v.string(),
+    storageId: v.optional(v.id('_storage')),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    let imageUrl: string | undefined;
+    if (args.storageId) {
+      imageUrl = await ctx.storage.getUrl(args.storageId) ?? undefined;
+    }
+
+    await ctx.db.patch(user._id, {
+      firstName: args.firstName,
+      lastName: args.lastName,
+      ...(imageUrl ? { imageUrl } : {}),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Get the current authenticated user's record.
  * Returns null if not authenticated or user not yet created.
  */
@@ -21,11 +69,13 @@ export const current = query({
 /**
  * Create a user record if one doesn't exist for the authenticated Clerk user.
  * Returns the user's Convex ID (existing or newly created).
+ * firstName/lastName default to empty strings - will be set during profile-setup onboarding.
  */
 export const createOrGet = mutation({
   args: {
     email: v.string(),
-    name: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -43,7 +93,8 @@ export const createOrGet = mutation({
     return ctx.db.insert('users', {
       clerkId: identity.subject,
       email: args.email,
-      name: args.name,
+      firstName: args.firstName ?? '',
+      lastName: args.lastName ?? '',
       imageUrl: args.imageUrl,
       hasCompletedOnboarding: false,
       goals: [],

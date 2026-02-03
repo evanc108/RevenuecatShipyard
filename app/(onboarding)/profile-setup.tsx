@@ -1,0 +1,271 @@
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import { Image } from 'expo-image';
+import { AvatarSizes } from '@/constants/theme';
+import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
+import { PageIndicator } from '@/components/onboarding/PageIndicator';
+import { ONBOARDING_COPY } from '@/constants/onboarding';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
+
+export default function ProfileSetupScreen() {
+  const router = useRouter();
+  const copy = ONBOARDING_COPY.profileSetup;
+  const insets = useSafeAreaInsets();
+  const updateProfile = useMutation(api.users.updateProfile);
+  const { pickAndUploadImage, isUploading } = useProfileImageUpload();
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [localImageUri, setLocalImageUri] = useState<string | null>(null);
+  const [storageId, setStorageId] = useState<Id<'_storage'> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handlePickImage = async () => {
+    const result = await pickAndUploadImage();
+    if (result) {
+      setLocalImageUri(result.localUri);
+      setStorageId(result.storageId);
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!firstName.trim() || !lastName.trim()) return;
+
+    try {
+      setIsSaving(true);
+      await updateProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        storageId: storageId ?? undefined,
+      });
+      router.push('/(onboarding)/goals');
+    } catch {
+      // Error handled silently - user can retry
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const canContinue = firstName.trim().length > 0 && lastName.trim().length > 0;
+  const photoLabel = localImageUri ? copy.changePhoto : copy.addPhoto;
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+        </Pressable>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInDown.duration(400)}>
+            <Text style={styles.headline}>{copy.headline}</Text>
+            <Text style={styles.subhead}>{copy.subhead}</Text>
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(400)}
+            style={styles.avatarSection}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Select profile photo"
+              onPress={handlePickImage}
+              disabled={isUploading}
+              style={styles.avatarContainer}
+            >
+              {isUploading ? (
+                <View style={styles.avatarPlaceholder}>
+                  <ActivityIndicator size="large" color={Colors.accent} />
+                </View>
+              ) : localImageUri ? (
+                <Image
+                  source={{ uri: localImageUri }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="camera" size={40} color={Colors.text.tertiary} />
+                </View>
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={photoLabel}
+              onPress={handlePickImage}
+              hitSlop={8}
+              disabled={isUploading}
+            >
+              <Text style={styles.photoLabel}>{photoLabel}</Text>
+            </Pressable>
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInDown.delay(150).duration(400)}
+            style={styles.formSection}
+          >
+            <TextInput
+              style={styles.textInput}
+              placeholder={copy.firstNamePlaceholder}
+              placeholderTextColor={Colors.text.tertiary}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="givenName"
+              returnKeyType="next"
+              accessibilityLabel={copy.firstNamePlaceholder}
+            />
+
+            <TextInput
+              style={styles.textInput}
+              placeholder={copy.lastNamePlaceholder}
+              placeholderTextColor={Colors.text.tertiary}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="familyName"
+              returnKeyType="done"
+              accessibilityLabel={copy.lastNamePlaceholder}
+            />
+          </Animated.View>
+        </ScrollView>
+
+        <Animated.View
+          entering={FadeInUp.delay(200).duration(400)}
+          style={styles.bottomBar}
+        >
+          <View
+            style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
+          >
+            <PageIndicator current={4} total={7} />
+          </View>
+          <PageTurnButton
+            label="Next >"
+            onPress={handleContinue}
+            disabled={!canContinue || isSaving}
+          />
+        </Animated.View>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background.primary,
+  },
+  backButton: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
+    alignSelf: 'flex-start' as const,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.lg,
+  },
+  headline: {
+    fontSize: 36,
+    fontWeight: '400',
+    color: Colors.text.primary,
+    letterSpacing: -0.5,
+    lineHeight: 50,
+    marginBottom: Spacing.md,
+  },
+  subhead: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.xl,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  avatarContainer: {
+    marginBottom: Spacing.sm,
+  },
+  avatarPlaceholder: {
+    width: AvatarSizes.xl,
+    height: AvatarSizes.xl,
+    borderRadius: AvatarSizes.xl / 2,
+    backgroundColor: Colors.background.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderStyle: 'dashed',
+  },
+  avatarImage: {
+    width: AvatarSizes.xl,
+    height: AvatarSizes.xl,
+    borderRadius: AvatarSizes.xl / 2,
+  },
+  photoLabel: {
+    ...Typography.body,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+  formSection: {
+    gap: Spacing.md,
+  },
+  textInput: {
+    height: 52,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    ...Typography.body,
+    color: Colors.text.primary,
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingLeft: Spacing.xl,
+  },
+  bottomLeft: {
+    gap: Spacing.xs,
+  },
+});

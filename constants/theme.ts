@@ -58,6 +58,20 @@ export const Radius = {
   full: 9999,
 } as const;
 
+export const AvatarSizes = {
+  sm: 32,
+  md: 48,
+  lg: 80,
+  xl: 120,
+} as const;
+
+export const AvatarFontSizes = {
+  sm: 12,
+  md: 18,
+  lg: 28,
+  xl: 42,
+} as const;
+
 export const Typography = {
   h1: {
     fontSize: 28,

@@ -43,7 +43,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     isCreatingUser.current = true;
     createOrGet({
       email,
-      name: clerkUser.fullName ?? undefined,
+      firstName: clerkUser.firstName ?? undefined,
+      lastName: clerkUser.lastName ?? undefined,
       imageUrl: clerkUser.imageUrl ?? undefined,
     }).catch(() => {
       // May fail if Convex token hasn't arrived yet; will retry on next query update
@@ -93,7 +94,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           if (hasOnboarded) {
             router.replace('/(tabs)');
           } else {
-            router.replace('/(onboarding)/goals');
+            router.replace('/(onboarding)/profile-setup');
           }
         }
       } else if (inOnboardingGroup) {
@@ -112,7 +113,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           // New user still on a sign-up/intro screen — advance to goals
           if (!hasNavigated.current) {
             hasNavigated.current = true;
-            router.replace('/(onboarding)/goals');
+            router.replace('/(onboarding)/profile-setup');
           }
         } else {
           hasNavigated.current = false;
@@ -121,7 +122,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
         // Not onboarded but trying to access tabs
         if (!hasNavigated.current) {
           hasNavigated.current = true;
-          router.replace('/(onboarding)/goals');
+          router.replace('/(onboarding)/profile-setup');
         }
       } else {
         hasNavigated.current = false;

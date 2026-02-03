@@ -6,7 +6,7 @@ type PageIndicatorProps = {
   total?: number;
 };
 
-export function PageIndicator({ current, total = 6 }: PageIndicatorProps) {
+export function PageIndicator({ current, total = 7 }: PageIndicatorProps) {
   return (
     <Text style={styles.container}>
       <Text style={styles.current}>{current}</Text>

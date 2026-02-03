@@ -6,7 +6,8 @@ export default defineSchema({
     // Identity (linked to Clerk)
     clerkId: v.string(),
     email: v.string(),
-    name: v.optional(v.string()),
+    firstName: v.string(),
+    lastName: v.string(),
     imageUrl: v.optional(v.string()),
 
     // Onboarding status
