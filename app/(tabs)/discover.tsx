@@ -12,6 +12,7 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
+import { CookbookSelectionModal } from '@/components/ui/CookbookSelectionModal';
 import type { Recipe } from '@/components/discover/RecipeCard';
 import type { Doc, Id } from '@/convex/_generated/dataModel';
 
@@ -71,6 +72,11 @@ export default function DiscoverScreen() {
   // Track which recipe IDs we've already added to the queue
   const seenRecipeIds = useRef<Set<string>>(new Set());
 
+  // Cookbook selection modal state
+  const [showCookbookModal, setShowCookbookModal] = useState(false);
+  const [pendingRecipe, setPendingRecipe] = useState<Recipe | null>(null);
+  const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
+
   const currentUser = useQuery(api.users.current);
   const unviewedRecipes = useQuery(api.discoverFeed.getUnviewedRecipes, {
     limit: 20,
@@ -79,6 +85,7 @@ export default function DiscoverScreen() {
 
   const recordView = useMutation(api.discoverFeed.recordView);
   const saveRecipe = useMutation(api.savedRecipes.saveRecipe);
+  const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
   const populateFromBackend = useAction(api.discoverFeedActions.populateFromBackend);
 
   // User preferences for population
@@ -193,14 +200,24 @@ export default function DiscoverScreen() {
   };
 
   const handleSwipeRight = async (recipe: Recipe) => {
-    const discoverRecipeId = (recipe as Recipe & { _discoverRecipeId?: string })
+    // Store the recipe and show cookbook selection modal
+    setPendingRecipe(recipe);
+    setShowCookbookModal(true);
+  };
+
+  const handleCookbookSelect = async (cookbookId: Id<'cookbooks'>) => {
+    if (!pendingRecipe) return;
+
+    setIsSavingToCookbook(true);
+
+    const discoverRecipeId = (pendingRecipe as Recipe & { _discoverRecipeId?: string })
       ._discoverRecipeId;
 
     // Record save action
     if (discoverRecipeId) {
       try {
         await recordView({
-          discoverRecipeId: discoverRecipeId as any,
+          discoverRecipeId: discoverRecipeId as Id<'discoverRecipes'>,
           action: 'saved',
         });
       } catch (err) {
@@ -208,37 +225,94 @@ export default function DiscoverScreen() {
       }
     }
 
-    // Save to user's collection
+    // Save to user's collection and add to cookbook
     try {
-      await saveRecipe({
-        url: recipe.url,
-        title: recipe.title,
-        description: recipe.description,
-        imageUrl: recipe.imageUrl,
-        cuisine: recipe.cuisine,
-        difficulty: recipe.difficulty,
+      const recipeId = await saveRecipe({
+        url: pendingRecipe.url,
+        title: pendingRecipe.title,
+        description: pendingRecipe.description,
+        imageUrl: pendingRecipe.imageUrl,
+        cuisine: pendingRecipe.cuisine,
+        difficulty: pendingRecipe.difficulty,
 
-        servings: recipe.servings,
-        prepTimeMinutes: recipe.prepTimeMinutes,
-        cookTimeMinutes: recipe.cookTimeMinutes,
-        totalTimeMinutes: recipe.totalTimeMinutes,
+        servings: pendingRecipe.servings,
+        prepTimeMinutes: pendingRecipe.prepTimeMinutes,
+        cookTimeMinutes: pendingRecipe.cookTimeMinutes,
+        totalTimeMinutes: pendingRecipe.totalTimeMinutes,
 
-        calories: recipe.calories,
-        proteinGrams: recipe.proteinGrams,
-        carbsGrams: recipe.carbsGrams,
-        fatGrams: recipe.fatGrams,
+        calories: pendingRecipe.calories,
+        proteinGrams: pendingRecipe.proteinGrams,
+        carbsGrams: pendingRecipe.carbsGrams,
+        fatGrams: pendingRecipe.fatGrams,
 
-        dietaryTags: recipe.dietaryTags,
-        keywords: recipe.keywords,
+        dietaryTags: pendingRecipe.dietaryTags,
+        keywords: pendingRecipe.keywords,
 
-        creatorName: recipe.creatorName,
+        creatorName: pendingRecipe.creatorName,
 
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
+        ingredients: pendingRecipe.ingredients,
+        instructions: pendingRecipe.instructions,
       });
+
+      // Add to the selected cookbook
+      if (recipeId) {
+        await addRecipeToCookbook({
+          cookbookId,
+          recipeId,
+        });
+      }
+
+      // Success - close modal
+      setShowCookbookModal(false);
+      setPendingRecipe(null);
     } catch (err) {
       console.error('Failed to save recipe:', err);
+    } finally {
+      setIsSavingToCookbook(false);
     }
+  };
+
+  const handleCookbookModalClose = () => {
+    // If user closes without selecting, we still want to save to their general collection
+    // but skip adding to a cookbook
+    if (pendingRecipe) {
+      const discoverRecipeId = (pendingRecipe as Recipe & { _discoverRecipeId?: string })
+        ._discoverRecipeId;
+
+      // Record save action in background
+      if (discoverRecipeId) {
+        recordView({
+          discoverRecipeId: discoverRecipeId as Id<'discoverRecipes'>,
+          action: 'saved',
+        }).catch((err) => console.error('Failed to record save:', err));
+      }
+
+      // Save to collection without cookbook
+      saveRecipe({
+        url: pendingRecipe.url,
+        title: pendingRecipe.title,
+        description: pendingRecipe.description,
+        imageUrl: pendingRecipe.imageUrl,
+        cuisine: pendingRecipe.cuisine,
+        difficulty: pendingRecipe.difficulty,
+        servings: pendingRecipe.servings,
+        prepTimeMinutes: pendingRecipe.prepTimeMinutes,
+        cookTimeMinutes: pendingRecipe.cookTimeMinutes,
+        totalTimeMinutes: pendingRecipe.totalTimeMinutes,
+        calories: pendingRecipe.calories,
+        proteinGrams: pendingRecipe.proteinGrams,
+        carbsGrams: pendingRecipe.carbsGrams,
+        fatGrams: pendingRecipe.fatGrams,
+        dietaryTags: pendingRecipe.dietaryTags,
+        keywords: pendingRecipe.keywords,
+        creatorName: pendingRecipe.creatorName,
+        ingredients: pendingRecipe.ingredients,
+        instructions: pendingRecipe.instructions,
+      }).catch((err) => console.error('Failed to save recipe:', err));
+    }
+
+    setShowCookbookModal(false);
+    setPendingRecipe(null);
   };
 
   const renderContent = () => {
@@ -312,6 +386,14 @@ export default function DiscoverScreen() {
 
         <View style={styles.cardContainer}>{renderContent()}</View>
       </SafeAreaView>
+
+      <CookbookSelectionModal
+        visible={showCookbookModal}
+        recipe={pendingRecipe}
+        onClose={handleCookbookModalClose}
+        onSelect={handleCookbookSelect}
+        isLoading={isSavingToCookbook}
+      />
     </GestureHandlerRootView>
   );
 }
