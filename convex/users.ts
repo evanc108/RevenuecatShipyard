@@ -223,3 +223,105 @@ export const updatePreferences = mutation({
     });
   },
 });
+
+/**
+ * Search for users by name or username.
+ * Returns users matching the search query, excluding the current user.
+ */
+export const search = query({
+  args: {
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    const searchQuery = args.query.toLowerCase().trim();
+    const limit = args.limit ?? 20;
+
+    // If query is too short, return empty
+    if (searchQuery.length < 2) return [];
+
+    // Get all users and filter client-side (for now - can optimize with search index later)
+    const allUsers = await ctx.db.query('users').collect();
+
+    const matchingUsers = allUsers
+      .filter((user) => {
+        // Exclude current user
+        if (currentUser && user._id === currentUser._id) return false;
+
+        // Only include users who have completed onboarding (have a username)
+        if (!user.username) return false;
+
+        // Match against username, first name, or last name
+        const username = user.username.toLowerCase();
+        const firstName = user.firstName.toLowerCase();
+        const lastName = user.lastName.toLowerCase();
+        const fullName = `${firstName} ${lastName}`;
+
+        return (
+          username.includes(searchQuery) ||
+          firstName.includes(searchQuery) ||
+          lastName.includes(searchQuery) ||
+          fullName.includes(searchQuery)
+        );
+      })
+      .slice(0, limit);
+
+    return matchingUsers;
+  },
+});
+
+/**
+ * Get suggested users to follow.
+ * Returns users the current user is not already following.
+ */
+export const suggested = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!currentUser) return [];
+
+    const limit = args.limit ?? 10;
+
+    // Get users the current user is already following
+    const following = await ctx.db
+      .query('follows')
+      .withIndex('by_follower', (q) => q.eq('followerId', currentUser._id))
+      .collect();
+
+    const followingIds = new Set(following.map((f) => f.followingId));
+
+    // Get all users who have completed onboarding
+    const allUsers = await ctx.db.query('users').collect();
+
+    const suggestedUsers = allUsers
+      .filter((user) => {
+        // Exclude current user
+        if (user._id === currentUser._id) return false;
+        // Exclude users already being followed
+        if (followingIds.has(user._id)) return false;
+        // Only include users who have completed onboarding
+        if (!user.username || !user.hasCompletedOnboarding) return false;
+        return true;
+      })
+      .slice(0, limit);
+
+    return suggestedUsers;
+  },
+});

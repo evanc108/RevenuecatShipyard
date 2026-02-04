@@ -243,3 +243,104 @@ export const remove = mutation({
     return { success: true };
   },
 });
+
+/**
+ * Get social feed - posts from users the current user follows.
+ * Returns posts in reverse chronological order with user and recipe data.
+ */
+export const socialFeed = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!currentUser) return [];
+
+    const limit = args.limit ?? 50;
+
+    // Get list of users the current user follows
+    const following = await ctx.db
+      .query('follows')
+      .withIndex('by_follower', (q) => q.eq('followerId', currentUser._id))
+      .collect();
+
+    const followingIds = following.map((f) => f.followingId);
+
+    // If not following anyone, return empty
+    if (followingIds.length === 0) return [];
+
+    // Get all posts, sorted by creation date (newest first)
+    const allPosts = await ctx.db
+      .query('posts')
+      .withIndex('by_created')
+      .order('desc')
+      .collect();
+
+    // Filter to only posts from followed users
+    const feedPosts = allPosts
+      .filter((post) => followingIds.includes(post.userId))
+      .slice(0, limit);
+
+    // Join with user, recipe, likes, comments, and save data
+    const postsWithData = await Promise.all(
+      feedPosts.map(async (post) => {
+        const [user, recipe, likes, comments, savedByUser] = await Promise.all([
+          ctx.db.get(post.userId),
+          ctx.db.get(post.recipeId),
+          ctx.db
+            .query('postLikes')
+            .withIndex('by_post', (q) => q.eq('postId', post._id))
+            .collect(),
+          ctx.db
+            .query('postComments')
+            .withIndex('by_post', (q) => q.eq('postId', post._id))
+            .collect(),
+          ctx.db
+            .query('savedPosts')
+            .withIndex('by_post_user', (q) =>
+              q.eq('postId', post._id).eq('userId', currentUser._id)
+            )
+            .unique(),
+        ]);
+
+        const isLikedByUser = likes.some((like) => like.userId === currentUser._id);
+
+        return {
+          ...post,
+          user: user
+            ? {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                username: user.username,
+                imageUrl: user.imageUrl,
+              }
+            : null,
+          recipe: recipe
+            ? {
+                _id: recipe._id,
+                title: recipe.title,
+                imageUrl: recipe.imageUrl,
+                totalTimeMinutes: recipe.totalTimeMinutes,
+                url: recipe.url,
+              }
+            : null,
+          likeCount: likes.length,
+          commentCount: comments.length,
+          isLiked: isLikedByUser,
+          isSaved: savedByUser !== null,
+        };
+      })
+    );
+
+    // Filter out posts where user or recipe was deleted
+    return postsWithData.filter((post) => post.user !== null && post.recipe !== null);
+  },
+});
