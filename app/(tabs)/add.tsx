@@ -19,6 +19,7 @@ import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
+import { CookbookDropdown } from '@/components/ui/CookbookDropdown';
 import type { Recipe } from '@/types/recipe';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -29,6 +30,8 @@ export default function AddRecipeScreen() {
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [selectedCookbookId, setSelectedCookbookId] = useState<Id<'cookbooks'> | null>(null);
+  const [showCookbookError, setShowCookbookError] = useState(false);
   const { extractRecipe, status, progress, error, wasExisting, reset } = useRecipeExtraction();
 
   // Rating state
@@ -70,9 +73,16 @@ export default function AddRecipeScreen() {
   const handleExtract = async () => {
     if (!url.trim()) return;
 
+    // Validate cookbook selection
+    if (!selectedCookbookId) {
+      setShowCookbookError(true);
+      return;
+    }
+
+    setShowCookbookError(false);
     setRecipe(null);
     setRecipeId(null);
-    const result = await extractRecipe(url.trim());
+    const result = await extractRecipe(url.trim(), selectedCookbookId);
     if (result) {
       setRecipe(result);
       setRecipeId(result.id as Id<'recipes'>);
@@ -84,7 +94,13 @@ export default function AddRecipeScreen() {
     setRecipe(null);
     setRecipeId(null);
     setServingsMultiplier(1);
+    setShowCookbookError(false);
     reset();
+  };
+
+  const handleCookbookSelect = (id: Id<'cookbooks'>) => {
+    setSelectedCookbookId(id);
+    setShowCookbookError(false);
   };
 
   const handleRate = async (value: number) => {
@@ -137,6 +153,16 @@ export default function AddRecipeScreen() {
               autoCorrect={false}
               keyboardType="url"
               editable={!isLoading}
+            />
+          </View>
+
+          {/* Cookbook Selection */}
+          <View style={styles.cookbookContainer}>
+            <CookbookDropdown
+              selectedId={selectedCookbookId}
+              onSelect={handleCookbookSelect}
+              disabled={isLoading}
+              error={showCookbookError}
             />
           </View>
 
@@ -449,6 +475,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   inputContainer: {
+    marginBottom: Spacing.md,
+  },
+  cookbookContainer: {
     marginBottom: Spacing.md,
   },
   input: {
