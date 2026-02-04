@@ -31,6 +31,18 @@ export const COPY = {
     noFollowing: 'Not following anyone yet',
     userNotFound: 'User not found',
   },
+  cookbookDetail: {
+    recentlyCooked: 'Recently Cooked',
+    yourRecipesPrefix: 'Your',
+    yourRecipesBold: 'Recipes',
+    cook: 'Cook',
+    searchPlaceholder: 'Search recipes...',
+    emptyTitle: 'No recipes yet',
+    emptySubtitle: 'Tap + to add your first recipe',
+    addRecipe: 'Add Recipe',
+    notFound: 'Cookbook not found',
+    minuteShort: 'min',
+  },
   cookbooks: {
     title: 'Cookbooks',
     newCookbook: 'New Cookbook',

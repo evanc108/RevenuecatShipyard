@@ -11,25 +11,24 @@ type CookbookCardProps = {
   recipeCount: number;
   coverImageUrl?: string | null;
   onPress: () => void;
+  variant?: 'grid' | 'carousel';
 };
 
-// Beautiful gradient patterns for cookbooks without cover images
-type GradientColors = readonly [string, string];
-
-const GRADIENT_PATTERNS: readonly GradientColors[] = [
-  ['#667eea', '#764ba2'], // Purple blue
-  ['#f093fb', '#f5576c'], // Pink
-  ['#4facfe', '#00f2fe'], // Blue cyan
-  ['#43e97b', '#38f9d7'], // Green mint
-  ['#fa709a', '#fee140'], // Pink yellow
-  ['#a8edea', '#fed6e3'], // Soft teal pink
-  ['#ff9a9e', '#fecfef'], // Soft pink
-  ['#ffecd2', '#fcb69f'], // Peach
+// Solid pastel palette for cookbooks without cover images
+const PASTEL_COLORS: readonly string[] = [
+  '#E0D6FF', // Lavender
+  '#FFD6E0', // Pink
+  '#D6E8FF', // Sky blue
+  '#D6FFE8', // Mint
+  '#FFE8D6', // Peach
+  '#FFF5D6', // Butter
+  '#D6F0E0', // Sage
+  '#FFE0D6', // Coral
 ] as const;
 
-function getGradientForName(name: string): GradientColors {
+function getPastelForName(name: string): string {
   const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return GRADIENT_PATTERNS[hash % GRADIENT_PATTERNS.length] ?? GRADIENT_PATTERNS[0];
+  return PASTEL_COLORS[hash % PASTEL_COLORS.length] ?? PASTEL_COLORS[0];
 }
 
 export const CookbookCard = memo(function CookbookCard({
@@ -38,57 +37,91 @@ export const CookbookCard = memo(function CookbookCard({
   recipeCount,
   coverImageUrl,
   onPress,
+  variant = 'grid',
 }: CookbookCardProps): React.ReactElement {
-  const gradient = getGradientForName(name);
+  const pastelBg = getPastelForName(name);
+  const isCarousel = variant === 'carousel';
+  const hasImage = Boolean(coverImageUrl);
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${name} cookbook with ${recipeCount} recipes`}
-      style={styles.card}
+      style={[
+        styles.card,
+        { backgroundColor: pastelBg },
+        isCarousel ? styles.cardCarousel : styles.cardGrid,
+      ]}
       onPress={onPress}
     >
-      {/* Background */}
-      {coverImageUrl ? (
-        <Image
-          source={{ uri: coverImageUrl }}
-          style={styles.backgroundImage}
-          contentFit="cover"
-          transition={300}
-          cachePolicy="memory-disk"
-        />
-      ) : (
-        <LinearGradient
-          colors={gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.backgroundGradient}
-        />
-      )}
+      {/* Full-bleed cover image */}
+      {hasImage ? (
+        <>
+          <Image
+            source={{ uri: coverImageUrl ?? undefined }}
+            style={styles.fullBleedImage}
+            contentFit="cover"
+            transition={300}
+            cachePolicy="memory-disk"
+          />
+          {/* Top gradient overlay for text readability on images */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.2)', 'transparent']}
+            locations={[0, 0.4, 0.7]}
+            style={styles.topOverlay}
+          />
+        </>
+      ) : null}
 
-      {/* Overlay gradient for text readability */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)']}
-        locations={[0, 0.4, 1]}
-        style={styles.overlay}
-      />
+      {/* Content — top-left with padding */}
+      <View style={[styles.content, isCarousel && styles.contentCarousel]}>
+        {/* Recipe count */}
+        <Text
+          style={[
+            styles.recipeCount,
+            isCarousel && styles.recipeCountCarousel,
+            hasImage && styles.textOnImage,
+          ]}
+        >
+          {recipeCount} {recipeCount === 1 ? 'Recipe' : 'Recipes'}
+        </Text>
 
-      {/* Recipe count badge — top left */}
-      <View style={styles.recipeBadge}>
-        <Ionicons name="restaurant-outline" size={18} color="rgba(255,255,255,0.95)" />
-        <Text style={styles.recipeBadgeText}>{recipeCount}</Text>
-      </View>
-
-      {/* Content — bottom left */}
-      <View style={styles.content}>
-        <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+        {/* Name */}
+        <Text
+          style={[
+            styles.cardTitle,
+            isCarousel && styles.cardTitleCarousel,
+            hasImage && styles.titleOnImage,
+          ]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
           {name}
         </Text>
+
+        {/* Description */}
         {description ? (
-          <Text style={styles.cardDescription} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            style={[
+              styles.cardDescription,
+              isCarousel && styles.cardDescriptionCarousel,
+              hasImage && styles.descriptionOnImage,
+            ]}
+            numberOfLines={isCarousel ? 2 : 1}
+            ellipsizeMode="tail"
+          >
             {description}
           </Text>
         ) : null}
+      </View>
+
+      {/* Clickable indicator */}
+      <View style={[styles.moreIcon, isCarousel && styles.moreIconCarousel]}>
+        <Ionicons
+          name="apps-outline"
+          size={isCarousel ? 24 : 18}
+          color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
+        />
       </View>
     </Pressable>
   );
@@ -96,62 +129,105 @@ export const CookbookCard = memo(function CookbookCard({
 
 const styles = StyleSheet.create({
   card: {
-    width: '100%',
-    aspectRatio: 1.2,
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    backgroundColor: Colors.background.secondary,
   },
-  backgroundImage: {
+  cardGrid: {
+    width: '100%',
+    aspectRatio: 0.7,
+  },
+  cardCarousel: {
+    flex: 1,
+  },
+
+  // Full-bleed cover image
+  fullBleedImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  backgroundGradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  recipeBadge: {
+  topOverlay: {
     position: 'absolute',
-    top: Spacing.sm + 4,
-    left: Spacing.sm + 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    zIndex: 2,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
   },
-  recipeBadgeText: {
-    fontSize: 16,
+
+  // Content — top-left aligned
+  content: {
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+  contentCarousel: {
+    padding: Spacing.xl,
+    paddingTop: Spacing.xxl,
+  },
+
+  // Recipe count — black
+  recipeCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  recipeCountCarousel: {
+    fontSize: 14,
+    marginBottom: Spacing.sm,
+  },
+
+  // Title — big and bold
+  cardTitle: {
+    fontSize: 22,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.95)',
+    color: Colors.text.primary,
+    letterSpacing: -0.3,
+    marginBottom: Spacing.xs,
+  },
+  cardTitleCarousel: {
+    fontSize: 32,
+    lineHeight: 38,
+    marginBottom: Spacing.sm,
+  },
+
+  // Description
+  cardDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.text.secondary,
+  },
+  cardDescriptionCarousel: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+
+  // Text-on-image overrides (white text with shadow)
+  textOnImage: {
+    color: 'rgba(255,255,255,0.9)',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  titleOnImage: {
+    color: '#FFFFFF',
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  content: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: Spacing.md,
-    zIndex: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: -0.3,
-    marginBottom: 2,
+  descriptionOnImage: {
+    color: 'rgba(255,255,255,0.85)',
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  cardDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: 'rgba(255,255,255,0.8)',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+
+  // Clickable indicator — top-right
+  moreIcon: {
+    position: 'absolute',
+    top: Spacing.xl,
+    right: Spacing.lg,
+  },
+  moreIconCarousel: {
+    top: Spacing.xxl,
+    right: Spacing.xl,
   },
 });

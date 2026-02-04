@@ -1,13 +1,13 @@
-import { CookbookCard } from '@/components/ui/CookbookCard';
 import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
+import { CookbookCarousel } from '@/components/ui/CookbookCarousel';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery } from 'convex/react';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -26,7 +26,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
 
 // --- Types ---
 
@@ -41,23 +40,20 @@ type CookbookDoc = {
   updatedAt: number;
 };
 
-type CookbookGridItem = { type: 'cookbook'; data: CookbookDoc };
-type CreateGridItem = { type: 'create' };
-type GridItem = CookbookGridItem | CreateGridItem;
-
 // --- Constants ---
 
 const SORT_OPTIONS: readonly { mode: SortMode; label: string }[] = [
   { mode: 'recent', label: 'Recent' },
   { mode: 'oldest', label: 'Oldest' },
-  { mode: 'a-z', label: 'A → Z' },
-  { mode: 'z-a', label: 'Z → A' },
+  { mode: 'a-z', label: 'A \u2192 Z' },
+  { mode: 'z-a', label: 'Z \u2192 A' },
 ];
 
 const SEARCH_ICON_SIZE = 40;
 
 const COPY = {
-  title: 'Cookbooks',
+  titleTop: 'Your',
+  titleBottom: 'Cookbooks',
   searchPlaceholder: 'Search...',
   newCookbook: 'New Cookbook',
   deleteTitle: 'Delete Cookbook',
@@ -71,7 +67,7 @@ const COPY = {
 // --- Component ---
 
 export default function CookbookScreen() {
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const cookbooks = useQuery(api.cookbooks.list);
   const createCookbook = useMutation(api.cookbooks.create);
   const generateUploadUrl = useMutation(api.users.generateUploadUrl);
@@ -85,7 +81,6 @@ export default function CookbookScreen() {
   const searchProgress = useSharedValue(0);
   const inputRef = useRef<TextInput>(null);
 
-  // Search expands to ~55% of header width, staying right of the title
   const searchMaxWidth = (screenWidth - Spacing.lg * 2) * 0.45;
 
   // --- Search Animation ---
@@ -148,15 +143,6 @@ export default function CookbookScreen() {
     return result;
   }, [cookbooks, searchQuery, sortMode]);
 
-  const gridData: GridItem[] = useMemo(() => {
-    const items: GridItem[] = sortedAndFiltered.map((c) => ({
-      type: 'cookbook' as const,
-      data: c as CookbookDoc,
-    }));
-    items.push({ type: 'create' as const });
-    return items;
-  }, [sortedAndFiltered]);
-
   // --- Handlers ---
 
   const handleCreateCookbook = useCallback(
@@ -193,11 +179,11 @@ export default function CookbookScreen() {
     [createCookbook, generateUploadUrl],
   );
 
-  const getKeyExtractor = useCallback(
-    (item: GridItem) =>
-      item.type === 'create' ? 'create-card' : item.data._id,
-    [],
-  );
+  const router = useRouter();
+
+  const handleCardPress = useCallback((id: Id<'cookbooks'>) => {
+    router.push({ pathname: '/cookbook/[cookbookId]', params: { cookbookId: id } });
+  }, [router]);
 
   const isLoading = cookbooks === undefined;
 
@@ -209,7 +195,10 @@ export default function CookbookScreen() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Ionicons name="book-outline" size={32} color={Colors.text.primary} />
-          <Text style={styles.title}>{COPY.title}</Text>
+          <View style={styles.titleStack}>
+            <Text style={styles.titleTop}>{COPY.titleTop}</Text>
+            <Text style={styles.titleBottom}>{COPY.titleBottom}</Text>
+          </View>
         </View>
 
         <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
@@ -281,102 +270,56 @@ export default function CookbookScreen() {
         })}
       </View>
 
-      {/* Grid */}
+      {/* Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
+      ) : sortedAndFiltered.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={COPY.newCookbook}
+            style={[
+              styles.emptyCard,
+              {
+                width: screenWidth * 0.85,
+                height: screenHeight * 0.65,
+              },
+            ]}
+            onPress={() => setIsCreateModalVisible(true)}
+          >
+            <Text style={styles.emptyCardTitle}>Add Cookbook</Text>
+            <View style={styles.emptyCardImageContainer}>
+              <Image
+                source={require('@/assets/images/create-cookbook-icon.png')}
+                style={styles.emptyCardImage}
+                contentFit="contain"
+              />
+            </View>
+            <LinearGradient
+              colors={['transparent', 'rgba(245,245,247,0.6)', Colors.background.secondary]}
+              locations={[0.3, 0.6, 1]}
+              style={styles.emptyCardGradient}
+            />
+          </Pressable>
+        </View>
       ) : (
-        <FlashList
-          key={`${sortMode}-${searchQuery.trim().length > 0}`}
-          data={gridData}
-          numColumns={2}
-          keyExtractor={getKeyExtractor}
-          contentContainerStyle={styles.gridContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>{COPY.emptyTitle}</Text>
-              <Text style={styles.emptySubtitle}>{COPY.emptySubtitle}</Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.gridItem}>
-              {item.type === 'create' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={COPY.newCookbook}
-                  style={styles.createCardOuter}
-                  onPress={() => setIsCreateModalVisible(true)}
-                >
-                  <View style={styles.createCardInner}>
-                    {/* Top-right thick plus */}
-                    <Ionicons
-                      name="add"
-                      size={30}
-                      color={Colors.accent}
-                      style={styles.createPlusIcon}
-                    />
-
-                    {/* Soft paint stroke behind image */}
-                    <Svg
-                      style={styles.createStroke}
-                      viewBox="0 0 200 160"
-                      preserveAspectRatio="xMidYMid meet"
-                    >
-                      <Path
-                        d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
-                        fill="#EEEEF3"
-                      />
-                      <Path
-                        d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
-                        fill="#F2F2F6"
-                      />
-                      <Path
-                        d="M25,105 C30,98 45,100 40,112 C35,120 22,115 25,105Z"
-                        fill="#F2F2F6"
-                      />
-                    </Svg>
-
-                    {/* Centered illustration */}
-                    <Image
-                      source={require('@/assets/images/create-cookbook-icon.png')}
-                      style={styles.createImage}
-                      contentFit="contain"
-                    />
-
-                    {/* Bottom fade over image */}
-                    <LinearGradient
-                      colors={[
-                        'rgba(255,255,255,0)',
-                        'rgba(255,255,255,0.15)',
-                        'rgba(255,255,255,0.4)',
-                        'rgba(255,255,255,0.7)',
-                        'rgba(255,255,255,1)',
-                      ]}
-                      locations={[0, 0.25, 0.5, 0.75, 1]}
-                      style={styles.createGradient}
-                    />
-
-                    {/* Bottom-left label */}
-                    <View style={styles.createBottom}>
-                      <Text style={styles.createLabel}>{'Add\nCookbook'}</Text>
-                    </View>
-                  </View>
-                </Pressable>
-              ) : (
-                <CookbookCard
-                  name={item.data.name}
-                  description={item.data.description}
-                  recipeCount={0}
-                  coverImageUrl={item.data.coverImageUrl}
-                  onPress={() => { }}
-                />
-              )}
-            </View>
-          )}
+        <CookbookCarousel
+          cookbooks={sortedAndFiltered as CookbookDoc[]}
+          onCardPress={handleCardPress}
         />
       )}
+
+      {/* FAB */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={COPY.newCookbook}
+        style={styles.fab}
+        onPress={() => setIsCreateModalVisible(true)}
+      >
+        <Ionicons name="add" size={28} color={Colors.text.inverse} />
+      </Pressable>
 
       {/* Create Modal */}
       <CreateCookbookModal
@@ -412,7 +355,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  title: {
+  titleStack: {
+    flexDirection: 'column',
+  },
+  titleTop: {
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '400',
+    color: Colors.text.primary,
+    letterSpacing: -0.2,
+  },
+  titleBottom: {
     ...Typography.h1,
     color: Colors.text.primary,
   },
@@ -492,95 +445,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Empty
+  // Empty ghost card
   emptyContainer: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: Spacing.xxl,
-    gap: Spacing.xs,
-  },
-  emptyTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-  },
-
-  // Grid
-  gridContent: {
-    paddingHorizontal: Spacing.lg - Spacing.xs,
-    paddingTop: Spacing.xs,
+    justifyContent: 'flex-end',
     paddingBottom: Spacing.xxl,
   },
-  gridItem: {
-    flex: 1,
-    padding: Spacing.xs,
-    minHeight: 10,
-  },
-
-  // Create Card (outer = shadow, inner = clip)
-  createCardOuter: {
-    width: '100%',
-    aspectRatio: 1.2,
+  emptyCard: {
     borderRadius: Radius.xl,
-    backgroundColor: Colors.background.primary,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  createCardInner: {
-    flex: 1,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background.secondary,
     overflow: 'hidden',
   },
-  createStroke: {
-    position: 'absolute',
-    width: '90%',
+  emptyCardTitle: {
+    ...Typography.h2,
+    color: Colors.text.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+  },
+  emptyCardImageContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyCardImage: {
+    width: '70%',
     height: '70%',
-    top: '8%',
-    left: '5%',
   },
-  createImage: {
-    position: 'absolute',
-    width: '92%',
-    height: '78%',
-    top: '10%',
-    left: '6%',
-  },
-  createGradient: {
+  emptyCardGradient: {
     position: 'absolute',
     bottom: 0,
-    left: -1,
-    right: -1,
-    height: '80%',
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
+    left: 0,
+    right: 0,
+    height: '40%',
   },
-  createBottom: {
+
+  // FAB
+  fab: {
     position: 'absolute',
-    bottom: Spacing.md,
-    left: Spacing.md,
-  },
-  createLabel: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text.primary,
-    lineHeight: 23,
-    textShadowColor: 'rgba(0, 0, 0, 0.12)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  createPlusIcon: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-    zIndex: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 2, height: 3 },
-    textShadowRadius: 3,
+    bottom: Spacing.lg,
+    right: Spacing.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 10,
   },
 });

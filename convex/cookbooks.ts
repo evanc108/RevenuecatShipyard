@@ -65,6 +65,29 @@ export const create = mutation({
 });
 
 /**
+ * Get a single cookbook by ID (must be owned by the authenticated user).
+ */
+export const getById = query({
+  args: { cookbookId: v.id('cookbooks') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook || cookbook.userId !== user._id) return null;
+
+    return cookbook;
+  },
+});
+
+/**
  * Delete a cookbook owned by the authenticated user.
  */
 export const remove = mutation({
