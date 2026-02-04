@@ -21,6 +21,7 @@ const MAPPING = {
   'safari.fill': 'explore',
   'plus.circle.fill': 'add-circle',
   'book.fill': 'menu-book',
+  'calendar': 'event',
   'person.fill': 'person',
 } as IconMapping;
 

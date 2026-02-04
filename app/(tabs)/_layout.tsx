@@ -43,8 +43,8 @@ function TabLayoutContent() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Home',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+            title: 'Cookbook',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
           }}
         />
         <Tabs.Screen
@@ -63,10 +63,10 @@ function TabLayoutContent() {
           }}
         />
         <Tabs.Screen
-          name="cookbook"
+          name="meal-plan"
           options={{
-            title: 'Cookbook',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
+            title: 'Meal Plan',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
           }}
         />
         <Tabs.Screen
