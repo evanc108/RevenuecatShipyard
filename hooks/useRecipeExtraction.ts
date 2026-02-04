@@ -7,7 +7,6 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
-// @ts-expect-error - react-native-sse lacks type declarations
 import EventSource from 'react-native-sse';
 
 import { api } from '@/convex/_generated/api';
@@ -18,11 +17,8 @@ import type {
   Recipe,
 } from '@/types/recipe';
 
-/** SSE message event shape */
-type SSEMessageEvent = {
-  type: string;
-  data: string | null;
-};
+/** SSE event with data field */
+type SSEEvent = { data?: string | null };
 
 /** Backend API base URL */
 const API_BASE_URL = process.env.EXPO_PUBLIC_EXTRACTION_API_URL ?? 'http://localhost:8000';
@@ -256,6 +252,7 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
       }
 
       setStatus('extracting');
+      setProgress({ message: 'Connecting...', percent: 0, tier: null });
 
       return new Promise<Recipe | null>((resolve) => {
         const encodedUrl = encodeURIComponent(url);
@@ -264,34 +261,17 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
         const eventSource = new EventSource(streamUrl);
         eventSourceRef.current = eventSource;
 
-        eventSource.addEventListener('progress', (event: SSEMessageEvent) => {
-          if (event.data) {
-            try {
-              const data: SSEProgressEvent = JSON.parse(event.data);
-              setProgress({
-                message: data.message,
-                percent: data.percent,
-                tier: data.tier,
-              });
-            } catch {
-              // Ignore parse errors
-            }
-          }
-        });
+        // Track if we received a terminal event (complete or error)
+        let receivedTerminalEvent = false;
 
-        eventSource.addEventListener('complete', async (event: SSEMessageEvent) => {
+        // Helper to handle complete event
+        const handleComplete = async (eventData: string) => {
+          receivedTerminalEvent = true;
           eventSource.close();
           eventSourceRef.current = null;
 
-          if (!event.data) {
-            setError('No recipe data received');
-            setStatus('error');
-            resolve(null);
-            return;
-          }
-
           try {
-            const data: SSECompleteEvent = JSON.parse(event.data);
+            const data: SSECompleteEvent = JSON.parse(eventData);
             const apiRecipe = data.recipe;
 
             if (!apiRecipe) {
@@ -396,39 +376,105 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
             setStatus('error');
             resolve(null);
           }
-        });
+        };
 
-        eventSource.addEventListener('error', (event: SSEMessageEvent) => {
+        // Helper to handle error event
+        const handleError = (errorMessage: string) => {
+          receivedTerminalEvent = true;
           eventSource.close();
           eventSourceRef.current = null;
+          setError(errorMessage);
+          setStatus('error');
+          resolve(null);
+        };
 
-          let message = 'Extraction failed';
-          if (event.data) {
+        // Cast to any to work around react-native-sse type limitations
+        // The library supports custom event names but types don't reflect this
+        const es = eventSource as unknown as {
+          addEventListener: (event: string, handler: (e: SSEEvent) => void) => void;
+        };
+
+        // Listen for named events (standard SSE)
+        es.addEventListener('progress', (event: SSEEvent) => {
+          const data = event.data;
+          if (data) {
             try {
-              const data: SSEErrorEvent = JSON.parse(event.data);
-              message = data.message;
+              const parsed: SSEProgressEvent = JSON.parse(data);
+              setProgress({
+                message: parsed.message,
+                percent: parsed.percent,
+                tier: parsed.tier,
+              });
+            } catch {
+              // Ignore parse errors
+            }
+          }
+        });
+
+        es.addEventListener('complete', (event: SSEEvent) => {
+          const data = event.data;
+          if (data) {
+            handleComplete(data);
+          } else {
+            handleError('No recipe data received');
+          }
+        });
+
+        es.addEventListener('error', (event: SSEEvent) => {
+          let message = 'Extraction failed';
+          const data = event.data;
+          if (data) {
+            try {
+              const parsed: SSEErrorEvent = JSON.parse(data);
+              message = parsed.message;
             } catch {
               // Use default message
             }
           }
-
-          setError(message);
-          setStatus('error');
-          resolve(null);
+          handleError(message);
         });
 
-        // Handle connection errors
-        eventSource.addEventListener('close', () => {
-          // Only treat as error if we're still extracting
-          if (status === 'extracting') {
-            setError('Connection closed unexpectedly');
-            setStatus('error');
-            resolve(null);
+        // Also listen for generic 'message' events as fallback
+        // Some SSE libraries route all events through 'message'
+        es.addEventListener('message', (event: SSEEvent) => {
+          const data = event.data;
+          if (!data) return;
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // Check for event type in the data itself
+            if (parsed.type === 'progress') {
+              setProgress({
+                message: parsed.message,
+                percent: parsed.percent,
+                tier: parsed.tier,
+              });
+            } else if (parsed.type === 'complete') {
+              handleComplete(data);
+            } else if (parsed.type === 'error') {
+              handleError(parsed.message || 'Extraction failed');
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        });
+
+        // Handle connection open
+        es.addEventListener('open', () => {
+          setProgress({ message: 'Connected, starting extraction...', percent: 0.05, tier: null });
+        });
+
+        // Handle connection close
+        es.addEventListener('close', () => {
+          // Only treat as error if we're still extracting and haven't received a terminal event
+          if (eventSourceRef.current && !receivedTerminalEvent) {
+            handleError('Connection closed unexpectedly');
           }
         });
       });
     },
-    [currentUser, convex, saveRecipe, saveToCollection, cancel, status]
+    [currentUser, convex, saveRecipe, saveToCollection, cancel]
   );
 
   const reset = useCallback(() => {

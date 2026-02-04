@@ -112,6 +112,19 @@ async def extraction_event_generator(url: str) -> AsyncGenerator[str, None]:
             # No progress update, continue waiting
             continue
 
+    # Drain any remaining progress events in the queue
+    while not progress_queue.empty():
+        try:
+            message, percent = progress_queue.get_nowait()
+            event = SSEProgressEvent(
+                message=message,
+                percent=percent,
+                tier=current_tier,
+            )
+            yield format_sse("progress", event.model_dump_json())
+        except asyncio.QueueEmpty:
+            break
+
     # Get the result
     try:
         recipe = await extraction_task
@@ -127,6 +140,9 @@ async def extraction_event_generator(url: str) -> AsyncGenerator[str, None]:
         logger.exception(f"Extraction failed for {url}")
         event = SSEErrorEvent(message=str(e))
         yield format_sse("error", event.model_dump_json())
+
+    # Small delay to ensure the final event is flushed to the client
+    await asyncio.sleep(0.1)
 
 
 @router.get(

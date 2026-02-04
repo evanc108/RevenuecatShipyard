@@ -33,10 +33,10 @@ Respond with valid JSON in this exact format:
     "prep_time_minutes": null or number,
     "cook_time_minutes": null or number,
     "total_time_minutes": null or number,
-    "calories": null or number,
-    "protein_grams": null or number,
-    "carbs_grams": null or number,
-    "fat_grams": null or number,
+    "calories": number (REQUIRED - estimate per serving based on ingredients),
+    "protein_grams": number (REQUIRED - estimate per serving based on ingredients),
+    "carbs_grams": number (REQUIRED - estimate per serving based on ingredients),
+    "fat_grams": number (REQUIRED - estimate per serving based on ingredients),
     "dietary_tags": ["vegetarian", "gluten-free", "dairy-free", "vegan", "keto", "low-carb", etc],
     "keywords": ["pasta", "quick", "weeknight", "comfort food", "one-pot", etc],
     "equipment": ["large skillet", "mixing bowl", "whisk", "baking sheet", etc],
@@ -66,6 +66,14 @@ Respond with valid JSON in this exact format:
 
 If no recipe found:
 {{"has_recipe": false}}
+
+NUTRITION ESTIMATION (REQUIRED):
+You MUST calculate and provide nutrition values (calories, protein_grams, carbs_grams, fat_grams) per serving based on the ingredients. If the webpage already has nutrition info, use those values. Otherwise, estimate using standard nutritional values:
+- Proteins: chicken breast ~165 cal/4oz, 31g protein; ground beef ~290 cal/4oz, 19g protein; salmon ~230 cal/4oz, 25g protein; eggs ~70 cal each, 6g protein; tofu ~80 cal/4oz, 9g protein
+- Carbs: rice ~200 cal/cup cooked, 45g carbs; pasta ~200 cal/cup cooked, 40g carbs; bread ~80 cal/slice, 15g carbs; flour ~455 cal/cup, 95g carbs
+- Fats: butter ~100 cal/tbsp, 11g fat; olive oil ~120 cal/tbsp, 14g fat; cheese ~110 cal/oz, 9g fat
+- Vegetables: most are ~25-50 cal/cup; potatoes ~160 cal/medium, 37g carbs
+- Sum up all ingredients, then divide by number of servings to get per-serving values. Round to whole numbers.
 
 INSTRUCTION WRITING GUIDELINES:
 1. Write DETAILED instructions - explain the "why" behind techniques, not just the "what"

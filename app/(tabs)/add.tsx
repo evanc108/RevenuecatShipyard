@@ -10,33 +10,106 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
+import { COPY } from '@/constants/copy';
 import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import type { Recipe } from '@/types/recipe';
+import type { Id } from '@/convex/_generated/dataModel';
+
+const copy = COPY.extraction;
 
 export default function AddRecipeScreen() {
+  const router = useRouter();
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const { extractRecipe, status, error, reset } = useRecipeExtraction();
+  const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const { extractRecipe, status, progress, error, wasExisting, reset } = useRecipeExtraction();
+
+  // Rating state
+  const [recipeId, setRecipeId] = useState<Id<'recipes'> | null>(null);
+  const userRating = useQuery(
+    api.recipes.getUserRating,
+    recipeId ? { recipeId } : 'skip'
+  );
+  const rateMutation = useMutation(api.recipes.rate);
+
+  // Derived values for adjusted servings
+  const originalServings = recipe?.servings ?? 1;
+  const adjustedServings = Math.round(originalServings * servingsMultiplier);
+
+  const adjustServings = (delta: number) => {
+    const newMultiplier = servingsMultiplier + delta;
+    if (newMultiplier >= 0.25 && newMultiplier <= 10) {
+      setServingsMultiplier(newMultiplier);
+    }
+  };
+
+  const formatQuantity = (qty: number): string => {
+    const adjusted = qty * servingsMultiplier;
+    // Format nicely - show fractions for common cooking amounts
+    if (adjusted === Math.floor(adjusted)) {
+      return adjusted.toString();
+    }
+    // Round to 2 decimal places
+    const rounded = Math.round(adjusted * 100) / 100;
+    // Show as fraction for common amounts
+    if (Math.abs(rounded - 0.25) < 0.01) return '¼';
+    if (Math.abs(rounded - 0.33) < 0.01) return '⅓';
+    if (Math.abs(rounded - 0.5) < 0.01) return '½';
+    if (Math.abs(rounded - 0.67) < 0.01) return '⅔';
+    if (Math.abs(rounded - 0.75) < 0.01) return '¾';
+    return rounded.toString();
+  };
 
   const handleExtract = async () => {
     if (!url.trim()) return;
 
     setRecipe(null);
+    setRecipeId(null);
     const result = await extractRecipe(url.trim());
     if (result) {
       setRecipe(result);
+      setRecipeId(result.id as Id<'recipes'>);
     }
   };
 
   const handleReset = () => {
     setUrl('');
     setRecipe(null);
+    setRecipeId(null);
+    setServingsMultiplier(1);
     reset();
   };
 
-  const isLoading = status === 'extracting' || status === 'saving';
+  const handleRate = async (value: number) => {
+    if (!recipeId) return;
+    await rateMutation({ recipeId, value });
+  };
+
+  const isLoading = status === 'checking' || status === 'extracting' || status === 'saving';
+
+  const getStatusMessage = () => {
+    switch (status) {
+      case 'checking':
+        return copy.checking;
+      case 'extracting':
+        return progress?.message ?? copy.extracting;
+      case 'saving':
+        return copy.saving;
+      case 'complete':
+        return copy.status.complete;
+      case 'error':
+        return copy.status.error;
+      default:
+        return copy.status.idle;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -49,16 +122,14 @@ export default function AddRecipeScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Import Recipe</Text>
-          <Text style={styles.subtitle}>
-            Paste a video URL from TikTok, Instagram, or YouTube
-          </Text>
+          <Text style={styles.title}>{copy.title}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
           {/* URL Input */}
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="https://youtube.com/watch?v=..."
+              placeholder={copy.placeholder}
               placeholderTextColor={Colors.text.tertiary}
               value={url}
               onChangeText={setUrl}
@@ -78,17 +149,33 @@ export default function AddRecipeScreen() {
             {isLoading ? (
               <View style={styles.loadingRow}>
                 <ActivityIndicator color={Colors.text.inverse} size="small" />
-                <Text style={styles.buttonText}>
-                  {status === 'extracting' ? 'Extracting...' : 'Saving...'}
-                </Text>
+                <Text style={styles.buttonText}>{getStatusMessage()}</Text>
               </View>
             ) : (
-              <Text style={styles.buttonText}>Extract Recipe</Text>
+              <Text style={styles.buttonText}>{copy.submit}</Text>
             )}
           </TouchableOpacity>
 
+          {/* Progress Bar */}
+          {status === 'extracting' && progress && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.round(progress.percent * 100)}%` }
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {Math.round(progress.percent * 100)}%
+                {progress.tier ? ` (${progress.tier} ${copy.tier})` : ''}
+              </Text>
+            </View>
+          )}
+
           {/* Status Display */}
-          {status !== 'idle' && (
+          {status !== 'idle' && status !== 'extracting' && (
             <View style={styles.statusContainer}>
               <Text style={styles.statusLabel}>Status:</Text>
               <Text style={[
@@ -96,8 +183,16 @@ export default function AddRecipeScreen() {
                 status === 'error' && styles.statusError,
                 status === 'complete' && styles.statusSuccess,
               ]}>
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                {getStatusMessage()}
               </Text>
+            </View>
+          )}
+
+          {/* Already Existed Indicator */}
+          {status === 'complete' && wasExisting && (
+            <View style={styles.existingBadge}>
+              <Ionicons name="checkmark-circle" size={18} color={Colors.semantic.success} />
+              <Text style={styles.existingText}>{copy.alreadyExists}</Text>
             </View>
           )}
 
@@ -106,7 +201,7 @@ export default function AddRecipeScreen() {
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity onPress={handleReset}>
-                <Text style={styles.resetLink}>Try again</Text>
+                <Text style={styles.resetLink}>{copy.tryAgain}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -114,7 +209,20 @@ export default function AddRecipeScreen() {
           {/* Recipe Result */}
           {recipe && (
             <View style={styles.recipeContainer}>
-              <Text style={styles.sectionTitle}>Extracted Recipe</Text>
+              <Text style={styles.sectionTitle}>{copy.extractedRecipe}</Text>
+
+              {/* Recipe Image */}
+              {recipe.thumbnailUrl ? (
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={{ uri: recipe.thumbnailUrl }}
+                    style={styles.recipeImage}
+                    contentFit="cover"
+                    transition={300}
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+              ) : null}
 
               {/* Header */}
               <View style={styles.recipeHeader}>
@@ -123,6 +231,75 @@ export default function AddRecipeScreen() {
                   <Text style={styles.recipeDescription}>{recipe.description}</Text>
                 ) : null}
               </View>
+
+              {/* Rating Section */}
+              <View style={styles.ratingSection}>
+                <Text style={styles.ratingLabel}>{copy.rateThisRecipe}</Text>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleRate(star)}
+                      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    >
+                      <Ionicons
+                        name={userRating != null && star <= userRating ? 'star' : 'star-outline'}
+                        size={28}
+                        color={userRating != null && star <= userRating ? '#FFB800' : Colors.text.tertiary}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {recipe.averageRating !== undefined && (
+                  <Text style={styles.avgRatingText}>
+                    {copy.communityAverage(recipe.averageRating)}
+                  </Text>
+                )}
+              </View>
+
+              {/* Servings Adjuster */}
+              {recipe.servings ? (
+                <View style={styles.servingsSection}>
+                  <Text style={styles.servingsLabel}>{copy.servings.label}</Text>
+                  <View style={styles.servingsAdjuster}>
+                    <TouchableOpacity
+                      style={styles.servingsButton}
+                      onPress={() => adjustServings(-0.5)}
+                      disabled={servingsMultiplier <= 0.25}
+                    >
+                      <Ionicons
+                        name="remove"
+                        size={20}
+                        color={servingsMultiplier <= 0.25 ? Colors.text.tertiary : Colors.accent}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.servingsDisplay}>
+                      <Text style={styles.servingsValue}>{adjustedServings}</Text>
+                      {servingsMultiplier !== 1 && (
+                        <Text style={styles.servingsOriginal}>
+                          {copy.servings.was(originalServings)}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.servingsButton}
+                      onPress={() => adjustServings(0.5)}
+                      disabled={servingsMultiplier >= 10}
+                    >
+                      <Ionicons
+                        name="add"
+                        size={20}
+                        color={servingsMultiplier >= 10 ? Colors.text.tertiary : Colors.accent}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {servingsMultiplier !== 1 && (
+                    <TouchableOpacity onPress={() => setServingsMultiplier(1)}>
+                      <Text style={styles.resetServings}>{copy.servings.reset}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : null}
 
               {/* Meta */}
               <View style={styles.metaRow}>
@@ -138,36 +315,45 @@ export default function AddRecipeScreen() {
                 ) : null}
                 {recipe.totalTimeMinutes ? (
                   <View style={styles.metaTag}>
-                    <Text style={styles.metaText}>{recipe.totalTimeMinutes} min</Text>
-                  </View>
-                ) : null}
-                {recipe.servings ? (
-                  <View style={styles.metaTag}>
-                    <Text style={styles.metaText}>{recipe.servings} servings</Text>
+                    <Text style={styles.metaText}>
+                      {copy.meta.minutes(recipe.totalTimeMinutes)}
+                    </Text>
                   </View>
                 ) : null}
               </View>
 
               {/* Method Used */}
               <View style={styles.methodContainer}>
-                <Text style={styles.methodLabel}>Extracted via:</Text>
-                <Text style={styles.methodValue}>{recipe.methodUsed} tier</Text>
+                <Text style={styles.methodLabel}>{copy.extractedVia}</Text>
+                <Text style={styles.methodValue}>{recipe.methodUsed} {copy.tier}</Text>
               </View>
 
               {/* Creator */}
               {recipe.creatorName ? (
-                <Text style={styles.creatorText}>By {recipe.creatorName}</Text>
+                <Text style={styles.creatorText}>{copy.by} {recipe.creatorName}</Text>
               ) : null}
 
               {/* Ingredients */}
               <View style={styles.section}>
                 <Text style={styles.sectionHeader}>
-                  Ingredients ({recipe.ingredients.length})
+                  {copy.ingredients} ({recipe.ingredients.length})
                 </Text>
                 {recipe.ingredients.map((ing, idx) => (
                   <View key={idx} style={styles.ingredientRow}>
                     <Text style={styles.ingredientBullet}>•</Text>
-                    <Text style={styles.ingredientText}>{ing.rawText}</Text>
+                    <Text style={styles.ingredientText}>
+                      {servingsMultiplier !== 1 && ing.quantity > 0 ? (
+                        <>
+                          <Text style={styles.ingredientQuantity}>
+                            {formatQuantity(ing.quantity)} {ing.unit}{' '}
+                          </Text>
+                          {ing.name}
+                          {ing.preparation ? `, ${ing.preparation}` : ''}
+                        </>
+                      ) : (
+                        ing.rawText
+                      )}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -175,7 +361,7 @@ export default function AddRecipeScreen() {
               {/* Instructions */}
               <View style={styles.section}>
                 <Text style={styles.sectionHeader}>
-                  Instructions ({recipe.instructions.length})
+                  {copy.instructions} ({recipe.instructions.length})
                 </Text>
                 {recipe.instructions.map((inst, idx) => (
                   <View key={idx} style={styles.instructionRow}>
@@ -190,7 +376,7 @@ export default function AddRecipeScreen() {
               {/* Dietary Tags */}
               {recipe.dietaryTags && recipe.dietaryTags.length > 0 ? (
                 <View style={styles.section}>
-                  <Text style={styles.sectionHeader}>Dietary</Text>
+                  <Text style={styles.sectionHeader}>{copy.dietary}</Text>
                   <View style={styles.tagRow}>
                     {recipe.dietaryTags.map((tag, idx) => (
                       <View key={idx} style={styles.tag}>
@@ -204,7 +390,7 @@ export default function AddRecipeScreen() {
               {/* Equipment */}
               {recipe.equipment && recipe.equipment.length > 0 ? (
                 <View style={styles.section}>
-                  <Text style={styles.sectionHeader}>Equipment</Text>
+                  <Text style={styles.sectionHeader}>{copy.equipment}</Text>
                   <View style={styles.tagRow}>
                     {recipe.equipment.map((equip, idx) => (
                       <View key={idx} style={styles.tag}>
@@ -215,10 +401,19 @@ export default function AddRecipeScreen() {
                 </View>
               ) : null}
 
-              {/* Reset */}
-              <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                <Text style={styles.resetButtonText}>Import Another</Text>
-              </TouchableOpacity>
+              {/* Action Buttons */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.viewRecipeButton}
+                  onPress={() => router.push(`/recipe/${recipeId}`)}
+                >
+                  <Ionicons name="book-outline" size={18} color={Colors.text.inverse} />
+                  <Text style={styles.viewRecipeButtonText}>{copy.viewRecipe}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+                  <Text style={styles.resetButtonText}>{copy.importAnother}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </ScrollView>
@@ -332,6 +527,16 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.md,
   },
+  imageContainer: {
+    marginBottom: Spacing.md,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  recipeImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: Colors.background.tertiary,
+  },
   recipeHeader: {
     marginBottom: Spacing.md,
   },
@@ -440,8 +645,25 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.text.secondary,
   },
-  resetButton: {
+  actionButtons: {
     marginTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  viewRecipeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+  },
+  viewRecipeButtonText: {
+    ...Typography.label,
+    color: Colors.text.inverse,
+    fontSize: 16,
+  },
+  resetButton: {
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderWidth: 1,
@@ -450,6 +672,110 @@ const styles = StyleSheet.create({
   },
   resetButtonText: {
     ...Typography.label,
+    color: Colors.accent,
+  },
+  progressContainer: {
+    marginTop: Spacing.md,
+    gap: Spacing.xs,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.accent,
+    borderRadius: 4,
+  },
+  progressText: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  existingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    marginTop: Spacing.md,
+  },
+  existingText: {
+    ...Typography.bodySmall,
+    color: Colors.semantic.success,
+    flex: 1,
+  },
+  ratingSection: {
+    backgroundColor: Colors.background.primary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+  },
+  ratingLabel: {
+    ...Typography.label,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.sm,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  avgRatingText: {
+    ...Typography.caption,
+    color: Colors.text.tertiary,
+    marginTop: Spacing.sm,
+  },
+  servingsSection: {
+    backgroundColor: Colors.background.primary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+  },
+  servingsLabel: {
+    ...Typography.label,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.sm,
+  },
+  servingsAdjuster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  servingsButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.background.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  servingsDisplay: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  servingsValue: {
+    ...Typography.h2,
+    color: Colors.text.primary,
+  },
+  servingsOriginal: {
+    ...Typography.caption,
+    color: Colors.text.tertiary,
+  },
+  resetServings: {
+    ...Typography.caption,
+    color: Colors.accent,
+    marginTop: Spacing.xs,
+  },
+  ingredientQuantity: {
+    fontWeight: '600',
     color: Colors.accent,
   },
 });
