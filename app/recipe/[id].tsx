@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,19 +20,39 @@ import { COPY } from '@/constants/copy';
 
 const copy = COPY.recipeDetail;
 
+const STAR_COLOR = '#FFB800';
+
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const recipeId = id as Id<'recipes'>;
 
   const recipe = useQuery(api.recipes.get, recipeId ? { id: recipeId } : 'skip');
-  const userRating = useQuery(
-    api.recipes.getUserRating,
+  const myPost = useQuery(
+    api.posts.getMyPostForRecipe,
     recipeId ? { recipeId } : 'skip'
   );
-  const rateMutation = useMutation(api.recipes.rate);
+  const updatePostMutation = useMutation(api.posts.update);
 
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
+
+  // Edit mode state for user's review
+  const [isEditing, setIsEditing] = useState(false);
+  const [editEase, setEditEase] = useState(0);
+  const [editTaste, setEditTaste] = useState(0);
+  const [editPresentation, setEditPresentation] = useState(0);
+  const [editNotes, setEditNotes] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync edit state when post loads or changes
+  useEffect(() => {
+    if (myPost) {
+      setEditEase(myPost.easeRating);
+      setEditTaste(myPost.tasteRating);
+      setEditPresentation(myPost.presentationRating);
+      setEditNotes(myPost.notes ?? '');
+    }
+  }, [myPost]);
 
   const originalServings = recipe?.servings ?? 1;
   const adjustedServings = Math.round(originalServings * servingsMultiplier);
@@ -57,9 +78,31 @@ export default function RecipeDetailScreen() {
     return rounded.toString();
   }, [servingsMultiplier]);
 
-  const handleRate = async (value: number) => {
-    if (!recipeId) return;
-    await rateMutation({ recipeId, value });
+  const handleSaveReview = async () => {
+    if (!myPost) return;
+    setIsSaving(true);
+    try {
+      await updatePostMutation({
+        postId: myPost._id,
+        easeRating: editEase,
+        tasteRating: editTaste,
+        presentationRating: editPresentation,
+        notes: editNotes || undefined,
+      });
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (myPost) {
+      setEditEase(myPost.easeRating);
+      setEditTaste(myPost.tasteRating);
+      setEditPresentation(myPost.presentationRating);
+      setEditNotes(myPost.notes ?? '');
+    }
+    setIsEditing(false);
   };
 
   if (!recipeId) {
@@ -133,31 +176,127 @@ export default function RecipeDetailScreen() {
           ) : null}
         </View>
 
-        {/* Rating Section */}
-        <View style={styles.ratingSection}>
-          <Text style={styles.ratingLabel}>{copy.rateThisRecipe}</Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => handleRate(star)}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                <Icon
-                  name="star"
-                  size={28}
-                  color={userRating != null && star <= userRating ? '#FFB800' : Colors.text.tertiary}
-                  filled={userRating != null && star <= userRating}
+        {/* Your Review Section - only show if user has a post for this recipe */}
+        {myPost ? (
+          <View style={styles.reviewSection}>
+            <View style={styles.reviewHeader}>
+              <Text style={styles.reviewTitle}>{copy.yourReview.title}</Text>
+              {isEditing ? (
+                <TouchableOpacity onPress={handleCancelEdit} hitSlop={8}>
+                  <Icon name="close" size={20} color={Colors.text.tertiary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => setIsEditing(true)} hitSlop={8}>
+                  <Icon name="pencil" size={18} color={Colors.accent} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Ease Rating */}
+            <View style={styles.reviewRatingRow}>
+              <Text style={styles.reviewRatingLabel}>{copy.yourReview.ease}</Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const value = isEditing ? editEase : myPost.easeRating;
+                  return (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => isEditing && setEditEase(star)}
+                      disabled={!isEditing}
+                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    >
+                      <Icon
+                        name={star <= value ? 'star' : 'star-outline'}
+                        size={20}
+                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Taste Rating */}
+            <View style={styles.reviewRatingRow}>
+              <Text style={styles.reviewRatingLabel}>{copy.yourReview.taste}</Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const value = isEditing ? editTaste : myPost.tasteRating;
+                  return (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => isEditing && setEditTaste(star)}
+                      disabled={!isEditing}
+                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    >
+                      <Icon
+                        name={star <= value ? 'star' : 'star-outline'}
+                        size={20}
+                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Presentation Rating */}
+            <View style={styles.reviewRatingRow}>
+              <Text style={styles.reviewRatingLabel}>{copy.yourReview.presentation}</Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const value = isEditing ? editPresentation : myPost.presentationRating;
+                  return (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => isEditing && setEditPresentation(star)}
+                      disabled={!isEditing}
+                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                    >
+                      <Icon
+                        name={star <= value ? 'star' : 'star-outline'}
+                        size={20}
+                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Notes */}
+            <View style={styles.reviewNotesContainer}>
+              <Text style={styles.reviewNotesLabel}>{copy.yourReview.notes}</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.reviewNotesInput}
+                  value={editNotes}
+                  onChangeText={setEditNotes}
+                  multiline
+                  placeholder={copy.yourReview.noNotes}
+                  placeholderTextColor={Colors.text.tertiary}
                 />
+              ) : (
+                <Text style={styles.reviewNotesText}>
+                  {myPost.notes || copy.yourReview.noNotes}
+                </Text>
+              )}
+            </View>
+
+            {/* Save Button */}
+            {isEditing && (
+              <TouchableOpacity
+                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveReview}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? copy.yourReview.saving : copy.yourReview.save}
+                </Text>
               </TouchableOpacity>
-            ))}
+            )}
           </View>
-          {recipe.averageRating !== undefined && recipe.averageRating !== null && (
-            <Text style={styles.avgRatingText}>
-              {copy.communityAverage(recipe.averageRating)}
-            </Text>
-          )}
-        </View>
+        ) : null}
 
         {/* Meta Tags */}
         <View style={styles.metaRow}>
@@ -414,26 +553,72 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: Spacing.sm,
   },
-  ratingSection: {
+  reviewSection: {
     backgroundColor: Colors.background.secondary,
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginBottom: Spacing.md,
-    alignItems: 'center',
   },
-  ratingLabel: {
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  reviewTitle: {
     ...Typography.label,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
+  },
+  reviewRatingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.sm,
+  },
+  reviewRatingLabel: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    width: 100,
   },
   starsRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
-  avgRatingText: {
-    ...Typography.caption,
-    color: Colors.text.tertiary,
+  reviewNotesContainer: {
     marginTop: Spacing.sm,
+  },
+  reviewNotesLabel: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.xs,
+  },
+  reviewNotesText: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    fontStyle: 'italic',
+  },
+  reviewNotesInput: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    backgroundColor: Colors.background.primary,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  saveButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.sm,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    ...Typography.label,
+    color: Colors.text.inverse,
   },
   metaRow: {
     flexDirection: 'row',

@@ -19,6 +19,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
 import { CookbookCard } from '@/components/ui/CookbookCard';
 import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
+import { PostRow } from '@/components/ui/PostRow';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 
@@ -212,6 +213,7 @@ export default function ProfileScreen(): React.ReactElement {
     api.follows.stats,
     user ? { userId: user._id } : 'skip'
   );
+  const posts = useQuery(api.posts.listMine);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -258,6 +260,10 @@ export default function ProfileScreen(): React.ReactElement {
     // TODO: Show confirmation dialog and delete
     setCookbooks((prev) => prev.filter((c) => c._id !== cookbook._id));
   }, []);
+
+  const handlePostPress = useCallback((recipeId: string) => {
+    router.push(`/recipe/${recipeId}`);
+  }, [router]);
 
   if (user === undefined) {
     return (
@@ -370,12 +376,30 @@ export default function ProfileScreen(): React.ReactElement {
               )}
             </View>
           ) : (
-            <View style={styles.emptyState}>
-              <Icon name="grid" size={48} color={Colors.text.tertiary} />
-              <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
-              <Text style={styles.emptyStateText}>
-                Share your first recipe to see it here
-              </Text>
+            <View style={styles.postsContainer}>
+              {posts && posts.length > 0 ? (
+                posts.map((post) => (
+                  <PostRow
+                    key={post._id}
+                    recipeTitle={post.recipe?.title ?? 'Unknown Recipe'}
+                    recipeImageUrl={post.recipe?.imageUrl}
+                    easeRating={post.easeRating}
+                    tasteRating={post.tasteRating}
+                    presentationRating={post.presentationRating}
+                    notes={post.notes}
+                    createdAt={post.createdAt}
+                    onPress={() => post.recipe && handlePostPress(post.recipe._id)}
+                  />
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Icon name="grid" size={48} color={Colors.text.tertiary} />
+                  <Text style={styles.emptyStateTitle}>{COPY.posts.emptyTitle}</Text>
+                  <Text style={styles.emptyStateText}>
+                    {COPY.posts.emptySubtitle}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -599,5 +623,9 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.text.tertiary,
     textAlign: 'center',
+  },
+  postsContainer: {
+    flex: 1,
+    marginHorizontal: -Spacing.md,
   },
 });

@@ -146,6 +146,45 @@ export const remove = mutation({
 });
 
 /**
+ * Get all recipes in a cookbook with full recipe details.
+ */
+export const getRecipes = query({
+  args: { cookbookId: v.id('cookbooks') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return [];
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook || cookbook.userId !== user._id) return [];
+
+    const cookbookRecipes = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook', (q) => q.eq('cookbookId', args.cookbookId))
+      .collect();
+
+    const recipes = await Promise.all(
+      cookbookRecipes.map(async (cr) => {
+        const recipe = await ctx.db.get(cr.recipeId);
+        if (!recipe) return null;
+        return {
+          ...recipe,
+          addedAt: cr.addedAt,
+        };
+      })
+    );
+
+    return recipes.filter((r): r is NonNullable<typeof r> => r !== null);
+  },
+});
+
+/**
  * Add a recipe to a cookbook.
  */
 export const addRecipe = mutation({
