@@ -87,7 +87,7 @@ export const RecipeCard = memo(function RecipeCard({
 
         <View style={styles.metaRow}>
           <View style={styles.timeChip}>
-            <Ionicons name="time-outline" size={14} color={Colors.text.secondary} />
+            <Ionicons name="time-outline" size={14} color={Colors.text.primary} />
             <Text style={styles.timeText}>
               {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
             </Text>
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.background.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     ...Typography.caption,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
   },
   cuisineChip: {
     paddingHorizontal: Spacing.sm,

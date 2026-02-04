@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.lg,
   },
   recipesHeaderTextRow: {
     flexDirection: 'row',

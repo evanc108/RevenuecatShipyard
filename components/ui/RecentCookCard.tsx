@@ -88,7 +88,9 @@ export const RecentCookCard = memo(function RecentCookCard({
         style={styles.cookButton}
         onPress={onCook}
       >
-        <Text style={styles.cookText}>{COPY.cookbookDetail.cook}</Text>
+        <View style={styles.cookTextWrapper}>
+          <Text style={styles.cookText}>{COPY.cookbookDetail.cook}</Text>
+        </View>
       </Pressable>
     </Pressable>
   );
@@ -146,11 +148,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cookTextWrapper: {
+    transform: [{ rotate: '90deg' }],
+  },
   cookText: {
     color: Colors.text.inverse,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,
-    transform: [{ rotate: '-90deg' }],
   },
 });
