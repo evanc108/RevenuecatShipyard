@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,13 +16,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useAddModal } from '@/context/AddModalContext';
 import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
 import { CookbookDropdown } from './CookbookDropdown';
+import { StarRatingInput } from './StarRatingInput';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // Enable LayoutAnimation on Android
@@ -81,9 +82,26 @@ export function AddModal(): React.ReactElement {
 
   // Share post view state
   const [selectedRecipeId, setSelectedRecipeId] = useState<Id<'recipes'> | null>(null);
+  const [shareSearchQuery, setShareSearchQuery] = useState('');
+  const [easeRating, setEaseRating] = useState(0);
+  const [tasteRating, setTasteRating] = useState(0);
+  const [presentationRating, setPresentationRating] = useState(0);
+  const [shareNotes, setShareNotes] = useState('');
+  const [shareIsLoading, setShareIsLoading] = useState(false);
 
   // User's recipes for share view
   const userRecipes = useQuery(api.recipes.listSaved);
+  const createPost = useMutation(api.posts.create);
+
+  // Filter recipes by search query
+  const filteredRecipes = useMemo(() => {
+    if (!userRecipes) return [];
+    if (!shareSearchQuery.trim()) return userRecipes;
+    const query = shareSearchQuery.toLowerCase();
+    return userRecipes.filter((recipe) =>
+      recipe.title.toLowerCase().includes(query)
+    );
+  }, [userRecipes, shareSearchQuery]);
 
   const inputRef = useRef<TextInput>(null);
 
@@ -140,6 +158,11 @@ export function AddModal(): React.ReactElement {
     setIngredients('');
     setInstructions('');
     setSelectedRecipeId(null);
+    setShareSearchQuery('');
+    setEaseRating(0);
+    setTasteRating(0);
+    setPresentationRating(0);
+    setShareNotes('');
   };
 
   // Handle view transitions with smooth expansion animation
@@ -189,10 +212,29 @@ export function AddModal(): React.ReactElement {
   };
 
   const handleSharePost = async () => {
-    closeModal();
+    if (!selectedRecipeId || easeRating === 0 || tasteRating === 0 || presentationRating === 0) {
+      return;
+    }
+
+    setShareIsLoading(true);
+    try {
+      await createPost({
+        recipeId: selectedRecipeId,
+        easeRating,
+        tasteRating,
+        presentationRating,
+        notes: shareNotes.trim() || undefined,
+      });
+      closeModal();
+    } catch (error) {
+      // TODO: Show error toast
+      console.error('Failed to create post:', error);
+    } finally {
+      setShareIsLoading(false);
+    }
   };
 
-  const isLoading = status === 'checking' || status === 'extracting' || status === 'saving';
+  const isLoading = status === 'checking' || status === 'extracting' || status === 'saving' || shareIsLoading;
   const canImport = url.trim().length > 0 && selectedCookbookId && !isLoading;
 
   const getStatusMessage = useCallback(() => {
@@ -452,39 +494,73 @@ export function AddModal(): React.ReactElement {
     </>
   );
 
+  const canShare = selectedRecipeId && easeRating > 0 && tasteRating > 0 && presentationRating > 0;
+
   const renderSharePostView = () => (
     <>
+      {/* Search Bar */}
+      <View style={styles.inputGroup}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search-outline" size={20} color={Colors.text.tertiary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={copy.sharePost.searchPlaceholder}
+            placeholderTextColor={Colors.text.tertiary}
+            value={shareSearchQuery}
+            onChangeText={setShareSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!shareIsLoading}
+          />
+          {shareSearchQuery.length > 0 && (
+            <Pressable
+              onPress={() => setShareSearchQuery('')}
+              hitSlop={8}
+              accessibilityLabel="Clear search"
+            >
+              <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+
       {/* Recipe Selection */}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.sharePost.selectRecipe}</Text>
         {userRecipes && userRecipes.length > 0 ? (
           <ScrollView
             style={styles.recipeList}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
           >
-            {userRecipes.map((recipe) => (
-              <Pressable
-                key={recipe._id}
-                style={[
-                  styles.recipeOption,
-                  selectedRecipeId === recipe._id && styles.recipeOptionSelected,
-                ]}
-                onPress={() => setSelectedRecipeId(recipe._id)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <Text style={[
-                    styles.recipeOptionText,
-                    selectedRecipeId === recipe._id && styles.recipeOptionTextSelected,
-                  ]} numberOfLines={1}>
-                    {recipe.title}
-                  </Text>
-                  {selectedRecipeId === recipe._id && (
-                    <Ionicons name="checkmark" size={20} color={Colors.accent} />
-                  )}
-                </View>
-              </Pressable>
-            ))}
+            {filteredRecipes.length > 0 ? (
+              filteredRecipes.map((recipe) => (
+                <Pressable
+                  key={recipe._id}
+                  style={[
+                    styles.recipeOption,
+                    selectedRecipeId === recipe._id && styles.recipeOptionSelected,
+                  ]}
+                  onPress={() => setSelectedRecipeId(recipe._id)}
+                  disabled={shareIsLoading}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Text style={[
+                      styles.recipeOptionText,
+                      selectedRecipeId === recipe._id && styles.recipeOptionTextSelected,
+                    ]} numberOfLines={1}>
+                      {recipe.title}
+                    </Text>
+                    {selectedRecipeId === recipe._id && (
+                      <Ionicons name="checkmark" size={20} color={Colors.accent} />
+                    )}
+                  </View>
+                </Pressable>
+              ))
+            ) : (
+              <View style={styles.noResultsContainer}>
+                <Text style={styles.noResultsText}>No recipes match "{shareSearchQuery}"</Text>
+              </View>
+            )}
           </ScrollView>
         ) : (
           <View style={styles.emptyRecipes}>
@@ -495,30 +571,49 @@ export function AddModal(): React.ReactElement {
         )}
       </View>
 
-      {/* Cookbook Selection */}
-      {selectedRecipeId && (
-        <View style={styles.inputGroup}>
-          <CookbookDropdown
-            selectedId={selectedCookbookId}
-            onSelect={handleCookbookSelect}
-            disabled={false}
-            error={cookbookError}
-          />
-        </View>
-      )}
+      {/* Ratings - only show when recipe is selected */}
+      {selectedRecipeId ? (
+        <>
+          <View style={styles.ratingsSection}>
+            <StarRatingInput
+              label={copy.sharePost.ratings.ease}
+              value={easeRating}
+              onChange={setEaseRating}
+              disabled={shareIsLoading}
+            />
+            <StarRatingInput
+              label={copy.sharePost.ratings.taste}
+              value={tasteRating}
+              onChange={setTasteRating}
+              disabled={shareIsLoading}
+            />
+            <StarRatingInput
+              label={copy.sharePost.ratings.presentation}
+              value={presentationRating}
+              onChange={setPresentationRating}
+              disabled={shareIsLoading}
+            />
+          </View>
 
-      {/* Notes */}
-      {selectedRecipeId && (
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>{copy.sharePost.notes}</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea]}
-            placeholder={copy.sharePost.notesPlaceholder}
-            placeholderTextColor={Colors.text.tertiary}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
+          {/* Notes */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>{copy.sharePost.notes}</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              placeholder={copy.sharePost.notesPlaceholder}
+              placeholderTextColor={Colors.text.tertiary}
+              value={shareNotes}
+              onChangeText={setShareNotes}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              editable={!shareIsLoading}
+            />
+          </View>
+        </>
+      ) : (
+        <View style={styles.selectRecipeHint}>
+          <Text style={styles.selectRecipeHintText}>{copy.sharePost.selectRecipeFirst}</Text>
         </View>
       )}
 
@@ -526,26 +621,24 @@ export function AddModal(): React.ReactElement {
       <Pressable
         style={[
           styles.submitButton,
-          selectedRecipeId && selectedCookbookId && styles.submitButtonActive,
+          canShare && styles.submitButtonActive,
+          shareIsLoading && styles.submitButtonLoading,
         ]}
         onPress={handleSharePost}
-        disabled={!selectedRecipeId || !selectedCookbookId}
+        disabled={!canShare || shareIsLoading}
         accessibilityRole="button"
         accessibilityLabel={copy.sharePost.submit}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons
-            name="share-outline"
-            size={20}
-            color={selectedRecipeId && selectedCookbookId ? Colors.text.inverse : Colors.text.disabled}
-          />
+        {shareIsLoading ? (
+          <ActivityIndicator size="small" color={Colors.text.inverse} />
+        ) : (
           <Text style={[
             styles.submitButtonText,
-            (!selectedRecipeId || !selectedCookbookId) && styles.submitButtonTextDisabled,
+            !canShare && styles.submitButtonTextDisabled,
           ]}>
             {copy.sharePost.submit}
           </Text>
-        </View>
+        )}
       </Pressable>
     </>
   );
@@ -933,5 +1026,49 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.text.tertiary,
     marginTop: Spacing.xs,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchIcon: {
+    marginRight: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    color: Colors.text.primary,
+    paddingVertical: Spacing.md,
+  },
+  noResultsContainer: {
+    padding: Spacing.lg,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    ...Typography.body,
+    color: Colors.text.tertiary,
+  },
+  ratingsSection: {
+    marginBottom: Spacing.md,
+  },
+  selectRecipeHint: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  selectRecipeHintText: {
+    ...Typography.body,
+    color: Colors.text.tertiary,
+  },
+  submitButtonLoading: {
+    backgroundColor: Colors.accent,
+    opacity: 0.8,
   },
 });

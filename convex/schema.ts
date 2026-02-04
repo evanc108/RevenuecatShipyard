@@ -235,4 +235,24 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_user_recipe', ['userId', 'discoverRecipeId']),
+
+  /**
+   * User posts - when a user shares that they cooked a recipe.
+   * Stores only the recipe ID reference, not redundant recipe data.
+   */
+  posts: defineTable({
+    userId: v.id('users'),
+    recipeId: v.id('recipes'),
+    // 3 rating dimensions (1-5 stars each)
+    easeRating: v.number(), // How easy was it to cook?
+    tasteRating: v.number(), // How tasty was it?
+    presentationRating: v.number(), // How did it look?
+    // Optional user notes
+    notes: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_recipe', ['recipeId'])
+    .index('by_created', ['createdAt']),
 });
