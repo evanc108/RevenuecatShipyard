@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(nvm list:*)",
+      "Bash(nvm use:*)",
+      "Bash(brew link:*)",
+      "Bash(/usr/local/bin/node:*)",
+      "Bash(/usr/local/bin/npx --version)",
+      "Bash(npx --version:*)",
+      "Bash(npx node:*)",
+      "Bash(npm config get:*)",
+      "Bash(npm root:*)",
+      "Bash(conda list:*)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(npx convex:*)",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)"
+    ]
+  }
+}

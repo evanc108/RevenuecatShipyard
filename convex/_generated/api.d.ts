@@ -9,8 +9,12 @@
  */
 
 import type * as cookbooks from "../cookbooks.js";
+import type * as discover from "../discover.js";
+import type * as discoverFeed from "../discoverFeed.js";
+import type * as discoverFeedActions from "../discoverFeedActions.js";
 import type * as follows from "../follows.js";
 import type * as recipes from "../recipes.js";
+import type * as savedRecipes from "../savedRecipes.js";
 import type * as users from "../users.js";
 
 import type {
@@ -21,8 +25,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   cookbooks: typeof cookbooks;
+  discover: typeof discover;
+  discoverFeed: typeof discoverFeed;
+  discoverFeedActions: typeof discoverFeedActions;
   follows: typeof follows;
   recipes: typeof recipes;
+  savedRecipes: typeof savedRecipes;
   users: typeof users;
 }>;
 

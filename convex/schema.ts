@@ -173,4 +173,66 @@ export default defineSchema({
     .index('by_cookbook', ['cookbookId'])
     .index('by_recipe', ['recipeId'])
     .index('by_cookbook_recipe', ['cookbookId', 'recipeId']),
+
+  /**
+   * Pre-populated recipes for the discover feed.
+   * These are fetched from TheMealDB and enriched via OpenAI.
+   */
+  discoverRecipes: defineTable({
+    // Unique identifier from source (e.g., TheMealDB ID or URL hash)
+    sourceId: v.string(),
+    sourceUrl: v.string(),
+
+    // Core identification
+    title: v.string(),
+    description: v.optional(v.string()),
+    cuisine: v.optional(v.string()),
+    difficulty: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+
+    // Servings and timing
+    servings: v.optional(v.number()),
+    prepTimeMinutes: v.optional(v.number()),
+    cookTimeMinutes: v.optional(v.number()),
+    totalTimeMinutes: v.optional(v.number()),
+
+    // Nutrition
+    calories: v.optional(v.number()),
+    proteinGrams: v.optional(v.number()),
+    carbsGrams: v.optional(v.number()),
+    fatGrams: v.optional(v.number()),
+
+    // Tags and metadata
+    dietaryTags: v.optional(v.array(v.string())),
+    keywords: v.optional(v.array(v.string())),
+    equipment: v.optional(v.array(v.string())),
+
+    // Creator information
+    creatorName: v.optional(v.string()),
+    creatorProfileUrl: v.optional(v.string()),
+
+    // Recipe content
+    ingredients: v.array(ingredientSchema),
+    instructions: v.array(instructionSchema),
+
+    // Metadata
+    createdAt: v.number(),
+    isActive: v.boolean(), // Can be disabled if recipe is problematic
+  })
+    .index('by_source_id', ['sourceId'])
+    .index('by_active', ['isActive'])
+    .index('by_created', ['createdAt']),
+
+  /**
+   * Tracks which discover recipes a user has viewed (swiped on).
+   * Used to avoid showing the same recipe twice.
+   */
+  userViewedRecipes: defineTable({
+    userId: v.id('users'),
+    discoverRecipeId: v.id('discoverRecipes'),
+    viewedAt: v.number(),
+    action: v.union(v.literal('skipped'), v.literal('saved')),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_recipe', ['userId', 'discoverRecipeId']),
 });
