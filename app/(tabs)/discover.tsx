@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,30 +8,71 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Typography } from '@/constants/theme';
+import { TabSlider } from '@/components/ui/TabSlider';
 import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
 import { CookbookSelectionModal } from '@/components/ui/CookbookSelectionModal';
+import { FeedPost } from '@/components/ui/FeedPost';
+import { UserSearch } from '@/components/ui/UserSearch';
+import { COPY } from '@/constants/copy';
 import type { Recipe } from '@/components/discover/RecipeCard';
 import type { Doc, Id } from '@/convex/_generated/dataModel';
 
-// Threshold for triggering more recipe population
-const LOW_RECIPE_THRESHOLD = 8;
-// Number of recipes to populate when running low
-const POPULATE_COUNT = 15;
-// Maximum populate attempts per session to prevent infinite loops
-const MAX_POPULATE_ATTEMPTS = 3;
-// Cooldown in ms before allowing another populate after success
-// This gives Convex queries time to sync
-const POPULATE_COOLDOWN_MS = 10000;
+// --- Types ---
+type TabKey = 'discover' | 'feed' | 'following';
 
 type DiscoverRecipe = Doc<'discoverRecipes'>;
 type RecipeWithId = Recipe & { _discoverRecipeId: Id<'discoverRecipes'> };
 
-/**
- * Convert a discoverRecipe document to the Recipe type used by cards.
- */
+type FeedRecipeInfo = {
+  _id: Id<'recipes'>;
+  title: string;
+  imageUrl?: string;
+  totalTimeMinutes?: number;
+  url: string;
+};
+
+type FeedPostData = {
+  _id: Id<'posts'>;
+  _creationTime: number;
+  userId: Id<'users'>;
+  recipeId: Id<'recipes'>;
+  easeRating: number;
+  tasteRating: number;
+  presentationRating: number;
+  notes?: string;
+  createdAt: number;
+  user: {
+    _id: Id<'users'>;
+    firstName: string;
+    lastName: string;
+    username: string;
+    imageUrl: string | undefined;
+  };
+  recipe: FeedRecipeInfo;
+  likeCount: number;
+  commentCount: number;
+  isLiked: boolean;
+  isSaved: boolean;
+};
+
+// --- Constants ---
+const TABS = [
+  { key: 'discover' as const, label: COPY.discover.tabs.discover },
+  { key: 'feed' as const, label: COPY.discover.tabs.feed },
+  { key: 'following' as const, label: COPY.discover.tabs.following },
+];
+
+const LOW_RECIPE_THRESHOLD = 8;
+const POPULATE_COUNT = 15;
+const MAX_POPULATE_ATTEMPTS = 3;
+const POPULATE_COOLDOWN_MS = 10000;
+
+// --- Helpers ---
 function toRecipeCard(recipe: DiscoverRecipe): Recipe {
   return {
     url: recipe.sourceUrl,
@@ -53,26 +94,20 @@ function toRecipeCard(recipe: DiscoverRecipe): Recipe {
     creatorName: recipe.creatorName,
     ingredients: recipe.ingredients,
     instructions: recipe.instructions,
-    // Include the discover recipe ID for tracking
     _discoverRecipeId: recipe._id,
   } as Recipe & { _discoverRecipeId: string };
 }
 
-export default function DiscoverScreen() {
+// --- Discover Content Component ---
+function DiscoverContent() {
   const [isPopulating, setIsPopulating] = useState(false);
   const [populateError, setPopulateError] = useState<string | null>(null);
   const [hasAttemptedPopulate, setHasAttemptedPopulate] = useState(false);
-  // Track total attempts this session to prevent infinite loops
   const [populateAttempts, setPopulateAttempts] = useState(0);
-  // Track if we're in cooldown period after a successful populate
   const [isInCooldown, setIsInCooldown] = useState(false);
-
-  // Stable queue of recipes - new recipes are appended to the end
   const [recipeQueue, setRecipeQueue] = useState<RecipeWithId[]>([]);
-  // Track which recipe IDs we've already added to the queue
   const seenRecipeIds = useRef<Set<string>>(new Set());
 
-  // Cookbook selection modal state
   const [showCookbookModal, setShowCookbookModal] = useState(false);
   const [pendingRecipe, setPendingRecipe] = useState<Recipe | null>(null);
   const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
@@ -88,11 +123,9 @@ export default function DiscoverScreen() {
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
   const populateFromBackend = useAction(api.discoverFeedActions.populateFromBackend);
 
-  // User preferences for population
   const dietaryRestrictions = currentUser?.dietaryRestrictions ?? [];
   const ingredientDislikes = currentUser?.ingredientDislikes ?? [];
 
-  // When unviewedRecipes changes, append any new recipes to the end of our queue
   useEffect(() => {
     if (!unviewedRecipes) return;
 
@@ -109,11 +142,8 @@ export default function DiscoverScreen() {
     }
   }, [unviewedRecipes]);
 
-  // Use our stable queue instead of directly using query results
   const recipes = recipeQueue;
 
-  // Check if we need to populate more recipes
-  // SAFETY: Multiple guards to prevent infinite loops that waste OpenAI tokens
   useEffect(() => {
     const shouldPopulate =
       unviewedCount !== undefined &&
@@ -146,22 +176,14 @@ export default function DiscoverScreen() {
           ingredientDislikes.length > 0 ? ingredientDislikes : undefined,
       });
 
-      // SAFETY: Only allow another populate if we actually added NEW recipes
-      // This prevents loops when all recipes already exist in the database
       const newlyInserted = result.newlyInserted ?? 0;
 
       if (newlyInserted > 0) {
-        // Start cooldown period to let Convex queries sync
-        // This prevents race condition where hasAttemptedPopulate resets
-        // before unviewedCount query has updated
         setIsInCooldown(true);
         setTimeout(() => {
           setIsInCooldown(false);
           setHasAttemptedPopulate(false);
         }, POPULATE_COOLDOWN_MS);
-      } else {
-        // No new recipes added - don't reset, we've exhausted the pool
-        console.log('No new recipes were added - may have exhausted available recipes');
       }
     } catch (err) {
       console.error('Failed to populate recipes:', err);
@@ -171,26 +193,18 @@ export default function DiscoverScreen() {
       } else {
         setPopulateError('Failed to load more recipes');
       }
-      // On error, don't reset - prevent retry loops
     } finally {
       setIsPopulating(false);
     }
-  }, [
-    isPopulating,
-    isInCooldown,
-    populateFromBackend,
-    dietaryRestrictions,
-    ingredientDislikes,
-  ]);
+  }, [isPopulating, isInCooldown, populateFromBackend, dietaryRestrictions, ingredientDislikes]);
 
   const handleSwipeLeft = async (recipe: Recipe) => {
-    // Record skip action
     const discoverRecipeId = (recipe as Recipe & { _discoverRecipeId?: string })
       ._discoverRecipeId;
     if (discoverRecipeId) {
       try {
         await recordView({
-          discoverRecipeId: discoverRecipeId as any,
+          discoverRecipeId: discoverRecipeId as Id<'discoverRecipes'>,
           action: 'skipped',
         });
       } catch (err) {
@@ -200,7 +214,6 @@ export default function DiscoverScreen() {
   };
 
   const handleSwipeRight = async (recipe: Recipe) => {
-    // Store the recipe and show cookbook selection modal
     setPendingRecipe(recipe);
     setShowCookbookModal(true);
   };
@@ -213,7 +226,6 @@ export default function DiscoverScreen() {
     const discoverRecipeId = (pendingRecipe as Recipe & { _discoverRecipeId?: string })
       ._discoverRecipeId;
 
-    // Record save action
     if (discoverRecipeId) {
       try {
         await recordView({
@@ -225,7 +237,6 @@ export default function DiscoverScreen() {
       }
     }
 
-    // Save to user's collection and add to cookbook
     try {
       const recipeId = await saveRecipe({
         url: pendingRecipe.url,
@@ -234,27 +245,21 @@ export default function DiscoverScreen() {
         imageUrl: pendingRecipe.imageUrl,
         cuisine: pendingRecipe.cuisine,
         difficulty: pendingRecipe.difficulty,
-
         servings: pendingRecipe.servings,
         prepTimeMinutes: pendingRecipe.prepTimeMinutes,
         cookTimeMinutes: pendingRecipe.cookTimeMinutes,
         totalTimeMinutes: pendingRecipe.totalTimeMinutes,
-
         calories: pendingRecipe.calories,
         proteinGrams: pendingRecipe.proteinGrams,
         carbsGrams: pendingRecipe.carbsGrams,
         fatGrams: pendingRecipe.fatGrams,
-
         dietaryTags: pendingRecipe.dietaryTags,
         keywords: pendingRecipe.keywords,
-
         creatorName: pendingRecipe.creatorName,
-
         ingredients: pendingRecipe.ingredients,
         instructions: pendingRecipe.instructions,
       });
 
-      // Add to the selected cookbook
       if (recipeId) {
         await addRecipeToCookbook({
           cookbookId,
@@ -262,7 +267,6 @@ export default function DiscoverScreen() {
         });
       }
 
-      // Success - close modal
       setShowCookbookModal(false);
       setPendingRecipe(null);
     } catch (err) {
@@ -273,13 +277,10 @@ export default function DiscoverScreen() {
   };
 
   const handleCookbookModalClose = () => {
-    // If user closes without selecting, we still want to save to their general collection
-    // but skip adding to a cookbook
     if (pendingRecipe) {
       const discoverRecipeId = (pendingRecipe as Recipe & { _discoverRecipeId?: string })
         ._discoverRecipeId;
 
-      // Record save action in background
       if (discoverRecipeId) {
         recordView({
           discoverRecipeId: discoverRecipeId as Id<'discoverRecipes'>,
@@ -287,7 +288,6 @@ export default function DiscoverScreen() {
         }).catch((err) => console.error('Failed to record save:', err));
       }
 
-      // Save to collection without cookbook
       saveRecipe({
         url: pendingRecipe.url,
         title: pendingRecipe.title,
@@ -315,78 +315,57 @@ export default function DiscoverScreen() {
     setPendingRecipe(null);
   };
 
-  const renderContent = () => {
-    // Loading state - waiting for initial data
-    if (unviewedRecipes === undefined || currentUser === undefined) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Loading recipes...</Text>
-        </View>
-      );
-    }
-
-    // Populating state - fetching new recipes from backend
-    if (isPopulating && recipes.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Finding recipes for you...</Text>
-          <Text style={styles.subText}>
-            This may take a moment as we curate the best recipes
-          </Text>
-        </View>
-      );
-    }
-
-    // Error state
-    if (populateError && recipes.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{populateError}</Text>
-          <Pressable style={styles.retryButton} onPress={handlePopulate}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    // Empty state - no recipes available
-    if (recipes.length === 0) {
-      return (
-        <View style={styles.centerContainer}>
-          <Text style={styles.emptyText}>No recipes available</Text>
-          <Text style={styles.subText}>
-            Check back soon for new recipes!
-          </Text>
-          <Pressable style={styles.retryButton} onPress={handlePopulate}>
-            <Text style={styles.retryButtonText}>Load Recipes</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    // Show recipe cards
+  if (unviewedRecipes === undefined || currentUser === undefined) {
     return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>Loading recipes...</Text>
+      </View>
+    );
+  }
+
+  if (isPopulating && recipes.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>Finding recipes for you...</Text>
+        <Text style={styles.subText}>
+          This may take a moment as we curate the best recipes
+        </Text>
+      </View>
+    );
+  }
+
+  if (populateError && recipes.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>{populateError}</Text>
+        <Pressable style={styles.retryButton} onPress={handlePopulate}>
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (recipes.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>No recipes available</Text>
+        <Text style={styles.subText}>Check back soon for new recipes!</Text>
+        <Pressable style={styles.retryButton} onPress={handlePopulate}>
+          <Text style={styles.retryButtonText}>Load Recipes</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <>
       <SwipeableCardStack
         recipes={recipes}
         onSwipeLeft={handleSwipeLeft}
         onSwipeRight={handleSwipeRight}
       />
-    );
-  };
-
-  return (
-    <GestureHandlerRootView style={styles.gestureRoot}>
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Discover</Text>
-          <Text style={styles.subtitle}>Swipe to find your next meal</Text>
-        </View>
-
-        <View style={styles.cardContainer}>{renderContent()}</View>
-      </SafeAreaView>
-
       <CookbookSelectionModal
         visible={showCookbookModal}
         recipe={pendingRecipe}
@@ -394,6 +373,170 @@ export default function DiscoverScreen() {
         onSelect={handleCookbookSelect}
         isLoading={isSavingToCookbook}
       />
+    </>
+  );
+}
+
+// --- Feed Content Component ---
+function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
+  const currentUser = useQuery(api.users.current);
+  const feedPosts = useQuery(api.posts.socialFeed, { limit: 50 });
+  const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
+
+  // Cookbook modal state
+  const [showCookbookModal, setShowCookbookModal] = useState(false);
+  const [pendingRecipe, setPendingRecipe] = useState<FeedRecipeInfo | null>(null);
+  const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
+
+  const handleBookmarkPress = useCallback((recipe: FeedRecipeInfo) => {
+    setPendingRecipe(recipe);
+    setShowCookbookModal(true);
+  }, []);
+
+  const handleCookbookSelect = useCallback(async (cookbookId: Id<'cookbooks'>) => {
+    if (!pendingRecipe) return;
+
+    setIsSavingToCookbook(true);
+    try {
+      await addRecipeToCookbook({
+        cookbookId,
+        recipeId: pendingRecipe._id,
+      });
+      setShowCookbookModal(false);
+      setPendingRecipe(null);
+    } catch (err) {
+      console.error('Failed to add recipe to cookbook:', err);
+    } finally {
+      setIsSavingToCookbook(false);
+    }
+  }, [pendingRecipe, addRecipeToCookbook]);
+
+  const handleCookbookModalClose = useCallback(() => {
+    setShowCookbookModal(false);
+    setPendingRecipe(null);
+  }, []);
+
+  const renderFeedItem = useCallback(
+    ({ item }: { item: FeedPostData }) => (
+      <FeedPost
+        postId={item._id}
+        user={item.user}
+        recipe={item.recipe}
+        easeRating={item.easeRating}
+        tasteRating={item.tasteRating}
+        presentationRating={item.presentationRating}
+        notes={item.notes}
+        createdAt={item.createdAt}
+        likeCount={item.likeCount}
+        commentCount={item.commentCount}
+        isLiked={item.isLiked}
+        isSaved={item.isSaved}
+        currentUserId={currentUser?._id}
+        onBookmarkPress={handleBookmarkPress}
+      />
+    ),
+    [handleBookmarkPress, currentUser?._id]
+  );
+
+  const keyExtractor = useCallback((item: FeedPostData) => item._id, []);
+
+  const EmptyFeedComponent = useMemo(() => {
+    if (feedPosts === undefined) {
+      return (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="newspaper-outline" size={64} color={Colors.text.tertiary} />
+        <Text style={styles.emptyTitle}>{COPY.socialFeed.emptyFeedTitle}</Text>
+        <Text style={styles.emptySubtitle}>{COPY.socialFeed.emptyFeedSubtitle}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={COPY.socialFeed.findPeople}
+          style={styles.findPeopleButton}
+          onPress={onFindPeople}
+        >
+          <Text style={styles.findPeopleText}>{COPY.socialFeed.findPeople}</Text>
+        </Pressable>
+      </View>
+    );
+  }, [feedPosts, onFindPeople]);
+
+  const validPosts: FeedPostData[] = useMemo(() => {
+    if (!feedPosts) return [];
+    return feedPosts.filter(
+      (post) => post.user !== null && post.recipe !== null
+    ) as FeedPostData[];
+  }, [feedPosts]);
+
+  // Convert FeedRecipeInfo to CookbookSelectionModal's expected format
+  const modalRecipe = pendingRecipe
+    ? {
+        title: pendingRecipe.title,
+        imageUrl: pendingRecipe.imageUrl,
+        url: pendingRecipe.url,
+      }
+    : null;
+
+  return (
+    <>
+      <View style={styles.feedContainer}>
+        <FlashList<FeedPostData>
+          data={validPosts}
+          renderItem={renderFeedItem}
+          keyExtractor={keyExtractor}
+          estimatedItemSize={320}
+          ListEmptyComponent={EmptyFeedComponent}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+      <CookbookSelectionModal
+        visible={showCookbookModal}
+        recipe={modalRecipe}
+        onClose={handleCookbookModalClose}
+        onSelect={handleCookbookSelect}
+        isLoading={isSavingToCookbook}
+      />
+    </>
+  );
+}
+
+// --- Main Screen Component ---
+export default function DiscoverScreen() {
+  const [activeTab, setActiveTab] = useState<TabKey>('discover');
+
+  const content = useMemo(() => {
+    switch (activeTab) {
+      case 'discover':
+        return <DiscoverContent />;
+      case 'feed':
+        return <FeedContent onFindPeople={() => setActiveTab('following')} />;
+      case 'following':
+        return <UserSearch showSuggestions />;
+      default:
+        return <DiscoverContent />;
+    }
+  }, [activeTab]);
+
+  return (
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{COPY.discover.title}</Text>
+        </View>
+        <View style={styles.tabContainer}>
+          <TabSlider
+            tabs={TABS}
+            activeTab={activeTab}
+            onTabChange={(key) => setActiveTab(key as TabKey)}
+          />
+        </View>
+        <View style={styles.content}>{content}</View>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
@@ -415,14 +558,12 @@ const styles = StyleSheet.create({
     ...Typography.h1,
     color: Colors.text.primary,
   },
-  subtitle: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
-    marginTop: Spacing.xs,
-  },
-  cardContainer: {
-    flex: 1,
+  tabContainer: {
+    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
+  },
+  content: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,
@@ -463,5 +604,39 @@ const styles = StyleSheet.create({
   retryButtonText: {
     ...Typography.label,
     color: Colors.text.inverse,
+  },
+  feedContainer: {
+    flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xxl * 2,
+    paddingHorizontal: Spacing.lg,
+  },
+  emptyTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    marginTop: Spacing.lg,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    marginTop: Spacing.xs,
+    textAlign: 'center',
+  },
+  findPeopleButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 20,
+  },
+  findPeopleText: {
+    ...Typography.label,
+    color: Colors.text.inverse,
+    fontWeight: '600',
   },
 });

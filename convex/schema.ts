@@ -255,4 +255,40 @@ export default defineSchema({
     .index('by_user', ['userId'])
     .index('by_recipe', ['recipeId'])
     .index('by_created', ['createdAt']),
+
+  /**
+   * Likes on posts.
+   */
+  postLikes: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId'])
+    .index('by_post_user', ['postId', 'userId']),
+
+  /**
+   * Comments on posts.
+   */
+  postComments: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    text: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId']),
+
+  /**
+   * Saved/bookmarked posts.
+   */
+  savedPosts: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    savedAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId'])
+    .index('by_post_user', ['postId', 'userId']),
 });

@@ -11,7 +11,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Icon } from '@/components/ui/Icon';
 import { Colors } from '@/constants/theme';
 import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 function AddTabButton(props: BottomTabBarButtonProps) {
   const { openModal } = useAddModal();
@@ -32,8 +31,6 @@ function AddTabButton(props: BottomTabBarButtonProps) {
 }
 
 function TabLayoutContent() {
-  const colorScheme = useColorScheme();
-
   return (
     <>
       <Tabs
