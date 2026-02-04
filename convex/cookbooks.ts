@@ -1,8 +1,8 @@
-import { query, mutation } from './_generated/server';
+import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
 /**
- * List all cookbooks for the authenticated user.
+ * List all cookbooks for the authenticated user, with recipe counts.
  */
 export const list = query({
   args: {},
@@ -17,21 +17,38 @@ export const list = query({
 
     if (!user) return [];
 
-    return ctx.db
+    const cookbooks = await ctx.db
       .query('cookbooks')
       .withIndex('by_user', (q) => q.eq('userId', user._id))
       .collect();
+
+    const cookbooksWithCounts = await Promise.all(
+      cookbooks.map(async (cookbook) => {
+        const recipes = await ctx.db
+          .query('cookbookRecipes')
+          .withIndex('by_cookbook', (q) => q.eq('cookbookId', cookbook._id))
+          .collect();
+        return {
+          ...cookbook,
+          recipeCount: recipes.length,
+        };
+      })
+    );
+
+    return cookbooksWithCounts;
   },
 });
 
 /**
  * Create a new cookbook for the authenticated user.
+ * Accepts either a Convex storage ID (resolved to URL) or a direct image URL.
  */
 export const create = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
     coverImageStorageId: v.optional(v.id('_storage')),
+    coverImageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -44,7 +61,7 @@ export const create = mutation({
 
     if (!user) throw new Error('User not found');
 
-    let coverImageUrl: string | undefined;
+    let coverImageUrl: string | undefined = args.coverImageUrl;
     if (args.coverImageStorageId) {
       const url = await ctx.storage.getUrl(args.coverImageStorageId);
       if (url) {
@@ -83,7 +100,15 @@ export const getById = query({
     const cookbook = await ctx.db.get(args.cookbookId);
     if (!cookbook || cookbook.userId !== user._id) return null;
 
-    return cookbook;
+    const recipes = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook', (q) => q.eq('cookbookId', cookbook._id))
+      .collect();
+
+    return {
+      ...cookbook,
+      recipeCount: recipes.length,
+    };
   },
 });
 
@@ -106,6 +131,62 @@ export const remove = mutation({
 
     if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
 
+    // Remove all cookbook-recipe associations
+    const cookbookRecipes = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook', (q) => q.eq('cookbookId', args.cookbookId))
+      .collect();
+
+    await Promise.all(
+      cookbookRecipes.map((cr) => ctx.db.delete(cr._id))
+    );
+
     await ctx.db.delete(args.cookbookId);
+  },
+});
+
+/**
+ * Add a recipe to a cookbook.
+ */
+export const addRecipe = mutation({
+  args: {
+    cookbookId: v.id('cookbooks'),
+    recipeId: v.id('recipes'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook) throw new Error('Cookbook not found');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    // Check if recipe is already in cookbook
+    const existing = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook_recipe', (q) =>
+        q.eq('cookbookId', args.cookbookId).eq('recipeId', args.recipeId)
+      )
+      .unique();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    const id = await ctx.db.insert('cookbookRecipes', {
+      cookbookId: args.cookbookId,
+      recipeId: args.recipeId,
+      addedAt: Date.now(),
+    });
+
+    await ctx.db.patch(args.cookbookId, { updatedAt: Date.now() });
+
+    return id;
   },
 });

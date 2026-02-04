@@ -10,6 +10,7 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import EventSource from 'react-native-sse';
 
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import type {
   ExtractionMethod,
   Ingredient,
@@ -33,7 +34,7 @@ type ProgressInfo = {
 
 type UseRecipeExtractionResult = {
   /** Submit a URL for extraction (checks for existing first) */
-  extractRecipe: (url: string) => Promise<Recipe | null>;
+  extractRecipe: (url: string, cookbookId: Id<'cookbooks'>) => Promise<Recipe | null>;
   /** Current status */
   status: ExtractionStatus;
   /** Progress info during extraction */
@@ -160,6 +161,7 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
   const currentUser = useQuery(api.users.current);
   const saveRecipe = useMutation(api.recipes.saveExtracted);
   const saveToCollection = useMutation(api.recipes.saveToCollection);
+  const addToCookbook = useMutation(api.cookbooks.addRecipe);
 
   const cancel = useCallback(() => {
     if (eventSourceRef.current) {
@@ -171,7 +173,7 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
   }, []);
 
   const extractRecipe = useCallback(
-    async (url: string): Promise<Recipe | null> => {
+    async (url: string, cookbookId: Id<'cookbooks'>): Promise<Recipe | null> => {
       if (!currentUser) {
         setError('You must be signed in to extract recipes');
         setStatus('error');
@@ -191,9 +193,10 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
         const existingRecipe = await convex.query(api.recipes.getByUrl, { url });
 
         if (existingRecipe) {
-          // Recipe already exists - just save to user's collection
+          // Recipe already exists - just save to user's collection and cookbook
           setStatus('saving');
           await saveToCollection({ recipeId: existingRecipe._id });
+          await addToCookbook({ cookbookId, recipeId: existingRecipe._id });
           setWasExisting(true);
           setStatus('complete');
 
@@ -324,6 +327,9 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
               })),
               methodUsed: apiRecipe.method_used,
             });
+
+            // Add to cookbook
+            await addToCookbook({ cookbookId, recipeId });
 
             setStatus('complete');
 
@@ -474,7 +480,7 @@ export function useRecipeExtraction(): UseRecipeExtractionResult {
         });
       });
     },
-    [currentUser, convex, saveRecipe, saveToCollection, cancel]
+    [currentUser, convex, saveRecipe, saveToCollection, addToCookbook, cancel]
   );
 
   const reset = useCallback(() => {

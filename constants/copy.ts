@@ -99,6 +99,13 @@ export const COPY = {
       reset: 'Reset to original',
       was: (n: number) => `(was ${n})`,
     },
+    cookbook: {
+      selectCookbook: 'Add to Cookbook',
+      selectPlaceholder: 'Select a cookbook...',
+      createNew: '+ Create New Cookbook',
+      required: 'Please select a cookbook',
+      noCookbooks: 'No cookbooks yet',
+    },
     errors: {
       invalidUrl: 'Please enter a valid video URL',
       notSignedIn: 'Sign in to import recipes',

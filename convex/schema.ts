@@ -150,6 +150,9 @@ export default defineSchema({
     .index('by_following', ['followingId'])
     .index('by_follower_following', ['followerId', 'followingId']),
 
+  /**
+   * User-created cookbooks for organizing recipes.
+   */
   cookbooks: defineTable({
     userId: v.id('users'),
     name: v.string(),
@@ -158,4 +161,16 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index('by_user', ['userId']),
+
+  /**
+   * Join table: recipes within a cookbook.
+   */
+  cookbookRecipes: defineTable({
+    cookbookId: v.id('cookbooks'),
+    recipeId: v.id('recipes'),
+    addedAt: v.number(),
+  })
+    .index('by_cookbook', ['cookbookId'])
+    .index('by_recipe', ['recipeId'])
+    .index('by_cookbook_recipe', ['cookbookId', 'recipeId']),
 });
