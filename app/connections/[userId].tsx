@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from 'convex/react';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { api } from '@/convex/_generated/api';
 import { UserListItem } from '@/components/ui/UserListItem';
 import { Colors, Spacing, Typography } from '@/constants/theme';
@@ -80,7 +80,7 @@ export default function ConnectionsScreen(): React.ReactElement {
             hitSlop={8}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -108,7 +108,7 @@ export default function ConnectionsScreen(): React.ReactElement {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>

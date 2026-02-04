@@ -2,7 +2,7 @@ import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import * as Clipboard from 'expo-clipboard';
@@ -102,7 +102,7 @@ export default function FirstRecipeScreen() {
         hitSlop={8}
         style={styles.backButton}
       >
-        <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
       </Pressable>
 
       <Animated.View
@@ -143,7 +143,7 @@ export default function FirstRecipeScreen() {
         <Text style={styles.orText}>{copy.orText}</Text>
 
         <View style={styles.shareCard}>
-          <Ionicons
+          <Icon
             name="share-outline"
             size={24}
             color={Colors.text.secondary}

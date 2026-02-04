@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
@@ -61,7 +61,7 @@ function RemovableChip({
         onPress={onRemove}
         hitSlop={4}
       >
-        <Ionicons name="close-circle" size={18} color={Colors.text.tertiary} />
+        <Icon name="close-circle" size={18} color={Colors.text.tertiary} />
       </Pressable>
     </View>
   );
@@ -220,7 +220,7 @@ export default function EditProfileScreen(): React.ReactElement {
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+            <Icon name="chevron-back" size={28} color={Colors.text.primary} />
           </Pressable>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <Pressable
@@ -331,9 +331,9 @@ export default function EditProfileScreen(): React.ReactElement {
                     {usernameCheck === undefined ? (
                       <ActivityIndicator size="small" color={Colors.text.tertiary} />
                     ) : isUsernameAvailable ? (
-                      <Ionicons name="checkmark-circle" size={20} color={Colors.semantic.success} />
+                      <Icon name="checkmark-circle" size={20} color={Colors.semantic.success} />
                     ) : (
-                      <Ionicons name="close-circle" size={20} color={Colors.semantic.error} />
+                      <Icon name="close-circle" size={20} color={Colors.semantic.error} />
                     )}
                   </View>
                 )}
@@ -344,7 +344,7 @@ export default function EditProfileScreen(): React.ReactElement {
               <Text style={styles.inputLabel}>Email</Text>
               <View style={styles.emailContainer}>
                 <Text style={styles.emailText}>{user.email}</Text>
-                <Ionicons name="lock-closed" size={16} color={Colors.text.tertiary} />
+                <Icon name="lock-closed" size={16} color={Colors.text.tertiary} />
               </View>
             </View>
           </View>
@@ -398,7 +398,7 @@ export default function EditProfileScreen(): React.ReactElement {
                 onPress={addDislike}
                 disabled={!dislikeInput.trim()}
               >
-                <Ionicons name="add" size={22} color={dislikeInput.trim() ? Colors.accent : Colors.text.tertiary} />
+                <Icon name="add" size={22} color={dislikeInput.trim() ? Colors.accent : Colors.text.tertiary} />
               </Pressable>
             </View>
             {ingredientDislikes.length > 0 && (

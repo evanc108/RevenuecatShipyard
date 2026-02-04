@@ -3,10 +3,12 @@ import { PlatformPressable } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { AddModal } from '@/components/ui/AddModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Icon } from '@/components/ui/Icon';
 import { Colors } from '@/constants/theme';
 import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -36,44 +38,56 @@ function TabLayoutContent() {
     <>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+          tabBarActiveTintColor: Colors.accent,
+          tabBarInactiveTintColor: Colors.text.tertiary,
           headerShown: false,
           tabBarButton: HapticTab,
+          tabBarStyle: {
+            paddingTop: 12,
+            height: 88,
+            backgroundColor: '#FFFFFF',
+            borderTopWidth: 1,
+            borderTopColor: '#E5E7EB',
+          },
         }}>
         <Tabs.Screen
           name="index"
           options={{
             title: 'Cookbook',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="book.fill" color={color} />,
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="book.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="discover"
           options={{
             title: 'Discover',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="safari.fill" color={color} />,
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="safari.fill" color={color} />,
           }}
         />
         <Tabs.Screen
           name="add"
           options={{
-            title: 'Add',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="plus.circle.fill" color={color} />,
+            title: '',
+            tabBarIcon: () => (
+              <View style={styles.addButton}>
+                <Icon name="plus" size={22} color={Colors.text.inverse} strokeWidth={2.5} />
+              </View>
+            ),
             tabBarButton: AddTabButton,
           }}
         />
         <Tabs.Screen
           name="meal-plan"
           options={{
-            title: 'Meal Plan',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="calendar" color={color} />,
+            title: 'Pantry',
+            tabBarIcon: ({ color }) => <Icon name="utensils" size={26} color={color} />,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.fill" color={color} />,
           }}
         />
       </Tabs>
@@ -81,6 +95,17 @@ function TabLayoutContent() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  addButton: {
+    width: 52,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export default function TabLayout() {
   return (

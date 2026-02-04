@@ -4,7 +4,7 @@ import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useQuery } from 'convex/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
@@ -463,7 +463,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
             onPress={() => router.back()}
             hitSlop={12}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
         </View>
         <View style={styles.emptyContainer}>
@@ -486,7 +486,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
             onPress={() => router.back()}
             hitSlop={12}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
             {cookbook.name}
@@ -500,7 +500,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
             onPress={!isSearchActive ? handleOpenSearch : undefined}
             style={styles.searchIconButton}
           >
-            <Ionicons
+            <Icon
               name="search"
               size={20}
               color={isSearchActive ? Colors.text.tertiary : Colors.text.secondary}
@@ -526,7 +526,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
                 onPress={handleCloseSearch}
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+                <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
               </Pressable>
             </Animated.View>
           ) : null}
@@ -642,7 +642,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
           // TODO: Add recipe flow
         }}
       >
-        <Ionicons name="add" size={28} color={Colors.text.inverse} />
+        <Icon name="add" size={28} color={Colors.text.inverse} />
       </Pressable>
     </SafeAreaView>
   );

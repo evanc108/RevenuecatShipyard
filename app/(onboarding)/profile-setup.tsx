@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -94,7 +94,7 @@ export default function ProfileSetupScreen() {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
         </Pressable>
 
         <ScrollView
@@ -132,7 +132,7 @@ export default function ProfileSetupScreen() {
                 />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Ionicons name="camera" size={40} color={Colors.text.tertiary} />
+                  <Icon name="camera" size={40} color={Colors.text.tertiary} />
                 </View>
               )}
             </Pressable>
@@ -199,9 +199,9 @@ export default function ProfileSetupScreen() {
                   {usernameCheck === undefined ? (
                     <ActivityIndicator size="small" color={Colors.text.tertiary} />
                   ) : isUsernameAvailable ? (
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.semantic.success} />
+                    <Icon name="checkmark-circle" size={20} color={Colors.semantic.success} />
                   ) : (
-                    <Ionicons name="close-circle" size={20} color={Colors.semantic.error} />
+                    <Icon name="close-circle" size={20} color={Colors.semantic.error} />
                   )}
                 </View>
               )}

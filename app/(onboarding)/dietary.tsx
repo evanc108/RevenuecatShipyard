@@ -6,7 +6,7 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -81,7 +81,7 @@ export default function DietaryScreen() {
         hitSlop={8}
         style={styles.backButton}
       >
-        <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
       </Pressable>
 
       <ScrollView

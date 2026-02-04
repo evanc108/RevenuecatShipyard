@@ -19,7 +19,10 @@
       "Bash(node:*)",
       "Bash(npx tsc:*)",
       "Bash(git fetch:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(git pull:*)"
     ]
   }
 }

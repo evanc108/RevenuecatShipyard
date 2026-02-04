@@ -1,5 +1,5 @@
 import { Pressable, View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -55,7 +55,7 @@ export function GoalCard({
         <Text style={styles.description}>{description}</Text>
       </View>
       {isSelected && (
-        <Ionicons name="checkmark-circle" size={24} color={Colors.accent} />
+        <Icon name="checkmark-circle" size={24} color={Colors.accent} />
       )}
     </AnimatedPressable>
   );

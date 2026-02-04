@@ -5,7 +5,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ export default function InfoScreen() {
         hitSlop={8}
         style={styles.backButton}
       >
-        <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
       </Pressable>
 
       <Animated.View

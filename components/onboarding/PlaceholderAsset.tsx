@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors } from '@/constants/theme';
 
 type PlaceholderAssetProps = {
@@ -17,7 +17,7 @@ export function PlaceholderAsset({
 }: PlaceholderAssetProps) {
   return (
     <View style={[styles.container, { width, height, borderRadius }]}>
-      <Ionicons name="image-outline" size={32} color={Colors.border} />
+      <Icon name="image-outline" size={32} color={Colors.border} />
       <Text style={styles.label}>{label}</Text>
     </View>
   );

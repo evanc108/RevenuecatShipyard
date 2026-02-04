@@ -1,6 +1,6 @@
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -58,7 +58,7 @@ export const RecentCookCard = memo(function RecentCookCard({
             cachePolicy="memory-disk"
           />
         ) : (
-          <Ionicons name="restaurant-outline" size={24} color={Colors.text.tertiary} />
+          <Icon name="restaurant-outline" size={24} color={Colors.text.tertiary} />
         )}
       </View>
 
@@ -68,7 +68,7 @@ export const RecentCookCard = memo(function RecentCookCard({
           {title}
         </Text>
         <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={13} color={Colors.text.primary} />
+          <Icon name="time-outline" size={13} color={Colors.text.primary} />
           <Text style={styles.metaText}>
             {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
           </Text>

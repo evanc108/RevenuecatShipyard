@@ -1,5 +1,5 @@
 import { Pressable, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius } from '@/constants/theme';
 
 type DislikeChipProps = {
@@ -11,7 +11,7 @@ export function DislikeChip({ label, onRemove }: DislikeChipProps) {
   return (
     <Pressable style={styles.chip} onPress={onRemove}>
       <Text style={styles.label}>{label}</Text>
-      <Ionicons name="close" size={16} color={Colors.accent} />
+      <Icon name="close" size={16} color={Colors.accent} />
     </Pressable>
   );
 }

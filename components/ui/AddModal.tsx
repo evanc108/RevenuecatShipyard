@@ -15,7 +15,7 @@ import {
   UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
@@ -255,7 +255,7 @@ export function AddModal(): React.ReactElement {
       {/* URL Input */}
       <View style={styles.inputGroup}>
         <View style={styles.urlInputContainer}>
-          <Ionicons name="link-outline" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
+          <Icon name="link" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
           <TextInput
             ref={inputRef}
             style={styles.urlInput}
@@ -275,7 +275,7 @@ export function AddModal(): React.ReactElement {
               hitSlop={8}
               accessibilityLabel="Clear URL"
             >
-              <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+              <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
             </Pressable>
           )}
         </View>
@@ -316,7 +316,7 @@ export function AddModal(): React.ReactElement {
       {/* Error display */}
       {error && (
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={16} color={Colors.semantic.error} />
+          <Icon name="alert-circle" size={16} color={Colors.semantic.error} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -339,8 +339,8 @@ export function AddModal(): React.ReactElement {
             <ActivityIndicator size="small" color={Colors.text.inverse} />
           ) : (
             <>
-              <Ionicons
-                name="download-outline"
+              <Icon
+                name="download"
                 size={20}
                 color={canImport ? Colors.text.inverse : Colors.text.disabled}
               />
@@ -372,13 +372,13 @@ export function AddModal(): React.ReactElement {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <View style={styles.optionIconContainer}>
-              <Ionicons name="create-outline" size={24} color={Colors.accent} />
+              <Icon name="create" size={24} color={Colors.accent} />
             </View>
             <View style={styles.optionContent}>
               <Text style={styles.optionTitle}>{copy.options.createRecipe}</Text>
               <Text style={styles.optionDescription}>{copy.options.createRecipeDesc}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
           </View>
         </Pressable>
 
@@ -390,13 +390,13 @@ export function AddModal(): React.ReactElement {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             <View style={styles.optionIconContainer}>
-              <Ionicons name="camera-outline" size={24} color={Colors.accent} />
+              <Icon name="camera" size={24} color={Colors.accent} />
             </View>
             <View style={styles.optionContent}>
               <Text style={styles.optionTitle}>{copy.options.sharePost}</Text>
               <Text style={styles.optionDescription}>{copy.options.sharePostDesc}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text.tertiary} />
+            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
           </View>
         </Pressable>
       </View>
@@ -501,7 +501,7 @@ export function AddModal(): React.ReactElement {
       {/* Search Bar */}
       <View style={styles.inputGroup}>
         <View style={styles.searchInputContainer}>
-          <Ionicons name="search-outline" size={20} color={Colors.text.tertiary} style={styles.searchIcon} />
+          <Icon name="search" size={20} color={Colors.text.tertiary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder={copy.sharePost.searchPlaceholder}
@@ -518,7 +518,7 @@ export function AddModal(): React.ReactElement {
               hitSlop={8}
               accessibilityLabel="Clear search"
             >
-              <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+              <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
             </Pressable>
           )}
         </View>
@@ -551,7 +551,7 @@ export function AddModal(): React.ReactElement {
                       {recipe.title}
                     </Text>
                     {selectedRecipeId === recipe._id && (
-                      <Ionicons name="checkmark" size={20} color={Colors.accent} />
+                      <Icon name="check" size={20} color={Colors.accent} />
                     )}
                   </View>
                 </Pressable>
@@ -564,7 +564,7 @@ export function AddModal(): React.ReactElement {
           </ScrollView>
         ) : (
           <View style={styles.emptyRecipes}>
-            <Ionicons name="book-outline" size={32} color={Colors.text.tertiary} />
+            <Icon name="book" size={32} color={Colors.text.tertiary} />
             <Text style={styles.emptyRecipesTitle}>{copy.sharePost.noRecipes}</Text>
             <Text style={styles.emptyRecipesDesc}>{copy.sharePost.noRecipesDesc}</Text>
           </View>
@@ -698,7 +698,7 @@ export function AddModal(): React.ReactElement {
                   style={styles.backButton}
                   accessibilityLabel={copy.back}
                 >
-                  <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+                  <Icon name="arrow-back" size={24} color={Colors.text.primary} />
                 </Pressable>
                 <Text style={styles.title}>{getModalTitle()}</Text>
                 <Pressable
@@ -708,7 +708,7 @@ export function AddModal(): React.ReactElement {
                   hitSlop={12}
                   disabled={isLoading}
                 >
-                  <Ionicons
+                  <Icon
                     name="close"
                     size={24}
                     color={isLoading ? Colors.text.disabled : Colors.text.secondary}

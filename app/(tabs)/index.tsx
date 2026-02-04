@@ -3,7 +3,7 @@ import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -204,7 +204,7 @@ export default function CookbookScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Ionicons name="book-outline" size={32} color={Colors.text.primary} />
+          <Icon name="book" size={32} color={Colors.text.primary} />
           <View style={styles.titleStack}>
             <Text style={styles.titleTop}>{COPY.titleTop}</Text>
             <Text style={styles.titleBottom}>{COPY.titleBottom}</Text>
@@ -218,7 +218,7 @@ export default function CookbookScreen() {
             onPress={!isSearchActive ? handleOpenSearch : undefined}
             style={styles.searchIconButton}
           >
-            <Ionicons
+            <Icon
               name="search"
               size={20}
               color={isSearchActive ? Colors.text.tertiary : Colors.text.secondary}
@@ -244,7 +244,7 @@ export default function CookbookScreen() {
                 onPress={handleCloseSearch}
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={20} color={Colors.text.tertiary} />
+                <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
               </Pressable>
             </Animated.View>
           ) : null}
@@ -301,8 +301,8 @@ export default function CookbookScreen() {
           >
             <View style={styles.emptyCardInner}>
               {/* Top-right plus icon */}
-              <Ionicons
-                name="add"
+              <Icon
+                name="plus"
                 size={30}
                 color={Colors.accent}
                 style={styles.emptyPlusIcon}
@@ -370,7 +370,7 @@ export default function CookbookScreen() {
         style={styles.fab}
         onPress={() => setIsCreateModalVisible(true)}
       >
-        <Ionicons name="add" size={28} color={Colors.text.inverse} />
+        <Icon name="plus" size={28} color={Colors.text.inverse} />
       </Pressable>
 
       {/* Create Modal */}

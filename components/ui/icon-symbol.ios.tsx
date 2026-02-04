@@ -1,32 +1,63 @@
-import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
-import { StyleProp, ViewStyle } from 'react-native';
+/**
+ * Icon component using Lucide for modern, line-based icons on iOS
+ * Uses Lucide instead of SF Symbols for consistent cross-platform appearance
+ */
+import { memo } from 'react';
+import {
+  BookOpen,
+  Compass,
+  PlusCircle,
+  Calendar,
+  User,
+  Home,
+  Send,
+  Code,
+  ChevronRight,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
+import type { SymbolWeight } from 'expo-symbols';
+import type { StyleProp, ViewStyle } from 'react-native';
 
-export function IconSymbol({
+// Map SF Symbol names to Lucide components
+const ICON_MAP: Record<string, LucideIcon> = {
+  'house.fill': Home,
+  'paperplane.fill': Send,
+  'chevron.left.forwardslash.chevron.right': Code,
+  'chevron.right': ChevronRight,
+  'safari.fill': Compass,
+  'plus.circle.fill': PlusCircle,
+  'book.fill': BookOpen,
+  calendar: Calendar,
+  'person.fill': User,
+};
+
+function IconSymbolComponent({
   name,
   size = 24,
   color,
   style,
-  weight = 'regular',
 }: {
-  name: SymbolViewProps['name'];
+  name: string;
   size?: number;
   color: string;
   style?: StyleProp<ViewStyle>;
   weight?: SymbolWeight;
-}) {
+}): React.ReactElement | null {
+  const IconElement = ICON_MAP[name];
+
+  if (!IconElement) {
+    console.warn(`IconSymbol "${name}" not found`);
+    return null;
+  }
+
   return (
-    <SymbolView
-      weight={weight}
-      tintColor={color}
-      resizeMode="scaleAspectFit"
-      name={name}
-      style={[
-        {
-          width: size,
-          height: size,
-        },
-        style,
-      ]}
+    <IconElement
+      size={size}
+      color={color}
+      strokeWidth={1.5}
+      style={style}
     />
   );
 }
+
+export const IconSymbol = memo(IconSymbolComponent);
