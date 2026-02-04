@@ -7,7 +7,6 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
 
 type EditData = {
   name: string;
@@ -40,19 +40,31 @@ export function CreateCookbookModal({
   onDelete,
   isLoading = false,
   editData,
-}: CreateCookbookModalProps): React.ReactElement {
+}: CreateCookbookModalProps): React.ReactElement | null {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
-  const slideAnim = useRef(new Animated.Value(400)).current;
 
   const isEditMode = editData !== undefined;
 
+  // Use shared modal animation
+  const { isRendered, backdropOpacity, modalTranslateY } = useModalAnimation({
+    visible,
+    onAnimationComplete: () => {
+      // Reset state only when closing (not editing)
+      if (!editData) {
+        setName('');
+        setDescription('');
+        setImageUri(null);
+      }
+    },
+  });
+
+  // Prefill with edit data or reset for create when modal opens
   useEffect(() => {
     if (visible) {
-      // Prefill with edit data or reset for create
       if (editData) {
         setName(editData.name);
         setDescription(editData.description ?? '');
@@ -62,14 +74,6 @@ export function CreateCookbookModal({
         setDescription('');
         setImageUri(null);
       }
-
-      slideAnim.setValue(400);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 65,
-        friction: 11,
-        useNativeDriver: true,
-      }).start();
       setTimeout(() => inputRef.current?.focus(), 250);
     }
   }, [visible, editData]);
@@ -120,22 +124,22 @@ export function CreateCookbookModal({
 
   const isValid = name.trim().length > 0;
 
+  if (!isRendered) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
+        pointerEvents="box-none"
       >
-        {/* Backdrop */}
-        <Pressable style={styles.backdrop} onPress={handleClose} />
+        {/* Animated Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
 
-        {/* Modal Content — slides up independently */}
-        <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
+        {/* Animated Modal Content */}
+        <Animated.View style={[styles.modalContent, { transform: [{ translateY: modalTranslateY }] }]}>
           {/* Handle bar */}
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
@@ -310,7 +314,7 @@ export function CreateCookbookModal({
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
@@ -324,6 +328,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.overlay,
   },
   modalContent: {
+    width: '100%',
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,

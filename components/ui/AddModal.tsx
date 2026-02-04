@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,15 +14,19 @@ import {
   LayoutAnimation,
   UIManager,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useAddModal } from '@/context/AddModalContext';
-import { useRecipeExtraction } from '@/hooks/useRecipeExtraction';
+import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
+import { useModalAnimation, MODAL_ANIMATION } from '@/hooks/useModalAnimation';
 import { CookbookDropdown } from './CookbookDropdown';
+import { StarRatingInput } from './StarRatingInput';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // Enable LayoutAnimation on Android
@@ -31,122 +35,126 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const copy = COPY.addModal;
-const extractionCopy = COPY.extraction;
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type ModalView = 'import' | 'create' | 'share';
+type ModalView = 'main' | 'import' | 'share';
 
-const ANIMATION_DURATION = 350;
-const SPRING_CONFIG = {
-  tension: 65,
-  friction: 11,
-};
-
+// Layout animation for container expansion - no text animation
 const EXPAND_ANIMATION = {
-  duration: 300,
+  duration: MODAL_ANIMATION.duration,
   update: {
     type: LayoutAnimation.Types.easeInEaseOut,
     property: LayoutAnimation.Properties.scaleY,
   },
+  // Don't animate create/delete to prevent text animation
+  create: undefined,
+  delete: undefined,
 };
+
+const PASTEL_FALLBACKS: readonly string[] = [
+  '#FFE8D6',
+  '#D6E8FF',
+  '#E0D6FF',
+  '#D6FFE8',
+  '#FFF5D6',
+  '#FFD6E0',
+  '#D6F0E0',
+  '#FFE0D6',
+] as const;
+
+function getRecipeCardColor(title: string): string {
+  const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return PASTEL_FALLBACKS[hash % PASTEL_FALLBACKS.length] ?? PASTEL_FALLBACKS[0];
+}
 
 export function AddModal(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { isVisible, closeModal } = useAddModal();
 
-  // Animation values
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const modalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-
-  // Internal visibility state for animation
-  const [isRendered, setIsRendered] = useState(false);
-
   // View state
-  const [currentView, setCurrentView] = useState<ModalView>('import');
+  const [currentView, setCurrentView] = useState<ModalView>('main');
+
+  // Content opacity for instant text transitions (no animation on text)
+  const contentOpacity = useRef(new Animated.Value(1)).current;
 
   // Import view state
   const [url, setUrl] = useState('');
   const [selectedCookbookId, setSelectedCookbookId] = useState<Id<'cookbooks'> | null>(null);
-  const [showCookbookDropdown, setShowCookbookDropdown] = useState(false);
   const [cookbookError, setCookbookError] = useState(false);
 
-  // Recipe extraction
-  const { extractRecipe, status, progress, error, reset: resetExtraction } = useRecipeExtraction();
+  // Background extraction
+  const { startExtraction } = useBackgroundExtraction();
+  const addUpload = usePendingUploadsStore((s) => s.addUpload);
 
-  // Create recipe view state
-  const [recipeName, setRecipeName] = useState('');
-  const [recipeDescription, setRecipeDescription] = useState('');
-  const [ingredients, setIngredients] = useState('');
-  const [instructions, setInstructions] = useState('');
+  // Get cookbooks to find selected cookbook name
+  const cookbooks = useQuery(api.cookbooks.list);
 
   // Share post view state
   const [selectedRecipeId, setSelectedRecipeId] = useState<Id<'recipes'> | null>(null);
+  const [shareSearchQuery, setShareSearchQuery] = useState('');
+  const [easeRating, setEaseRating] = useState(0);
+  const [tasteRating, setTasteRating] = useState(0);
+  const [presentationRating, setPresentationRating] = useState(0);
+  const [shareNotes, setShareNotes] = useState('');
+  const [shareIsLoading, setShareIsLoading] = useState(false);
 
   // User's recipes for share view
   const userRecipes = useQuery(api.recipes.listSaved);
+  const createPost = useMutation(api.posts.create);
+
+  // Filter recipes by search query
+  const filteredRecipes = useMemo(() => {
+    if (!userRecipes) return [];
+    if (!shareSearchQuery.trim()) return userRecipes;
+    const query = shareSearchQuery.toLowerCase();
+    return userRecipes.filter((recipe) =>
+      recipe.title.toLowerCase().includes(query)
+    );
+  }, [userRecipes, shareSearchQuery]);
 
   const inputRef = useRef<TextInput>(null);
 
-  // Handle modal open/close animations
-  useEffect(() => {
-    if (isVisible) {
-      setIsRendered(true);
-      // Animate in
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-        Animated.spring(modalTranslateY, {
-          toValue: 0,
-          ...SPRING_CONFIG,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Focus input after animation completes
-        setTimeout(() => inputRef.current?.focus(), 50);
-      });
-    } else if (isRendered) {
-      // Animate out
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: ANIMATION_DURATION - 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(modalTranslateY, {
-          toValue: SCREEN_HEIGHT,
-          duration: ANIMATION_DURATION,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setIsRendered(false);
-        // Reset state after animation
-        resetState();
-      });
-    }
-  }, [isVisible]);
-
-  const resetState = () => {
-    setCurrentView('import');
+  // Reset state callback - defined before useModalAnimation
+  const resetState = useCallback(() => {
+    setCurrentView('main');
     setUrl('');
     setSelectedCookbookId(null);
-    setShowCookbookDropdown(false);
     setCookbookError(false);
-    resetExtraction();
-    setRecipeName('');
-    setRecipeDescription('');
-    setIngredients('');
-    setInstructions('');
     setSelectedRecipeId(null);
-  };
+    setShareSearchQuery('');
+    setEaseRating(0);
+    setTasteRating(0);
+    setPresentationRating(0);
+    setShareNotes('');
+  }, []);
+
+  // Use shared modal animation
+  const { isRendered, backdropOpacity, modalTranslateY } = useModalAnimation({
+    visible: isVisible,
+    onAnimationComplete: resetState,
+  });
 
   // Handle view transitions with smooth expansion animation
-  const animateToView = (newView: ModalView) => {
+  // Container expands smoothly, text appears instantly (no animation on text)
+  const animateToView = useCallback((newView: ModalView) => {
+    // Instantly hide content
+    contentOpacity.setValue(0);
+
+    // Configure layout animation for container only
     LayoutAnimation.configureNext(EXPAND_ANIMATION);
     setCurrentView(newView);
-  };
+
+    // Instantly show new content after layout settles
+    // Using a short delay ensures the layout animation has started
+    setTimeout(() => {
+      contentOpacity.setValue(1);
+    }, 16); // One frame delay
+
+    // Focus input when navigating to import view
+    if (newView === 'import') {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [contentOpacity]);
 
   const handleClose = () => {
     if (isLoading) return;
@@ -154,15 +162,7 @@ export function AddModal(): React.ReactElement {
   };
 
   const handleBack = () => {
-    animateToView('import');
-  };
-
-  const handleUrlChange = (text: string) => {
-    setUrl(text);
-    if (text.trim().length > 0 && !showCookbookDropdown) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setShowCookbookDropdown(true);
-    }
+    animateToView('main');
   };
 
   const handleCookbookSelect = (id: Id<'cookbooks'>) => {
@@ -170,7 +170,7 @@ export function AddModal(): React.ReactElement {
     setCookbookError(false);
   };
 
-  const handleImport = async () => {
+  const handleImport = () => {
     if (!url.trim()) return;
 
     if (!selectedCookbookId) {
@@ -178,40 +178,89 @@ export function AddModal(): React.ReactElement {
       return;
     }
 
-    const result = await extractRecipe(url.trim(), selectedCookbookId);
-    if (result) {
-      closeModal();
-    }
-  };
+    // Find cookbook name for display in progress indicator
+    const selectedCookbook = cookbooks?.find((c) => c._id === selectedCookbookId);
+    const cookbookName = selectedCookbook?.name ?? 'Cookbook';
 
-  const handleCreateRecipe = async () => {
+    // Add to pending uploads store and start background extraction
+    const uploadId = addUpload(url.trim(), selectedCookbookId, cookbookName);
+    startExtraction(uploadId);
+
+    // Close modal immediately - progress shown in UploadProgressIndicator
     closeModal();
   };
 
   const handleSharePost = async () => {
-    closeModal();
+    if (!selectedRecipeId || easeRating === 0 || tasteRating === 0 || presentationRating === 0) {
+      return;
+    }
+
+    setShareIsLoading(true);
+    try {
+      await createPost({
+        recipeId: selectedRecipeId,
+        easeRating,
+        tasteRating,
+        presentationRating,
+        notes: shareNotes.trim() || undefined,
+      });
+      closeModal();
+    } catch (error) {
+      // TODO: Show error toast
+      console.error('Failed to create post:', error);
+    } finally {
+      setShareIsLoading(false);
+    }
   };
 
-  const isLoading = status === 'checking' || status === 'extracting' || status === 'saving';
-  const canImport = url.trim().length > 0 && selectedCookbookId && !isLoading;
+  const isLoading = shareIsLoading;
+  const canImport = url.trim().length > 0 && selectedCookbookId !== null;
 
-  const getStatusMessage = useCallback(() => {
-    switch (status) {
-      case 'checking':
-        return extractionCopy.checking;
-      case 'extracting':
-        return progress?.message ?? extractionCopy.extracting;
-      case 'saving':
-        return extractionCopy.saving;
-      default:
-        return copy.importUrl.importing;
-    }
-  }, [status, progress?.message]);
+  const renderMainView = () => (
+    <View style={styles.optionsContainer}>
+      <Pressable
+        style={styles.optionCard}
+        onPress={() => animateToView('import')}
+        accessibilityRole="button"
+        accessibilityLabel={copy.options.importUrl}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={styles.optionIconContainer}>
+            <Icon name="link" size={24} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{copy.options.importUrl}</Text>
+            <Text style={styles.optionDescription}>{copy.options.importUrlDesc}</Text>
+          </View>
+          <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
+        </View>
+      </Pressable>
+
+      <Pressable
+        style={styles.optionCard}
+        onPress={() => animateToView('share')}
+        accessibilityRole="button"
+        accessibilityLabel={copy.options.sharePost}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={styles.optionIconContainer}>
+            <Icon name="camera" size={24} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{copy.options.sharePost}</Text>
+            <Text style={styles.optionDescription}>{copy.options.sharePostDesc}</Text>
+          </View>
+          <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
+        </View>
+      </Pressable>
+    </View>
+  );
 
   const renderImportView = () => (
     <>
       {/* URL Input */}
       <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>{copy.importUrl.urlLabel}</Text>
         <View style={styles.urlInputContainer}>
           <Icon name="link" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
           <TextInput
@@ -220,14 +269,13 @@ export function AddModal(): React.ReactElement {
             placeholder={copy.importUrl.placeholder}
             placeholderTextColor={Colors.text.tertiary}
             value={url}
-            onChangeText={handleUrlChange}
+            onChangeText={setUrl}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            editable={!isLoading}
             returnKeyType="done"
           />
-          {url.length > 0 && !isLoading && (
+          {url.length > 0 && (
             <Pressable
               onPress={() => setUrl('')}
               hitSlop={8}
@@ -239,52 +287,20 @@ export function AddModal(): React.ReactElement {
         </View>
       </View>
 
-      {/* Cookbook Selection (appears after URL is entered) */}
-      {showCookbookDropdown && (
-        <View style={styles.cookbookSection}>
-          <CookbookDropdown
-            selectedId={selectedCookbookId}
-            onSelect={handleCookbookSelect}
-            disabled={isLoading}
-            error={cookbookError}
-          />
-        </View>
-      )}
-
-      {/* Progress indicator */}
-      {isLoading && (
-        <View style={styles.progressSection}>
-          <View style={styles.progressRow}>
-            <ActivityIndicator size="small" color={Colors.accent} />
-            <Text style={styles.progressText}>{getStatusMessage()}</Text>
-          </View>
-          {status === 'extracting' && progress && (
-            <View style={styles.progressBarContainer}>
-              <Animated.View
-                style={[
-                  styles.progressBar,
-                  { width: `${Math.round(progress.percent * 100)}%` },
-                ]}
-              />
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Error display */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Icon name="alert-circle" size={16} color={Colors.semantic.error} />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
+      {/* Cookbook Selection */}
+      <View style={styles.inputGroup}>
+        <CookbookDropdown
+          selectedId={selectedCookbookId}
+          onSelect={handleCookbookSelect}
+          error={cookbookError}
+        />
+      </View>
 
       {/* Import Button */}
       <Pressable
         style={[
           styles.importButton,
           canImport && styles.importButtonActive,
-          isLoading && styles.importButtonLoading,
         ]}
         onPress={handleImport}
         disabled={!canImport}
@@ -293,198 +309,116 @@ export function AddModal(): React.ReactElement {
         accessibilityState={{ disabled: !canImport }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          {isLoading ? (
-            <ActivityIndicator size="small" color={Colors.text.inverse} />
-          ) : (
-            <>
-              <Icon
-                name="download"
-                size={20}
-                color={canImport ? Colors.text.inverse : Colors.text.disabled}
-              />
-              <Text style={[
-                styles.importButtonText,
-                !canImport && styles.importButtonTextDisabled,
-              ]}>
-                {selectedCookbookId ? copy.importUrl.submitActive : copy.importUrl.submit}
-              </Text>
-            </>
-          )}
+          <Icon
+            name="download"
+            size={20}
+            color={canImport ? Colors.text.inverse : Colors.text.disabled}
+          />
+          <Text style={[
+            styles.importButtonText,
+            !canImport && styles.importButtonTextDisabled,
+          ]}>
+            {selectedCookbookId ? copy.importUrl.submitActive : copy.importUrl.submit}
+          </Text>
         </View>
       </Pressable>
-
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      {/* Option Cards */}
-      <View style={styles.optionsContainer}>
-        <Pressable
-          style={styles.optionCard}
-          onPress={() => animateToView('create')}
-          accessibilityRole="button"
-          accessibilityLabel={copy.options.createRecipe}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={styles.optionIconContainer}>
-              <Icon name="create" size={24} color={Colors.accent} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>{copy.options.createRecipe}</Text>
-              <Text style={styles.optionDescription}>{copy.options.createRecipeDesc}</Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={styles.optionCard}
-          onPress={() => animateToView('share')}
-          accessibilityRole="button"
-          accessibilityLabel={copy.options.sharePost}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={styles.optionIconContainer}>
-              <Icon name="camera" size={24} color={Colors.accent} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>{copy.options.sharePost}</Text>
-              <Text style={styles.optionDescription}>{copy.options.sharePostDesc}</Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
-          </View>
-        </Pressable>
-      </View>
     </>
   );
 
-  const renderCreateRecipeView = () => (
-    <>
-      {/* Recipe Name */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.name}</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder={copy.createRecipe.namePlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={recipeName}
-          onChangeText={setRecipeName}
-          autoCapitalize="words"
-        />
-      </View>
+  const canShare = selectedRecipeId && easeRating > 0 && tasteRating > 0 && presentationRating > 0;
 
-      {/* Description */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.description}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder={copy.createRecipe.descriptionPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={recipeDescription}
-          onChangeText={setRecipeDescription}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Cookbook Selection */}
-      <View style={styles.inputGroup}>
-        <CookbookDropdown
-          selectedId={selectedCookbookId}
-          onSelect={handleCookbookSelect}
-          disabled={false}
-          error={cookbookError}
-        />
-      </View>
-
-      {/* Ingredients */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.ingredients}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textAreaLarge]}
-          placeholder={copy.createRecipe.ingredientsPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={ingredients}
-          onChangeText={setIngredients}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Instructions */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.instructions}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textAreaLarge]}
-          placeholder={copy.createRecipe.instructionsPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={instructions}
-          onChangeText={setInstructions}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Submit Button */}
-      <Pressable
-        style={[
-          styles.submitButton,
-          recipeName.trim().length > 0 && selectedCookbookId && styles.submitButtonActive,
-        ]}
-        onPress={handleCreateRecipe}
-        disabled={!recipeName.trim() || !selectedCookbookId}
-        accessibilityRole="button"
-        accessibilityLabel={copy.createRecipe.submit}
-      >
-        <Text style={[
-          styles.submitButtonText,
-          (!recipeName.trim() || !selectedCookbookId) && styles.submitButtonTextDisabled,
-        ]}>
-          {copy.createRecipe.submit}
-        </Text>
-      </Pressable>
-    </>
-  );
+  // Get selected recipe details for display
+  const selectedRecipe = useMemo(() => {
+    if (!selectedRecipeId || !userRecipes) return null;
+    return userRecipes.find((r) => r._id === selectedRecipeId) ?? null;
+  }, [selectedRecipeId, userRecipes]);
 
   const renderSharePostView = () => (
     <>
-      {/* Recipe Selection */}
+      {/* Recipe Selection Section */}
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>{copy.sharePost.selectRecipe}</Text>
+
+        {/* Search Bar */}
+        <View style={styles.searchInputContainer}>
+          <Icon name="search" size={20} color={Colors.text.tertiary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={copy.sharePost.searchPlaceholder}
+            placeholderTextColor={Colors.text.tertiary}
+            value={shareSearchQuery}
+            onChangeText={setShareSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!shareIsLoading}
+          />
+          {shareSearchQuery.length > 0 && (
+            <Pressable
+              onPress={() => setShareSearchQuery('')}
+              hitSlop={8}
+              accessibilityLabel="Clear search"
+            >
+              <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Horizontal Recipe Cards */}
         {userRecipes && userRecipes.length > 0 ? (
           <ScrollView
-            style={styles.recipeList}
-            showsVerticalScrollIndicator={false}
-            nestedScrollEnabled
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.recipeCardsContainer}
+            contentContainerStyle={styles.recipeCardsContent}
           >
-            {userRecipes.map((recipe) => (
-              <Pressable
-                key={recipe._id}
-                style={[
-                  styles.recipeOption,
-                  selectedRecipeId === recipe._id && styles.recipeOptionSelected,
-                ]}
-                onPress={() => setSelectedRecipeId(recipe._id)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <Text style={[
-                    styles.recipeOptionText,
-                    selectedRecipeId === recipe._id && styles.recipeOptionTextSelected,
-                  ]} numberOfLines={1}>
+            {filteredRecipes.length > 0 ? (
+              filteredRecipes.map((recipe) => (
+                <Pressable
+                  key={recipe._id}
+                  style={[
+                    styles.recipeCard,
+                    selectedRecipeId === recipe._id && styles.recipeCardSelected,
+                  ]}
+                  onPress={() => setSelectedRecipeId(recipe._id)}
+                  disabled={shareIsLoading}
+                >
+                  <View style={[
+                    styles.recipeCardImage,
+                    { backgroundColor: getRecipeCardColor(recipe.title) },
+                  ]}>
+                    {recipe.imageUrl ? (
+                      <Image
+                        source={{ uri: recipe.imageUrl }}
+                        style={styles.recipeCardImageFill}
+                        contentFit="cover"
+                        transition={200}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <Icon name="restaurant-outline" size={24} color={Colors.text.tertiary} />
+                    )}
+                    {selectedRecipeId === recipe._id && (
+                      <View style={styles.recipeCardCheckmark}>
+                        <Icon name="checkmark-circle" size={24} color={Colors.accent} />
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.recipeCardTitle,
+                      selectedRecipeId === recipe._id && styles.recipeCardTitleSelected,
+                    ]}
+                    numberOfLines={2}
+                  >
                     {recipe.title}
                   </Text>
-                  {selectedRecipeId === recipe._id && (
-                    <Icon name="check" size={20} color={Colors.accent} />
-                  )}
-                </View>
-              </Pressable>
-            ))}
+                </Pressable>
+              ))
+            ) : (
+              <View style={styles.noResultsInline}>
+                <Text style={styles.noResultsText}>No recipes match "{shareSearchQuery}"</Text>
+              </View>
+            )}
           </ScrollView>
         ) : (
           <View style={styles.emptyRecipes}>
@@ -495,69 +429,54 @@ export function AddModal(): React.ReactElement {
         )}
       </View>
 
-      {/* Cookbook Selection */}
-      {selectedRecipeId && (
-        <View style={styles.inputGroup}>
-          <CookbookDropdown
-            selectedId={selectedCookbookId}
-            onSelect={handleCookbookSelect}
-            disabled={false}
-            error={cookbookError}
-          />
-        </View>
-      )}
+      {/* Ratings Section */}
+      <View style={styles.ratingsSection}>
+        <StarRatingInput
+          label={copy.sharePost.ratings.ease}
+          value={easeRating}
+          onChange={setEaseRating}
+          disabled={shareIsLoading}
+        />
+        <StarRatingInput
+          label={copy.sharePost.ratings.taste}
+          value={tasteRating}
+          onChange={setTasteRating}
+          disabled={shareIsLoading}
+        />
+        <StarRatingInput
+          label={copy.sharePost.ratings.presentation}
+          value={presentationRating}
+          onChange={setPresentationRating}
+          disabled={shareIsLoading}
+        />
+      </View>
 
       {/* Notes */}
-      {selectedRecipeId && (
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>{copy.sharePost.notes}</Text>
-          <TextInput
-            style={[styles.textInput, styles.textArea]}
-            placeholder={copy.sharePost.notesPlaceholder}
-            placeholderTextColor={Colors.text.tertiary}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-      )}
-
-      {/* Submit Button */}
-      <Pressable
-        style={[
-          styles.submitButton,
-          selectedRecipeId && selectedCookbookId && styles.submitButtonActive,
-        ]}
-        onPress={handleSharePost}
-        disabled={!selectedRecipeId || !selectedCookbookId}
-        accessibilityRole="button"
-        accessibilityLabel={copy.sharePost.submit}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon
-            name="share"
-            size={20}
-            color={selectedRecipeId && selectedCookbookId ? Colors.text.inverse : Colors.text.disabled}
-          />
-          <Text style={[
-            styles.submitButtonText,
-            (!selectedRecipeId || !selectedCookbookId) && styles.submitButtonTextDisabled,
-          ]}>
-            {copy.sharePost.submit}
-          </Text>
-        </View>
-      </Pressable>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>{copy.sharePost.notes}</Text>
+        <TextInput
+          style={[styles.textInput, styles.textArea]}
+          placeholder={copy.sharePost.notesPlaceholder}
+          placeholderTextColor={Colors.text.tertiary}
+          value={shareNotes}
+          onChangeText={setShareNotes}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+          editable={!shareIsLoading}
+        />
+      </View>
     </>
   );
 
   const getModalTitle = () => {
     switch (currentView) {
-      case 'create':
-        return copy.createRecipe.title;
+      case 'import':
+        return copy.importUrl.title;
       case 'share':
         return copy.sharePost.title;
       default:
-        return copy.importUrl.title;
+        return copy.main.title;
     }
   };
 
@@ -586,7 +505,7 @@ export function AddModal(): React.ReactElement {
             styles.modalContainer,
             {
               transform: [{ translateY: modalTranslateY }],
-              maxHeight: currentView === 'import' ? '70%' : '90%',
+              maxHeight: currentView === 'main' ? '60%' : '90%',
             },
           ]}
         >
@@ -596,8 +515,8 @@ export function AddModal(): React.ReactElement {
               <View style={styles.handle} />
             </View>
 
-            {/* Header - only show for create/share views */}
-            {currentView !== 'import' && (
+            {/* Header - only show for sub-views */}
+            {currentView !== 'main' && (
               <View style={styles.header}>
                 <Pressable
                   onPress={handleBack}
@@ -624,21 +543,54 @@ export function AddModal(): React.ReactElement {
               </View>
             )}
 
-            {/* Content */}
+            {/* Content - wrapped in Animated.View for instant text transitions */}
             <ScrollView
-              style={styles.scrollView}
+              style={[
+                styles.scrollView,
+                currentView === 'share' && { maxHeight: SCREEN_HEIGHT * 0.65 },
+              ]}
               contentContainerStyle={[
                 styles.scrollContent,
-                { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md },
+                currentView !== 'share' && { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md },
               ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               bounces={false}
             >
-              {currentView === 'import' && renderImportView()}
-              {currentView === 'create' && renderCreateRecipeView()}
-              {currentView === 'share' && renderSharePostView()}
+              <Animated.View style={{ opacity: contentOpacity }}>
+                {currentView === 'main' && renderMainView()}
+                {currentView === 'import' && renderImportView()}
+                {currentView === 'share' && renderSharePostView()}
+              </Animated.View>
             </ScrollView>
+
+            {/* Sticky Submit Button for Share View */}
+            {currentView === 'share' && (
+              <View style={[styles.stickyButtonContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+                <Pressable
+                  style={[
+                    styles.submitButton,
+                    canShare && styles.submitButtonActive,
+                    shareIsLoading && styles.submitButtonLoading,
+                  ]}
+                  onPress={handleSharePost}
+                  disabled={!canShare || shareIsLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.sharePost.submit}
+                >
+                  {shareIsLoading ? (
+                    <ActivityIndicator size="small" color={Colors.text.inverse} />
+                  ) : (
+                    <Text style={[
+                      styles.submitButtonText,
+                      !canShare && styles.submitButtonTextDisabled,
+                    ]}>
+                      {copy.sharePost.submit}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -662,7 +614,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    overflow: 'hidden',
+  },
+  modalContentFlex: {
+    flex: 1,
   },
   handleContainer: {
     alignItems: 'center',
@@ -699,6 +653,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flexGrow: 0,
   },
+  scrollViewFlex: {
+    flex: 1,
+  },
   scrollContent: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
@@ -728,9 +685,6 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.text.primary,
     paddingVertical: Spacing.md,
-  },
-  cookbookSection: {
-    marginTop: Spacing.sm,
   },
   progressSection: {
     backgroundColor: Colors.background.secondary,
@@ -800,21 +754,6 @@ const styles = StyleSheet.create({
   importButtonTextDisabled: {
     color: Colors.text.disabled,
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border,
-  },
-  dividerText: {
-    ...Typography.caption,
-    color: Colors.text.tertiary,
-    paddingHorizontal: Spacing.md,
-  },
   optionsContainer: {
     marginTop: Spacing.sm,
   },
@@ -874,7 +813,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
   },
   submitButtonActive: {
     backgroundColor: Colors.accent,
@@ -933,5 +871,119 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.text.tertiary,
     marginTop: Spacing.xs,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchIcon: {
+    marginRight: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    color: Colors.text.primary,
+    paddingVertical: Spacing.md,
+  },
+  noResultsContainer: {
+    padding: Spacing.lg,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    ...Typography.body,
+    color: Colors.text.tertiary,
+  },
+  ratingsSection: {
+    marginBottom: Spacing.md,
+  },
+  selectRecipeHint: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  selectRecipeHintText: {
+    ...Typography.body,
+    color: Colors.text.tertiary,
+  },
+  submitButtonLoading: {
+    backgroundColor: Colors.accent,
+    opacity: 0.8,
+  },
+  stickyButtonContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background.primary,
+  },
+  shareSubmitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background.tertiary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+  },
+  recipeCardsContainer: {
+    marginTop: Spacing.md,
+    marginHorizontal: -Spacing.lg,
+  },
+  recipeCardsContent: {
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  recipeCard: {
+    width: 120,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.background.secondary,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  recipeCardSelected: {
+    borderColor: Colors.accent,
+  },
+  recipeCardImage: {
+    width: '100%',
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  recipeCardImageFill: {
+    width: '100%',
+    height: '100%',
+  },
+  recipeCardCheckmark: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    backgroundColor: Colors.background.primary,
+    borderRadius: Radius.full,
+  },
+  recipeCardTitle: {
+    ...Typography.caption,
+    color: Colors.text.primary,
+    padding: Spacing.sm,
+    textAlign: 'center',
+  },
+  recipeCardTitleSelected: {
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+  noResultsInline: {
+    width: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.md,
   },
 });

@@ -263,9 +263,7 @@ export const getRecipes = query({
       })
     );
 
-    return recipes.filter(
-      (r): r is NonNullable<typeof r> => r !== null
-    );
+    return recipes.filter((r): r is NonNullable<typeof r> => r !== null);
   },
 });
 

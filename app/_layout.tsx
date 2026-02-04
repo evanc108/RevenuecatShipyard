@@ -14,6 +14,8 @@ import { api } from '@/convex/_generated/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { ShareIntentProvider } from '@/context/ShareIntentContext';
+import { UploadProgressIndicator } from '@/components/ui/UploadProgressIndicator';
 import '@/global.css';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -148,15 +150,18 @@ export default function RootLayout() {
             <GluestackUIProvider mode="dark">
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <AuthGuard>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(onboarding)" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(tabs)" />
-                    <Stack.Screen name="cookbook/[cookbookId]" />
-                    <Stack.Screen name="recipe/[id]" />
-                    <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
-                  </Stack>
+                  <ShareIntentProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="(onboarding)" />
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(tabs)" />
+                      <Stack.Screen name="cookbook/[cookbookId]" />
+                      <Stack.Screen name="recipe/[id]" />
+                      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+                    </Stack>
+                    <UploadProgressIndicator />
+                  </ShareIntentProvider>
                 </AuthGuard>
                 <StatusBar style="auto" />
               </ThemeProvider>

@@ -235,4 +235,60 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_user_recipe', ['userId', 'discoverRecipeId']),
+
+  /**
+   * User posts - when a user shares that they cooked a recipe.
+   * Stores only the recipe ID reference, not redundant recipe data.
+   */
+  posts: defineTable({
+    userId: v.id('users'),
+    recipeId: v.id('recipes'),
+    // 3 rating dimensions (1-5 stars each)
+    easeRating: v.number(), // How easy was it to cook?
+    tasteRating: v.number(), // How tasty was it?
+    presentationRating: v.number(), // How did it look?
+    // Optional user notes
+    notes: v.optional(v.string()),
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_recipe', ['recipeId'])
+    .index('by_created', ['createdAt']),
+
+  /**
+   * Likes on posts.
+   */
+  postLikes: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId'])
+    .index('by_post_user', ['postId', 'userId']),
+
+  /**
+   * Comments on posts.
+   */
+  postComments: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    text: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId']),
+
+  /**
+   * Saved/bookmarked posts.
+   */
+  savedPosts: defineTable({
+    postId: v.id('posts'),
+    userId: v.id('users'),
+    savedAt: v.number(),
+  })
+    .index('by_post', ['postId'])
+    .index('by_user', ['userId'])
+    .index('by_post_user', ['postId', 'userId']),
 });
