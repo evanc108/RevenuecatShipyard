@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius } from '@/constants/theme';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
 type CookbookCardProps = {
   name: string;
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
 
   // Recipe count — black
   recipeCount: {
-    fontSize: 12,
+    ...Typography.caption,
     fontWeight: '600',
     letterSpacing: 0.3,
     color: Colors.text.primary,
@@ -177,10 +177,10 @@ const styles = StyleSheet.create({
 
   // Title — big and bold
   cardTitle: {
-    fontSize: 22,
+    ...Typography.h2,
     fontWeight: '700',
-    color: Colors.text.primary,
     letterSpacing: -0.3,
+    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   cardTitleCarousel: {
@@ -191,8 +191,7 @@ const styles = StyleSheet.create({
 
   // Description
   cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+    ...Typography.bodySmall,
     color: Colors.text.secondary,
   },
   cardDescriptionCarousel: {

@@ -1,12 +1,12 @@
-import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
 import { CookbookCarousel } from '@/components/ui/CookbookCarousel';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -19,7 +19,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -27,6 +26,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 // --- Types ---
 
@@ -51,6 +51,9 @@ const SORT_OPTIONS: readonly { mode: SortMode; label: string }[] = [
 ];
 
 const SEARCH_ICON_SIZE = 40;
+const CARD_WIDTH_RATIO = 0.85;
+const CARD_HEIGHT_RATIO = 0.65;
+const FAB_SIZE = 56;
 
 const COPY = {
   titleTop: 'Your',
@@ -63,7 +66,13 @@ const COPY = {
   cancel: 'Cancel',
   emptyTitle: 'No cookbooks yet',
   emptySubtitle: 'Tap + to create your first cookbook',
+  addCookbook: 'Add\nCookbook',
+  createError: 'Failed to create cookbook. Please try again.',
 } as const;
+
+// Decorative SVG fill colors for brush stroke
+const STROKE_FILL_PRIMARY = '#EEEEF3';
+const STROKE_FILL_SECONDARY = '#F2F2F6';
 
 // --- Component ---
 
@@ -163,16 +172,16 @@ export default function CookbookScreen() {
             body: blob,
           });
           if (!uploadResponse.ok) {
-            throw new Error('Failed to upload image');
+            throw new Error(COPY.createError);
           }
-          const { storageId } = await uploadResponse.json();
-          coverImageStorageId = storageId as Id<'_storage'>;
+          const { storageId } = (await uploadResponse.json()) as { storageId: Id<'_storage'> };
+          coverImageStorageId = storageId;
         }
 
         await createCookbook({ name, description, coverImageStorageId });
         setIsCreateModalVisible(false);
       } catch {
-        Alert.alert('Error', 'Failed to create cookbook. Please try again.');
+        Alert.alert('Error', COPY.createError);
       } finally {
         setIsCreating(false);
       }
@@ -284,8 +293,8 @@ export default function CookbookScreen() {
             style={[
               styles.emptyCardOuter,
               {
-                width: screenWidth * 0.85,
-                height: screenHeight * 0.65,
+                width: screenWidth * CARD_WIDTH_RATIO,
+                height: screenHeight * CARD_HEIGHT_RATIO,
               },
             ]}
             onPress={() => setIsCreateModalVisible(true)}
@@ -307,15 +316,15 @@ export default function CookbookScreen() {
               >
                 <Path
                   d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
-                  fill="#EEEEF3"
+                  fill={STROKE_FILL_PRIMARY}
                 />
                 <Path
                   d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
-                  fill="#F2F2F6"
+                  fill={STROKE_FILL_SECONDARY}
                 />
                 <Path
                   d="M25,105 C30,98 45,100 40,112 C35,120 22,115 25,105Z"
-                  fill="#F2F2F6"
+                  fill={STROKE_FILL_SECONDARY}
                 />
               </Svg>
 
@@ -324,6 +333,7 @@ export default function CookbookScreen() {
                 source={require('@/assets/images/create-cookbook-icon.png')}
                 style={styles.emptyCardImage}
                 contentFit="contain"
+                cachePolicy="memory-disk"
               />
 
               {/* Bottom fade — white, over image only */}
@@ -341,14 +351,14 @@ export default function CookbookScreen() {
 
               {/* Bottom-left label */}
               <View style={styles.emptyBottom}>
-                <Text style={styles.emptyCardTitle}>{'Add\nCookbook'}</Text>
+                <Text style={styles.emptyCardTitle}>{COPY.addCookbook}</Text>
               </View>
             </View>
           </Pressable>
         </View>
       ) : (
         <CookbookCarousel
-          cookbooks={sortedAndFiltered as CookbookDoc[]}
+          cookbooks={sortedAndFiltered}
           onCardPress={handleCardPress}
         />
       )}
@@ -401,8 +411,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   titleTop: {
-    fontSize: 18,
-    lineHeight: 22,
+    ...Typography.h3,
     fontWeight: '400',
     color: Colors.text.primary,
     letterSpacing: -0.2,
@@ -422,11 +431,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    ...Shadow.surface,
   },
   searchIconButton: {
     width: SEARCH_ICON_SIZE,
@@ -462,11 +467,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: Radius.full,
     backgroundColor: Colors.background.primary,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    ...Shadow.surface,
   },
   sortPillActive: {
     backgroundColor: Colors.accentLight,
@@ -497,11 +498,7 @@ const styles = StyleSheet.create({
   emptyCardOuter: {
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    ...Shadow.elevated,
   },
   emptyCardInner: {
     flex: 1,
@@ -544,11 +541,8 @@ const styles = StyleSheet.create({
     left: Spacing.lg,
   },
   emptyCardTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    ...Typography.h1,
     color: Colors.text.primary,
-    lineHeight: 34,
-    letterSpacing: -0.3,
   },
 
   // FAB
@@ -556,17 +550,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: Spacing.lg,
     right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Shadow.elevated,
     zIndex: 10,
   },
 });

@@ -37,7 +37,6 @@ type CarouselCardProps = {
   cardHeight: number;
   cardStep: number;
   screenWidth: number;
-  totalCards: number;
   onPress: () => void;
 };
 
@@ -65,6 +64,7 @@ const DOT_ACTIVE_WIDTH = 24;
 const SCALE_STEP = 0.05;
 const CARD_SPACING_RATIO = 0.82;
 const ADJACENT_Y_OFFSET = 24;
+const CARD_STEP_RATIO = 0.35;
 
 const SNAP_SPRING = {
   damping: 20,
@@ -82,7 +82,6 @@ const CarouselCard = memo(function CarouselCard({
   cardHeight,
   cardStep,
   screenWidth,
-  totalCards,
   onPress,
 }: CarouselCardProps): React.ReactElement {
   const cardLeft = (screenWidth - cardWidth) / 2;
@@ -233,7 +232,7 @@ export function CookbookCarousel({
   const cardWidth = screenWidth * CARD_WIDTH_RATIO;
   const cardHeight = screenHeight * CARD_HEIGHT_RATIO;
   // cardStep is the abstract "drag distance per card transition"
-  const cardStep = screenWidth * 0.35;
+  const cardStep = screenWidth * CARD_STEP_RATIO;
 
   const translateX = useSharedValue(0);
   const contextX = useSharedValue(0);
@@ -303,7 +302,6 @@ export function CookbookCarousel({
               cardHeight={cardHeight}
               cardStep={cardStep}
               screenWidth={screenWidth}
-              totalCards={cookbooks.length}
               onPress={() => handleCardPress(cookbook._id)}
             />
           ))}
