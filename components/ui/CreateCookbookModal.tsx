@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
@@ -34,10 +35,18 @@ export function CreateCookbookModal({
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const slideAnim = useRef(new Animated.Value(400)).current;
 
   useEffect(() => {
     if (visible) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      slideAnim.setValue(400);
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 65,
+        friction: 11,
+        useNativeDriver: true,
+      }).start();
+      setTimeout(() => inputRef.current?.focus(), 250);
     } else {
       setName('');
       setDescription('');
@@ -79,7 +88,7 @@ export function CreateCookbookModal({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
@@ -89,8 +98,8 @@ export function CreateCookbookModal({
         {/* Backdrop */}
         <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        {/* Modal Content */}
-        <View style={styles.modalContent}>
+        {/* Modal Content — slides up independently */}
+        <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
           {/* Handle bar */}
           <View style={styles.handleContainer}>
             <View style={styles.handle} />
@@ -234,7 +243,7 @@ export function CreateCookbookModal({
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

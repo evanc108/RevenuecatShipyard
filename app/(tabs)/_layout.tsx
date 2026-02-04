@@ -1,14 +1,14 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
+import { Tabs } from 'expo-router';
+import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AddModal } from '@/components/ui/AddModal';
-import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 function AddTabButton(props: BottomTabBarButtonProps) {

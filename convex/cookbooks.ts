@@ -2,69 +2,26 @@ import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
 /**
- * Create a new cookbook for the current user.
- */
-export const create = mutation({
-  args: {
-    name: v.string(),
-    description: v.optional(v.string()),
-    coverImageUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error('Unauthorized');
-    }
-
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
-      .unique();
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    const now = Date.now();
-    const cookbookId = await ctx.db.insert('cookbooks', {
-      userId: user._id,
-      name: args.name,
-      description: args.description,
-      coverImageUrl: args.coverImageUrl,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return cookbookId;
-  },
-});
-
-/**
- * List all cookbooks for the current user.
+ * List all cookbooks for the authenticated user, with recipe counts.
  */
 export const list = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
+    if (!identity) return [];
 
     const user = await ctx.db
       .query('users')
       .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
       .unique();
 
-    if (!user) {
-      return [];
-    }
+    if (!user) return [];
 
     const cookbooks = await ctx.db
       .query('cookbooks')
       .withIndex('by_user', (q) => q.eq('userId', user._id))
       .collect();
 
-    // Get recipe counts for each cookbook
     const cookbooksWithCounts = await Promise.all(
       cookbooks.map(async (cookbook) => {
         const recipes = await ctx.db
@@ -83,17 +40,66 @@ export const list = query({
 });
 
 /**
- * Get a cookbook by ID.
+ * Create a new cookbook for the authenticated user.
+ * Accepts either a Convex storage ID (resolved to URL) or a direct image URL.
  */
-export const get = query({
-  args: { id: v.id('cookbooks') },
+export const create = mutation({
+  args: {
+    name: v.string(),
+    description: v.optional(v.string()),
+    coverImageStorageId: v.optional(v.id('_storage')),
+    coverImageUrl: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
-    const cookbook = await ctx.db.get(args.id);
-    if (!cookbook) {
-      return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    let coverImageUrl: string | undefined = args.coverImageUrl;
+    if (args.coverImageStorageId) {
+      const url = await ctx.storage.getUrl(args.coverImageStorageId);
+      if (url) {
+        coverImageUrl = url;
+      }
     }
 
-    // Get recipe count
+    const now = Date.now();
+    return ctx.db.insert('cookbooks', {
+      userId: user._id,
+      name: args.name,
+      description: args.description,
+      coverImageUrl,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Get a single cookbook by ID (must be owned by the authenticated user).
+ */
+export const getById = query({
+  args: { cookbookId: v.id('cookbooks') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook || cookbook.userId !== user._id) return null;
+
     const recipes = await ctx.db
       .query('cookbookRecipes')
       .withIndex('by_cookbook', (q) => q.eq('cookbookId', cookbook._id))
@@ -107,6 +113,39 @@ export const get = query({
 });
 
 /**
+ * Delete a cookbook owned by the authenticated user.
+ */
+export const remove = mutation({
+  args: { cookbookId: v.id('cookbooks') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook) throw new Error('Cookbook not found');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    // Remove all cookbook-recipe associations
+    const cookbookRecipes = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook', (q) => q.eq('cookbookId', args.cookbookId))
+      .collect();
+
+    await Promise.all(
+      cookbookRecipes.map((cr) => ctx.db.delete(cr._id))
+    );
+
+    await ctx.db.delete(args.cookbookId);
+  },
+});
+
+/**
  * Add a recipe to a cookbook.
  */
 export const addRecipe = mutation({
@@ -116,24 +155,17 @@ export const addRecipe = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error('Unauthorized');
-    }
+    if (!identity) throw new Error('Unauthorized');
 
-    // Verify the cookbook exists and belongs to the user
     const cookbook = await ctx.db.get(args.cookbookId);
-    if (!cookbook) {
-      throw new Error('Cookbook not found');
-    }
+    if (!cookbook) throw new Error('Cookbook not found');
 
     const user = await ctx.db
       .query('users')
       .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
       .unique();
 
-    if (!user || cookbook.userId !== user._id) {
-      throw new Error('Unauthorized');
-    }
+    if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
 
     // Check if recipe is already in cookbook
     const existing = await ctx.db
@@ -144,18 +176,15 @@ export const addRecipe = mutation({
       .unique();
 
     if (existing) {
-      // Already in cookbook, return existing
       return existing._id;
     }
 
-    // Add recipe to cookbook
     const id = await ctx.db.insert('cookbookRecipes', {
       cookbookId: args.cookbookId,
       recipeId: args.recipeId,
       addedAt: Date.now(),
     });
 
-    // Update cookbook's updatedAt
     await ctx.db.patch(args.cookbookId, { updatedAt: Date.now() });
 
     return id;
