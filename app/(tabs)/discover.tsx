@@ -376,7 +376,7 @@ function DiscoverContent() {
 }
 
 // --- Feed Content Component ---
-function FeedContent() {
+function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
   const currentUser = useQuery(api.users.current);
   const feedPosts = useQuery(api.posts.socialFeed, { limit: 50 });
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
@@ -452,9 +452,17 @@ function FeedContent() {
         <Ionicons name="newspaper-outline" size={64} color={Colors.text.tertiary} />
         <Text style={styles.emptyTitle}>{COPY.socialFeed.emptyFeedTitle}</Text>
         <Text style={styles.emptySubtitle}>{COPY.socialFeed.emptyFeedSubtitle}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={COPY.socialFeed.findPeople}
+          style={styles.findPeopleButton}
+          onPress={onFindPeople}
+        >
+          <Text style={styles.findPeopleText}>{COPY.socialFeed.findPeople}</Text>
+        </Pressable>
       </View>
     );
-  }, [feedPosts]);
+  }, [feedPosts, onFindPeople]);
 
   const validPosts: FeedPostData[] = useMemo(() => {
     if (!feedPosts) return [];
@@ -614,5 +622,17 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: Spacing.xs,
     textAlign: 'center',
+  },
+  findPeopleButton: {
+    marginTop: Spacing.lg,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 20,
+  },
+  findPeopleText: {
+    ...Typography.label,
+    color: Colors.text.inverse,
+    fontWeight: '600',
   },
 });
