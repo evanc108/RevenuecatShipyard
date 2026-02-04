@@ -25,7 +25,10 @@
       "Bash(git pull:*)",
       "Bash(ls:*)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npx expo doctor:*)",
+      "Bash(grep:*)",
+      "Bash(npx expo lint:*)"
     ]
   }
 }
