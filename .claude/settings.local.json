@@ -22,7 +22,10 @@
       "Bash(git merge:*)",
       "Bash(find:*)",
       "Bash(npm install:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(ls:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }
