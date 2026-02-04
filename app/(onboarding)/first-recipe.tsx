@@ -35,7 +35,7 @@ export default function FirstRecipeScreen() {
     dislikes: string;
   }>();
   const completeOnboarding = useMutation(api.users.completeOnboarding);
-  const saveRecipe = useMutation(api.recipes.save);
+  const saveRecipe = useMutation(api.recipes.saveUrl);
   const copy = ONBOARDING_COPY.firstRecipe;
   const insets = useSafeAreaInsets();
 

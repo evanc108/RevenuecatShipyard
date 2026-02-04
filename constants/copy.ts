@@ -49,4 +49,24 @@ export const COPY = {
     generic: 'Something went wrong. Please try again.',
     network: 'Check your internet connection.',
   },
+  extraction: {
+    title: 'Import Recipe',
+    subtitle: 'Paste a video link to extract the recipe',
+    placeholder: 'Paste TikTok, Instagram, or YouTube link',
+    submit: 'Extract Recipe',
+    extracting: 'Extracting...',
+    status: {
+      pending: 'Queued',
+      scraping: 'Analyzing video...',
+      transcribing: 'Transcribing audio...',
+      analyzing: 'Processing video frames...',
+      complete: 'Recipe extracted!',
+      failed: 'Extraction failed',
+    },
+    errors: {
+      invalidUrl: 'Please enter a valid video URL',
+      notSignedIn: 'Sign in to import recipes',
+      extractionFailed: 'Could not extract recipe from this video',
+    },
+  },
 } as const;
