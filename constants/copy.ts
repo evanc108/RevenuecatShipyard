@@ -116,14 +116,20 @@ export const COPY = {
     viewRecipe: 'View Recipe',
   },
   addModal: {
+    main: {
+      title: 'Add',
+    },
     importUrl: {
-      title: 'Add Recipe',
+      title: 'Import Recipe',
+      urlLabel: 'Recipe URL',
       placeholder: 'Paste a video URL...',
       submit: 'Import',
       submitActive: 'Import Recipe',
       importing: 'Importing...',
     },
     options: {
+      importUrl: 'Import from URL',
+      importUrlDesc: 'Save a recipe from a video or website',
       createRecipe: 'Create Recipe',
       createRecipeDesc: 'Write your own recipe from scratch',
       sharePost: 'Share a Cook',
@@ -160,6 +166,25 @@ export const COPY = {
     },
     back: 'Back',
     cancel: 'Cancel',
+  },
+  pantry: {
+    tabs: {
+      mealPlan: 'Meal Plan',
+      yourFood: 'Your Food',
+      groceries: 'Groceries',
+    },
+    mealPlan: {
+      emptyTitle: 'Plan Your Meals',
+      emptySubtitle: 'Organize your weekly meals and stay on track',
+    },
+    yourFood: {
+      emptyTitle: 'Track Your Pantry',
+      emptySubtitle: 'Add ingredients you have on hand',
+    },
+    groceries: {
+      emptyTitle: 'Shopping List',
+      emptySubtitle: 'Add items you need to buy',
+    },
   },
   posts: {
     ratings: {

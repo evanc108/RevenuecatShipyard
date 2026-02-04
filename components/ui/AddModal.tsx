@@ -35,7 +35,7 @@ const copy = COPY.addModal;
 const extractionCopy = COPY.extraction;
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-type ModalView = 'import' | 'create' | 'share';
+type ModalView = 'main' | 'import' | 'share';
 
 const ANIMATION_DURATION = 350;
 const SPRING_CONFIG = {
@@ -63,22 +63,15 @@ export function AddModal(): React.ReactElement {
   const [isRendered, setIsRendered] = useState(false);
 
   // View state
-  const [currentView, setCurrentView] = useState<ModalView>('import');
+  const [currentView, setCurrentView] = useState<ModalView>('main');
 
   // Import view state
   const [url, setUrl] = useState('');
   const [selectedCookbookId, setSelectedCookbookId] = useState<Id<'cookbooks'> | null>(null);
-  const [showCookbookDropdown, setShowCookbookDropdown] = useState(false);
   const [cookbookError, setCookbookError] = useState(false);
 
   // Recipe extraction
   const { extractRecipe, status, progress, error, reset: resetExtraction } = useRecipeExtraction();
-
-  // Create recipe view state
-  const [recipeName, setRecipeName] = useState('');
-  const [recipeDescription, setRecipeDescription] = useState('');
-  const [ingredients, setIngredients] = useState('');
-  const [instructions, setInstructions] = useState('');
 
   // Share post view state
   const [selectedRecipeId, setSelectedRecipeId] = useState<Id<'recipes'> | null>(null);
@@ -121,10 +114,7 @@ export function AddModal(): React.ReactElement {
           ...SPRING_CONFIG,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        // Focus input after animation completes
-        setTimeout(() => inputRef.current?.focus(), 50);
-      });
+      ]).start();
     } else if (isRendered) {
       // Animate out
       Animated.parallel([
@@ -147,16 +137,11 @@ export function AddModal(): React.ReactElement {
   }, [isVisible]);
 
   const resetState = () => {
-    setCurrentView('import');
+    setCurrentView('main');
     setUrl('');
     setSelectedCookbookId(null);
-    setShowCookbookDropdown(false);
     setCookbookError(false);
     resetExtraction();
-    setRecipeName('');
-    setRecipeDescription('');
-    setIngredients('');
-    setInstructions('');
     setSelectedRecipeId(null);
     setShareSearchQuery('');
     setEaseRating(0);
@@ -169,6 +154,10 @@ export function AddModal(): React.ReactElement {
   const animateToView = (newView: ModalView) => {
     LayoutAnimation.configureNext(EXPAND_ANIMATION);
     setCurrentView(newView);
+    // Focus input when navigating to import view
+    if (newView === 'import') {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
   };
 
   const handleClose = () => {
@@ -177,15 +166,7 @@ export function AddModal(): React.ReactElement {
   };
 
   const handleBack = () => {
-    animateToView('import');
-  };
-
-  const handleUrlChange = (text: string) => {
-    setUrl(text);
-    if (text.trim().length > 0 && !showCookbookDropdown) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setShowCookbookDropdown(true);
-    }
+    animateToView('main');
   };
 
   const handleCookbookSelect = (id: Id<'cookbooks'>) => {
@@ -205,10 +186,6 @@ export function AddModal(): React.ReactElement {
     if (result) {
       closeModal();
     }
-  };
-
-  const handleCreateRecipe = async () => {
-    closeModal();
   };
 
   const handleSharePost = async () => {
@@ -250,10 +227,51 @@ export function AddModal(): React.ReactElement {
     }
   }, [status, progress?.message]);
 
+  const renderMainView = () => (
+    <View style={styles.optionsContainer}>
+      <Pressable
+        style={styles.optionCard}
+        onPress={() => animateToView('import')}
+        accessibilityRole="button"
+        accessibilityLabel={copy.options.importUrl}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={styles.optionIconContainer}>
+            <Icon name="link" size={24} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{copy.options.importUrl}</Text>
+            <Text style={styles.optionDescription}>{copy.options.importUrlDesc}</Text>
+          </View>
+          <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
+        </View>
+      </Pressable>
+
+      <Pressable
+        style={styles.optionCard}
+        onPress={() => animateToView('share')}
+        accessibilityRole="button"
+        accessibilityLabel={copy.options.sharePost}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={styles.optionIconContainer}>
+            <Icon name="camera" size={24} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{copy.options.sharePost}</Text>
+            <Text style={styles.optionDescription}>{copy.options.sharePostDesc}</Text>
+          </View>
+          <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
+        </View>
+      </Pressable>
+    </View>
+  );
+
   const renderImportView = () => (
     <>
       {/* URL Input */}
       <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>{copy.importUrl.urlLabel}</Text>
         <View style={styles.urlInputContainer}>
           <Icon name="link" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
           <TextInput
@@ -262,7 +280,7 @@ export function AddModal(): React.ReactElement {
             placeholder={copy.importUrl.placeholder}
             placeholderTextColor={Colors.text.tertiary}
             value={url}
-            onChangeText={handleUrlChange}
+            onChangeText={setUrl}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -281,17 +299,15 @@ export function AddModal(): React.ReactElement {
         </View>
       </View>
 
-      {/* Cookbook Selection (appears after URL is entered) */}
-      {showCookbookDropdown && (
-        <View style={styles.cookbookSection}>
-          <CookbookDropdown
-            selectedId={selectedCookbookId}
-            onSelect={handleCookbookSelect}
-            disabled={isLoading}
-            error={cookbookError}
-          />
-        </View>
-      )}
+      {/* Cookbook Selection */}
+      <View style={styles.inputGroup}>
+        <CookbookDropdown
+          selectedId={selectedCookbookId}
+          onSelect={handleCookbookSelect}
+          disabled={isLoading}
+          error={cookbookError}
+        />
+      </View>
 
       {/* Progress indicator */}
       {isLoading && (
@@ -353,143 +369,6 @@ export function AddModal(): React.ReactElement {
             </>
           )}
         </View>
-      </Pressable>
-
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or</Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      {/* Option Cards */}
-      <View style={styles.optionsContainer}>
-        <Pressable
-          style={styles.optionCard}
-          onPress={() => animateToView('create')}
-          accessibilityRole="button"
-          accessibilityLabel={copy.options.createRecipe}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={styles.optionIconContainer}>
-              <Icon name="create" size={24} color={Colors.accent} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>{copy.options.createRecipe}</Text>
-              <Text style={styles.optionDescription}>{copy.options.createRecipeDesc}</Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={styles.optionCard}
-          onPress={() => animateToView('share')}
-          accessibilityRole="button"
-          accessibilityLabel={copy.options.sharePost}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-            <View style={styles.optionIconContainer}>
-              <Icon name="camera" size={24} color={Colors.accent} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>{copy.options.sharePost}</Text>
-              <Text style={styles.optionDescription}>{copy.options.sharePostDesc}</Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={Colors.text.tertiary} />
-          </View>
-        </Pressable>
-      </View>
-    </>
-  );
-
-  const renderCreateRecipeView = () => (
-    <>
-      {/* Recipe Name */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.name}</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder={copy.createRecipe.namePlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={recipeName}
-          onChangeText={setRecipeName}
-          autoCapitalize="words"
-        />
-      </View>
-
-      {/* Description */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.description}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder={copy.createRecipe.descriptionPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={recipeDescription}
-          onChangeText={setRecipeDescription}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Cookbook Selection */}
-      <View style={styles.inputGroup}>
-        <CookbookDropdown
-          selectedId={selectedCookbookId}
-          onSelect={handleCookbookSelect}
-          disabled={false}
-          error={cookbookError}
-        />
-      </View>
-
-      {/* Ingredients */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.ingredients}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textAreaLarge]}
-          placeholder={copy.createRecipe.ingredientsPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={ingredients}
-          onChangeText={setIngredients}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Instructions */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.createRecipe.instructions}</Text>
-        <TextInput
-          style={[styles.textInput, styles.textAreaLarge]}
-          placeholder={copy.createRecipe.instructionsPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={instructions}
-          onChangeText={setInstructions}
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
-      </View>
-
-      {/* Submit Button */}
-      <Pressable
-        style={[
-          styles.submitButton,
-          recipeName.trim().length > 0 && selectedCookbookId && styles.submitButtonActive,
-        ]}
-        onPress={handleCreateRecipe}
-        disabled={!recipeName.trim() || !selectedCookbookId}
-        accessibilityRole="button"
-        accessibilityLabel={copy.createRecipe.submit}
-      >
-        <Text style={[
-          styles.submitButtonText,
-          (!recipeName.trim() || !selectedCookbookId) && styles.submitButtonTextDisabled,
-        ]}>
-          {copy.createRecipe.submit}
-        </Text>
       </Pressable>
     </>
   );
@@ -645,12 +524,12 @@ export function AddModal(): React.ReactElement {
 
   const getModalTitle = () => {
     switch (currentView) {
-      case 'create':
-        return copy.createRecipe.title;
+      case 'import':
+        return copy.importUrl.title;
       case 'share':
         return copy.sharePost.title;
       default:
-        return copy.importUrl.title;
+        return copy.main.title;
     }
   };
 
@@ -679,7 +558,7 @@ export function AddModal(): React.ReactElement {
             styles.modalContainer,
             {
               transform: [{ translateY: modalTranslateY }],
-              maxHeight: currentView === 'import' ? '70%' : '90%',
+              maxHeight: currentView === 'main' ? '60%' : '90%',
             },
           ]}
         >
@@ -689,8 +568,8 @@ export function AddModal(): React.ReactElement {
               <View style={styles.handle} />
             </View>
 
-            {/* Header - only show for create/share views */}
-            {currentView !== 'import' && (
+            {/* Header - only show for sub-views */}
+            {currentView !== 'main' && (
               <View style={styles.header}>
                 <Pressable
                   onPress={handleBack}
@@ -728,8 +607,8 @@ export function AddModal(): React.ReactElement {
               keyboardShouldPersistTaps="handled"
               bounces={false}
             >
+              {currentView === 'main' && renderMainView()}
               {currentView === 'import' && renderImportView()}
-              {currentView === 'create' && renderCreateRecipeView()}
               {currentView === 'share' && renderSharePostView()}
             </ScrollView>
           </View>
@@ -822,9 +701,6 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     paddingVertical: Spacing.md,
   },
-  cookbookSection: {
-    marginTop: Spacing.sm,
-  },
   progressSection: {
     backgroundColor: Colors.background.secondary,
     borderRadius: Radius.md,
@@ -892,21 +768,6 @@ const styles = StyleSheet.create({
   },
   importButtonTextDisabled: {
     color: Colors.text.disabled,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border,
-  },
-  dividerText: {
-    ...Typography.caption,
-    color: Colors.text.tertiary,
-    paddingHorizontal: Spacing.md,
   },
   optionsContainer: {
     marginTop: Spacing.sm,
