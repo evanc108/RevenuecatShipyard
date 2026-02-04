@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSignUp } from '@clerk/clerk-expo';
 import { useRef, useState, useEffect } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
@@ -135,7 +135,7 @@ export default function SignUpEmailScreen() {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
         </Pressable>
 
         <ScrollView
@@ -277,7 +277,7 @@ export default function SignUpEmailScreen() {
 
               {resendSuccess ? (
                 <View style={styles.resendSuccessContainer}>
-                  <Ionicons name="checkmark-circle" size={18} color={Colors.semantic.success} />
+                  <Icon name="checkmark-circle" size={18} color={Colors.semantic.success} />
                   <Text style={styles.resendSuccessText}>{copy.resendSuccess}</Text>
                 </View>
               ) : (

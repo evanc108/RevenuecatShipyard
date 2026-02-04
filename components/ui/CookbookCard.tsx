@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
 type CookbookCardProps = {
@@ -117,8 +117,8 @@ export const CookbookCard = memo(function CookbookCard({
 
       {/* Clickable indicator */}
       <View style={[styles.moreIcon, isCarousel && styles.moreIconCarousel]}>
-        <Ionicons
-          name="apps-outline"
+        <Icon
+          name="apps"
           size={isCarousel ? 24 : 18}
           color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
         />

@@ -11,7 +11,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 
@@ -140,7 +140,7 @@ export default function SignUpScreen() {
             onPress={() => onSSOSignUp('oauth_apple')}
             activeOpacity={0.7}
           >
-            <Ionicons name="logo-apple" size={20} color={Colors.text.primary} />
+            <Icon name="logo-apple" size={20} color={Colors.text.primary} />
             <Text style={styles.oauthButtonText}>{COPY.auth.continueWithApple}</Text>
           </TouchableOpacity>
 
@@ -149,7 +149,7 @@ export default function SignUpScreen() {
             onPress={() => onSSOSignUp('oauth_google')}
             activeOpacity={0.7}
           >
-            <Ionicons name="logo-google" size={20} color={Colors.text.primary} />
+            <Icon name="logo-google" size={20} color={Colors.text.primary} />
             <Text style={styles.oauthButtonText}>{COPY.auth.continueWithGoogle}</Text>
           </TouchableOpacity>
         </View>

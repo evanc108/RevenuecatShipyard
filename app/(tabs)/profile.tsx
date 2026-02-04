@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
 import { useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
@@ -26,9 +26,11 @@ const DRAWER_WIDTH = Dimensions.get('window').width * 0.75;
 
 type ProfileTab = 'cookbooks' | 'posts';
 
-const TABS: { key: ProfileTab; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-  { key: 'cookbooks', icon: 'book-outline', label: 'Cookbooks' },
-  { key: 'posts', icon: 'grid-outline', label: 'Posts' },
+import type { IconName } from '@/components/ui/Icon';
+
+const TABS: { key: ProfileTab; icon: IconName; label: string }[] = [
+  { key: 'cookbooks', icon: 'book', label: 'Cookbooks' },
+  { key: 'posts', icon: 'grid', label: 'Posts' },
 ];
 
 function SlideOutDrawer({
@@ -104,7 +106,7 @@ function SlideOutDrawer({
               onPress={handleClose}
               hitSlop={8}
             >
-              <Ionicons name="close" size={28} color={Colors.text.primary} />
+              <Icon name="close" size={28} color={Colors.text.primary} />
             </Pressable>
           </View>
 
@@ -117,7 +119,7 @@ function SlideOutDrawer({
                 setTimeout(onEditProfile, 280);
               }}
             >
-              <Ionicons name="person-outline" size={22} color={Colors.text.primary} />
+              <Icon name="user" size={22} color={Colors.text.primary} />
               <Text style={styles.drawerItemText}>Edit Profile</Text>
             </Pressable>
 
@@ -131,7 +133,7 @@ function SlideOutDrawer({
                 setTimeout(onSignOut, 280);
               }}
             >
-              <Ionicons name="log-out-outline" size={22} color={Colors.semantic.error} />
+              <Icon name="log-out" size={22} color={Colors.semantic.error} />
               <Text style={[styles.drawerItemText, { color: Colors.semantic.error }]}>
                 Sign Out
               </Text>
@@ -165,7 +167,7 @@ function ProfileTabBar({
               onPress={() => onTabPress(tab.key)}
             >
               <View style={styles.tabItemContent}>
-                <Ionicons
+                <Icon
                   name={tab.icon}
                   size={20}
                   color={isActive ? Colors.accent : Colors.text.tertiary}
@@ -293,7 +295,7 @@ export default function ProfileScreen(): React.ReactElement {
           onPress={() => setDrawerVisible(true)}
           hitSlop={8}
         >
-          <Ionicons name="menu" size={28} color={Colors.text.primary} />
+          <Icon name="menu" size={28} color={Colors.text.primary} />
         </Pressable>
       </View>
 
@@ -318,7 +320,7 @@ export default function ProfileScreen(): React.ReactElement {
               style={styles.editButton}
               onPress={() => router.push('/edit-profile')}
             >
-              <Ionicons name="pencil" size={16} color={Colors.text.inverse} />
+              <Icon name="pencil" size={16} color={Colors.text.inverse} />
             </Pressable>
           </View>
           {user.username ? (
@@ -369,7 +371,7 @@ export default function ProfileScreen(): React.ReactElement {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="grid-outline" size={48} color={Colors.text.tertiary} />
+              <Icon name="grid" size={48} color={Colors.text.tertiary} />
               <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
               <Text style={styles.emptyStateText}>
                 Share your first recipe to see it here

@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from 'convex/react';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
@@ -42,7 +42,7 @@ export default function UserProfileScreen(): React.ReactElement {
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
           <View style={styles.headerSpacer} />
         </View>
@@ -63,7 +63,7 @@ export default function UserProfileScreen(): React.ReactElement {
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
           <View style={styles.headerSpacer} />
         </View>
@@ -89,7 +89,7 @@ export default function UserProfileScreen(): React.ReactElement {
           onPress={() => router.back()}
           hitSlop={8}
         >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
         </Pressable>
         <Text style={styles.headerName}>{fullName}</Text>
         <View style={styles.headerSpacer} />

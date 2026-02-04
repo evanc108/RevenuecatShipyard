@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
@@ -115,7 +115,7 @@ export function CreateCookbookModal({
               hitSlop={12}
               disabled={isLoading}
             >
-              <Ionicons
+              <Icon
                 name="close"
                 size={24}
                 color={isLoading ? Colors.text.disabled : Colors.text.secondary}
@@ -188,7 +188,7 @@ export function CreateCookbookModal({
                       onPress={handlePickImage}
                       disabled={isLoading}
                     >
-                      <Ionicons name="image-outline" size={16} color={Colors.text.secondary} />
+                      <Icon name="image-outline" size={16} color={Colors.text.secondary} />
                       <Text style={styles.imageActionText}>Change</Text>
                     </Pressable>
                     <Pressable
@@ -198,7 +198,7 @@ export function CreateCookbookModal({
                       onPress={handleRemoveImage}
                       disabled={isLoading}
                     >
-                      <Ionicons name="trash-outline" size={16} color={Colors.semantic.error} />
+                      <Icon name="trash-outline" size={16} color={Colors.semantic.error} />
                       <Text style={[styles.imageActionText, styles.imageActionTextDanger]}>
                         Remove
                       </Text>
@@ -213,7 +213,7 @@ export function CreateCookbookModal({
                   onPress={handlePickImage}
                   disabled={isLoading}
                 >
-                  <Ionicons name="camera-outline" size={22} color={Colors.text.tertiary} />
+                  <Icon name="camera-outline" size={22} color={Colors.text.tertiary} />
                   <Text style={styles.imagePickerText}>Add a cover photo</Text>
                 </Pressable>
               )}

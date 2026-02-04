@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSSO, useSignIn } from '@clerk/clerk-expo';
 import { useCallback, useState } from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
@@ -113,7 +113,7 @@ export default function AuthScreen() {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={28} color={Colors.text.primary} />
+          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
         </Pressable>
 
         <Animated.View
@@ -156,7 +156,7 @@ export default function AuthScreen() {
               <ActivityIndicator color={Colors.text.inverse} />
             ) : (
               <>
-                <Ionicons name="logo-apple" size={20} color={Colors.text.inverse} />
+                <Icon name="logo-apple" size={20} color={Colors.text.inverse} />
                 <Text style={styles.authButtonText}>{copy.appleCta}</Text>
               </>
             )}
@@ -173,7 +173,7 @@ export default function AuthScreen() {
               <ActivityIndicator color={Colors.text.inverse} />
             ) : (
               <>
-                <Ionicons name="logo-google" size={20} color={Colors.text.inverse} />
+                <Icon name="logo-google" size={20} color={Colors.text.inverse} />
                 <Text style={styles.authButtonText}>{copy.googleCta}</Text>
               </>
             )}
@@ -236,7 +236,7 @@ export default function AuthScreen() {
               onPress={() => router.push('/(onboarding)/sign-up-email')}
               disabled={isLoading !== null}
             >
-              <Ionicons name="mail-outline" size={20} color={Colors.text.primary} />
+              <Icon name="mail-outline" size={20} color={Colors.text.primary} />
               <Text style={styles.ghostButtonText}>{copy.emailCta}</Text>
             </Pressable>
           )}

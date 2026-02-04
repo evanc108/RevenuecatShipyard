@@ -10,7 +10,7 @@ import {
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -87,7 +87,7 @@ export default function RecipeDetailScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+            <Icon name="chevron-back" size={24} color={Colors.text.primary} />
           </TouchableOpacity>
         </View>
         <View style={styles.errorContainer}>
@@ -101,7 +101,7 @@ export default function RecipeDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+          <Icon name="chevron-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{copy.title}</Text>
         <View style={styles.headerSpacer} />
@@ -143,10 +143,11 @@ export default function RecipeDetailScreen() {
                 onPress={() => handleRate(star)}
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
               >
-                <Ionicons
-                  name={userRating != null && star <= userRating ? 'star' : 'star-outline'}
+                <Icon
+                  name="star"
                   size={28}
                   color={userRating != null && star <= userRating ? '#FFB800' : Colors.text.tertiary}
+                  filled={userRating != null && star <= userRating}
                 />
               </TouchableOpacity>
             ))}
@@ -189,8 +190,8 @@ export default function RecipeDetailScreen() {
                 onPress={() => adjustServings(-0.5)}
                 disabled={servingsMultiplier <= 0.25}
               >
-                <Ionicons
-                  name="remove"
+                <Icon
+                  name="minus"
                   size={20}
                   color={servingsMultiplier <= 0.25 ? Colors.text.tertiary : Colors.accent}
                 />
@@ -208,8 +209,8 @@ export default function RecipeDetailScreen() {
                 onPress={() => adjustServings(0.5)}
                 disabled={servingsMultiplier >= 10}
               >
-                <Ionicons
-                  name="add"
+                <Icon
+                  name="plus"
                   size={20}
                   color={servingsMultiplier >= 10 ? Colors.text.tertiary : Colors.accent}
                 />

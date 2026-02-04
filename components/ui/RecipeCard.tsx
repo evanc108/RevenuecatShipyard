@@ -1,6 +1,6 @@
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -36,7 +36,7 @@ function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactEle
   const stars: React.ReactElement[] = [];
   for (let i = 1; i <= MAX_STARS; i++) {
     stars.push(
-      <Ionicons
+      <Icon
         key={i}
         name={i <= difficulty ? 'star' : 'star-outline'}
         size={14}
@@ -75,7 +75,7 @@ export const RecipeCard = memo(function RecipeCard({
             cachePolicy="memory-disk"
           />
         ) : (
-          <Ionicons name="restaurant-outline" size={40} color={Colors.text.tertiary} />
+          <Icon name="restaurant-outline" size={40} color={Colors.text.tertiary} />
         )}
       </View>
 
@@ -87,7 +87,7 @@ export const RecipeCard = memo(function RecipeCard({
 
         <View style={styles.metaRow}>
           <View style={styles.timeChip}>
-            <Ionicons name="time-outline" size={14} color={Colors.text.primary} />
+            <Icon name="time-outline" size={14} color={Colors.text.primary} />
             <Text style={styles.timeText}>
               {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
             </Text>

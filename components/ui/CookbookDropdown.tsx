@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -113,7 +113,7 @@ export function CookbookDropdown({
               >
                 {selectedCookbook?.name ?? copy.selectPlaceholder}
               </Text>
-              <Ionicons
+              <Icon
                 name="chevron-down"
                 size={20}
                 color={disabled ? Colors.text.disabled : Colors.text.secondary}
@@ -142,7 +142,7 @@ export function CookbookDropdown({
             <View style={styles.dropdownHeader}>
               <Text style={styles.dropdownTitle}>{copy.selectCookbook}</Text>
               <Pressable onPress={handleClose} hitSlop={12}>
-                <Ionicons name="close" size={24} color={Colors.text.secondary} />
+                <Icon name="close" size={24} color={Colors.text.secondary} />
               </Pressable>
             </View>
 
@@ -179,7 +179,7 @@ export function CookbookDropdown({
                       </Text>
                     </View>
                     {selectedId === cookbook._id && (
-                      <Ionicons
+                      <Icon
                         name="checkmark"
                         size={20}
                         color={Colors.accent}
@@ -194,7 +194,7 @@ export function CookbookDropdown({
                 style={styles.createOption}
                 onPress={handleCreateNew}
               >
-                <Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
+                <Icon name="add-circle-outline" size={20} color={Colors.accent} />
                 <Text style={styles.createOptionText}>{copy.createNew}</Text>
               </TouchableOpacity>
             </ScrollView>

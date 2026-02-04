@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -110,7 +110,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
         </View>
         {recipe.calories !== undefined && (
           <View style={styles.ratingBadge}>
-            <Ionicons name="flame" size={12} color="#FFD700" />
+            <Icon name="flame" size={12} color="#FFD700" />
             <Text style={styles.ratingText}>{recipe.calories} cal</Text>
           </View>
         )}
@@ -139,19 +139,19 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
 
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={16} color={Colors.text.inverse} />
+            <Icon name="time-outline" size={16} color={Colors.text.inverse} />
             <Text style={styles.metaText}>{totalTime} min</Text>
           </View>
           <View style={styles.metaDivider} />
           <View style={styles.metaItem}>
-            <Ionicons name="flame-outline" size={16} color={Colors.text.inverse} />
+            <Icon name="flame-outline" size={16} color={Colors.text.inverse} />
             <Text style={styles.metaText}>{recipe.difficulty ?? 'Medium'}</Text>
           </View>
           {recipe.servings !== undefined && (
             <>
               <View style={styles.metaDivider} />
               <View style={styles.metaItem}>
-                <Ionicons name="people-outline" size={16} color={Colors.text.inverse} />
+                <Icon name="people-outline" size={16} color={Colors.text.inverse} />
                 <Text style={styles.metaText}>{recipe.servings} servings</Text>
               </View>
             </>

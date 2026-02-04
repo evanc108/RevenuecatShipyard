@@ -11,7 +11,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 
 export default function ForgotPasswordScreen() {
@@ -78,7 +78,7 @@ export default function ForgotPasswordScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
 
         <View style={styles.header}>
