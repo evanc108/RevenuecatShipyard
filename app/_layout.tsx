@@ -154,6 +154,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(auth)" />
                     <Stack.Screen name="(tabs)" />
                     <Stack.Screen name="cookbook/[cookbookId]" />
+                    <Stack.Screen name="recipe/[id]" />
                     <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
                   </Stack>
                 </AuthGuard>

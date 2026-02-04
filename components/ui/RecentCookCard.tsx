@@ -64,19 +64,20 @@ export const RecentCookCard = memo(function RecentCookCard({
 
       {/* Text info */}
       <View style={styles.textArea}>
-        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
           {title}
         </Text>
-        <View style={styles.metaRow}>
-          <Icon name="time-outline" size={13} color={Colors.text.primary} />
-          <Text style={styles.metaText}>
-            {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
-          </Text>
+        <View style={styles.tagsColumn}>
+          <View style={styles.tagChip}>
+            <Icon name="time-outline" size={14} color={Colors.text.primary} />
+            <Text style={styles.tagText}>
+              {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
+            </Text>
+          </View>
           {cuisine ? (
-            <>
-              <Text style={styles.metaDot}>{'\u00B7'}</Text>
-              <Text style={styles.metaText}>{cuisine}</Text>
-            </>
+            <View style={styles.tagChip}>
+              <Text style={styles.tagText}>{cuisine}</Text>
+            </View>
           ) : null}
         </View>
       </View>
@@ -98,19 +99,20 @@ export const RecentCookCard = memo(function RecentCookCard({
 
 const styles = StyleSheet.create({
   card: {
-    height: CARD_HEIGHT,
-    borderRadius: Radius.lg,
+    minHeight: CARD_HEIGHT,
+    borderRadius: Radius.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: Spacing.sm,
+    paddingLeft: Spacing.md,
     paddingRight: Spacing.sm,
-    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
     ...Shadow.surface,
   },
   imageContainer: {
     width: 90,
     height: 90,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -127,18 +129,23 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.text.primary,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  tagsColumn: {
     gap: Spacing.xs,
   },
-  metaText: {
-    ...Typography.caption,
-    color: Colors.text.primary,
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
   },
-  metaDot: {
-    ...Typography.caption,
+  tagText: {
+    ...Typography.bodySmall,
     color: Colors.text.primary,
+    fontWeight: '500',
   },
   cookButton: {
     backgroundColor: Colors.text.primary,

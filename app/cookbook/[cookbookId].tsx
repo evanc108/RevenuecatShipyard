@@ -29,103 +29,44 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// --- Mock Recipe Data ---
+// --- Helpers ---
 
-type MockRecipe = {
-  id: string;
-  title: string;
-  description: string;
-  cuisine: string;
-  difficulty: number;
-  totalTimeMinutes: number;
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
-  servings: number;
-  calories: number;
-  imageUrl?: string;
-  dietaryTags: readonly string[];
+const DIFFICULTY_MAP: Record<string, number> = {
+  easy: 1,
+  medium: 2,
+  moderate: 2,
+  intermediate: 3,
+  hard: 4,
+  difficult: 4,
+  expert: 5,
 };
 
-const MOCK_RECIPES: readonly MockRecipe[] = [
-  {
-    id: '1',
-    title: 'Truffle Mushroom Risotto',
-    description: 'Creamy arborio rice with wild mushrooms and truffle oil',
-    cuisine: 'Italian',
-    difficulty: 4,
-    totalTimeMinutes: 45,
-    prepTimeMinutes: 15,
-    cookTimeMinutes: 30,
-    servings: 4,
-    calories: 420,
-    dietaryTags: ['Vegetarian', 'Gluten-Free'],
-  },
-  {
-    id: '2',
-    title: 'Miso Glazed Salmon',
-    description: 'Sweet white miso marinated salmon with sesame bok choy',
-    cuisine: 'Japanese',
-    difficulty: 2,
-    totalTimeMinutes: 30,
-    prepTimeMinutes: 10,
-    cookTimeMinutes: 20,
-    servings: 2,
-    calories: 380,
-    dietaryTags: ['High Protein', 'Dairy-Free'],
-  },
-  {
-    id: '3',
-    title: 'Shakshuka',
-    description: 'Poached eggs in spiced tomato and pepper sauce',
-    cuisine: 'Middle Eastern',
-    difficulty: 1,
-    totalTimeMinutes: 25,
-    prepTimeMinutes: 5,
-    cookTimeMinutes: 20,
-    servings: 3,
-    calories: 290,
-    dietaryTags: ['Vegetarian'],
-  },
-  {
-    id: '4',
-    title: 'Pad Thai',
-    description: 'Rice noodles with shrimp, peanuts, and tamarind sauce',
-    cuisine: 'Thai',
-    difficulty: 3,
-    totalTimeMinutes: 35,
-    prepTimeMinutes: 15,
-    cookTimeMinutes: 20,
-    servings: 2,
-    calories: 450,
-    dietaryTags: ['Dairy-Free'],
-  },
-  {
-    id: '5',
-    title: 'Sourdough Focaccia',
-    description: 'Olive oil and rosemary topped artisan flatbread',
-    cuisine: 'Italian',
-    difficulty: 3,
-    totalTimeMinutes: 180,
-    prepTimeMinutes: 30,
-    cookTimeMinutes: 25,
-    servings: 8,
-    calories: 210,
-    dietaryTags: ['Vegan'],
-  },
-  {
-    id: '6',
-    title: 'Korean Fried Chicken',
-    description: 'Double-fried chicken with gochujang glaze',
-    cuisine: 'Korean',
-    difficulty: 4,
-    totalTimeMinutes: 60,
-    prepTimeMinutes: 20,
-    cookTimeMinutes: 40,
-    servings: 4,
-    calories: 520,
-    dietaryTags: ['High Protein'],
-  },
-] as const;
+function parseDifficulty(difficulty?: string): number {
+  if (!difficulty) return 0;
+  const mapped = DIFFICULTY_MAP[difficulty.toLowerCase()];
+  if (mapped !== undefined) return mapped;
+  const num = parseInt(difficulty, 10);
+  if (!isNaN(num) && num >= 1 && num <= 5) return num;
+  return 3;
+}
+
+// --- Recipe type from getRecipes query ---
+
+type CookbookRecipe = {
+  _id: Id<'recipes'>;
+  title: string;
+  description?: string;
+  cuisine?: string;
+  difficulty?: string;
+  imageUrl?: string;
+  totalTimeMinutes?: number;
+  prepTimeMinutes?: number;
+  cookTimeMinutes?: number;
+  servings?: number;
+  calories?: number;
+  createdAt: number;
+  addedAt: number;
+};
 
 // --- Types ---
 
@@ -162,7 +103,7 @@ const DOT_ACTIVE_WIDTH = 18;
 // --- Stacked Recipe Card ---
 
 type StackedCardProps = {
-  recipe: MockRecipe;
+  recipe: CookbookRecipe;
   index: number;
   translateX: SharedValue<number>;
   cardWidth: number;
@@ -249,8 +190,8 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
         <RecipeCard
           title={recipe.title}
           imageUrl={recipe.imageUrl}
-          totalTimeMinutes={recipe.totalTimeMinutes}
-          difficulty={recipe.difficulty}
+          totalTimeMinutes={recipe.totalTimeMinutes ?? 0}
+          difficulty={parseDifficulty(recipe.difficulty)}
           cuisine={recipe.cuisine}
           onPress={onPress}
         />
@@ -315,6 +256,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
     cookbookId ? { cookbookId: cookbookId as Id<'cookbooks'> } : 'skip',
   );
 
+  const cookbookRecipes = useQuery(
+    api.cookbooks.getRecipes,
+    cookbookId ? { cookbookId: cookbookId as Id<'cookbooks'> } : 'skip',
+  );
+
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -331,8 +277,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const cardWidth = screenWidth * CARD_WIDTH_RATIO;
   const cardStep = screenWidth * 0.35;
 
-  // Most recent recipe for the "recently cooked" card
-  const mostRecentRecipe = MOCK_RECIPES[0];
+  const recipes: CookbookRecipe[] = cookbookRecipes ?? [];
 
   // --- Search Animation ---
 
@@ -363,22 +308,23 @@ export default function CookbookDetailScreen(): React.ReactElement {
   // --- Sort & Filter ---
 
   const sortedRecipes = useMemo(() => {
-    let result = [...MOCK_RECIPES];
+    let result = [...recipes];
 
     if (searchQuery.trim().length > 0) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
         (r) =>
           r.title.toLowerCase().includes(q) ||
-          r.cuisine.toLowerCase().includes(q),
+          (r.cuisine?.toLowerCase().includes(q) ?? false),
       );
     }
 
     switch (sortMode) {
       case 'recent':
+        result.sort((a, b) => b.addedAt - a.addedAt);
         break;
       case 'oldest':
-        result.reverse();
+        result.sort((a, b) => a.addedAt - b.addedAt);
         break;
       case 'a-z':
         result.sort((a, b) => a.title.localeCompare(b.title));
@@ -389,7 +335,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
     }
 
     return result;
-  }, [searchQuery, sortMode]);
+  }, [recipes, searchQuery, sortMode]);
 
   const maxIndex = Math.max(sortedRecipes.length - 1, 0);
 
@@ -433,11 +379,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
 
   // --- Handlers ---
 
-  const handleRecipePress = useCallback((_recipeId: string) => {
-    // TODO: Navigate to recipe detail
-  }, []);
+  const handleRecipePress = useCallback((recipeId: Id<'recipes'>) => {
+    router.push(`/recipe/${recipeId}`);
+  }, [router]);
 
-  const handleCookPress = useCallback((_recipeId: string) => {
+  const handleCookPress = useCallback((_recipeId: Id<'recipes'>) => {
     // TODO: Start cooking flow
   }, []);
 
@@ -565,19 +511,21 @@ export default function CookbookDetailScreen(): React.ReactElement {
       {/* Content */}
       <View style={styles.contentContainer}>
         {/* Recently Cooked — single card */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>{COPY.cookbookDetail.recentlyCooked}</Text>
-          <View style={styles.recentCardWrapper}>
-            <RecentCookCard
-              title={mostRecentRecipe.title}
-              imageUrl={mostRecentRecipe.imageUrl}
-              totalTimeMinutes={mostRecentRecipe.totalTimeMinutes}
-              cuisine={mostRecentRecipe.cuisine}
-              onPress={() => handleRecipePress(mostRecentRecipe.id)}
-              onCook={() => handleCookPress(mostRecentRecipe.id)}
-            />
+        {sortedRecipes.length > 0 ? (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>{COPY.cookbookDetail.recentlyCooked}</Text>
+            <View style={styles.recentCardWrapper}>
+              <RecentCookCard
+                title={sortedRecipes[0].title}
+                imageUrl={sortedRecipes[0].imageUrl}
+                totalTimeMinutes={sortedRecipes[0].totalTimeMinutes ?? 0}
+                cuisine={sortedRecipes[0].cuisine}
+                onPress={() => handleRecipePress(sortedRecipes[0]._id)}
+                onCook={() => handleCookPress(sortedRecipes[0]._id)}
+              />
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Your Recipes header + pagination dots inline */}
         <View style={styles.recipesHeaderRow}>
@@ -595,7 +543,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
             <View style={styles.dotsContainer}>
               {sortedRecipes.map((recipe, idx) => (
                 <PaginationDot
-                  key={recipe.id}
+                  key={recipe._id}
                   index={idx}
                   translateX={translateX}
                   cardStep={cardStep}
@@ -617,14 +565,14 @@ export default function CookbookDetailScreen(): React.ReactElement {
               <Animated.View style={styles.carouselTrack}>
                 {sortedRecipes.map((recipe, idx) => (
                   <StackedRecipeCard
-                    key={recipe.id}
+                    key={recipe._id}
                     recipe={recipe}
                     index={idx}
                     translateX={translateX}
                     cardWidth={cardWidth}
                     cardStep={cardStep}
                     screenWidth={screenWidth}
-                    onPress={() => handleRecipePress(recipe.id)}
+                    onPress={() => handleRecipePress(recipe._id)}
                   />
                 ))}
               </Animated.View>

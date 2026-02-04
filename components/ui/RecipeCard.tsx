@@ -2,6 +2,7 @@ import { COPY } from '@/constants/copy';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -32,15 +33,20 @@ function getPastelForTitle(title: string): string {
 
 const MAX_STARS = 5;
 
-function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactElement {
+function DifficultyStars({ difficulty, onImage }: { difficulty: number; onImage?: boolean }): React.ReactElement {
   const stars: React.ReactElement[] = [];
   for (let i = 1; i <= MAX_STARS; i++) {
+    const isFilled = i <= difficulty;
     stars.push(
       <Icon
         key={i}
-        name={i <= difficulty ? 'star' : 'star-outline'}
+        name="star"
         size={14}
-        color={i <= difficulty ? Colors.accent : Colors.text.tertiary}
+        color={
+          isFilled
+            ? (onImage ? '#FFD700' : Colors.accent)
+            : (onImage ? 'rgba(255,255,255,0.25)' : Colors.border)
+        }
       />,
     );
   }
@@ -56,6 +62,7 @@ export const RecipeCard = memo(function RecipeCard({
   onPress,
 }: RecipeCardProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(title);
+  const hasImage = Boolean(imageUrl);
 
   return (
     <Pressable
@@ -79,28 +86,47 @@ export const RecipeCard = memo(function RecipeCard({
         )}
       </View>
 
+      {/* Gradient overlay for text visibility */}
+      {hasImage ? (
+        <LinearGradient
+          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.2)', 'transparent']}
+          locations={[0, 0.4, 0.75]}
+          style={styles.gradientOverlay}
+        />
+      ) : null}
+
       {/* Info overlays on image, right-aligned */}
       <View style={styles.infoSection}>
-        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+        <Text
+          style={[styles.title, hasImage && styles.titleOnImage]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
           {title}
         </Text>
 
         <View style={styles.metaRow}>
           <View style={styles.timeChip}>
-            <Icon name="time-outline" size={14} color={Colors.text.primary} />
-            <Text style={styles.timeText}>
+            <Icon
+              name="time-outline"
+              size={14}
+              color={hasImage ? 'rgba(255,255,255,0.9)' : Colors.text.primary}
+            />
+            <Text style={[styles.timeText, hasImage && styles.textOnImage]}>
               {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
             </Text>
           </View>
 
           {cuisine ? (
             <View style={styles.cuisineChip}>
-              <Text style={styles.cuisineText}>{cuisine}</Text>
+              <Text style={[styles.cuisineText, hasImage && styles.cuisineTextOnImage]}>
+                {cuisine}
+              </Text>
             </View>
           ) : null}
         </View>
 
-        <DifficultyStars difficulty={difficulty} />
+        <DifficultyStars difficulty={difficulty} onImage={hasImage} />
       </View>
     </Pressable>
   );
@@ -162,5 +188,26 @@ const styles = StyleSheet.create({
   starsRow: {
     flexDirection: 'row',
     gap: 2,
+  },
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  titleOnImage: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  textOnImage: {
+    color: 'rgba(255,255,255,0.9)',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  cuisineTextOnImage: {
+    color: 'rgba(255,255,255,0.85)',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -1,34 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  Animated,
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Modal,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type EditData = {
+  name: string;
+  description?: string;
+  coverImageUrl?: string;
+};
 
 type CreateCookbookModalProps = {
   visible: boolean;
   onClose: () => void;
   onSubmit: (name: string, description?: string, imageUri?: string) => void;
+  onDelete?: () => void;
   isLoading?: boolean;
+  editData?: EditData;
 };
 
 export function CreateCookbookModal({
   visible,
   onClose,
   onSubmit,
+  onDelete,
   isLoading = false,
+  editData,
 }: CreateCookbookModalProps): React.ReactElement {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
@@ -37,8 +48,21 @@ export function CreateCookbookModal({
   const inputRef = useRef<TextInput>(null);
   const slideAnim = useRef(new Animated.Value(400)).current;
 
+  const isEditMode = editData !== undefined;
+
   useEffect(() => {
     if (visible) {
+      // Prefill with edit data or reset for create
+      if (editData) {
+        setName(editData.name);
+        setDescription(editData.description ?? '');
+        setImageUri(editData.coverImageUrl ?? null);
+      } else {
+        setName('');
+        setDescription('');
+        setImageUri(null);
+      }
+
       slideAnim.setValue(400);
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -47,12 +71,8 @@ export function CreateCookbookModal({
         useNativeDriver: true,
       }).start();
       setTimeout(() => inputRef.current?.focus(), 250);
-    } else {
-      setName('');
-      setDescription('');
-      setImageUri(null);
     }
-  }, [visible]);
+  }, [visible, editData]);
 
   const handleClose = () => {
     if (isLoading) return;
@@ -82,6 +102,22 @@ export function CreateCookbookModal({
     onSubmit(trimmedName, description.trim() || undefined, imageUri ?? undefined);
   };
 
+  const handleDelete = () => {
+    if (!onDelete || isLoading) return;
+    Alert.alert(
+      'Delete Cookbook',
+      'Are you sure you want to delete this cookbook? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: onDelete,
+        },
+      ],
+    );
+  };
+
   const isValid = name.trim().length > 0;
 
   return (
@@ -107,7 +143,7 @@ export function CreateCookbookModal({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>New Cookbook</Text>
+            <Text style={styles.title}>{isEditMode ? 'Edit Cookbook' : 'New Cookbook'}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close"
@@ -218,30 +254,59 @@ export function CreateCookbookModal({
                 </Pressable>
               )}
             </View>
+
           </ScrollView>
 
-          {/* Submit button */}
+          {/* Action buttons */}
           <View style={[styles.submitContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Create cookbook"
-              accessibilityState={{ disabled: !isValid || isLoading }}
-              style={[
-                styles.submitButton,
-                (!isValid || isLoading) && styles.submitButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={!isValid || isLoading}
-            >
-              <Text
+            <View style={isEditMode && onDelete ? styles.buttonRow : undefined}>
+              {/* Delete button (edit mode only) */}
+              {isEditMode && onDelete ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete cookbook"
+                  style={[styles.deleteButton, isLoading && styles.deleteButtonDisabled]}
+                  onPress={handleDelete}
+                  disabled={isLoading}
+                >
+                  <Icon
+                    name="trash-outline"
+                    size={18}
+                    color={isLoading ? Colors.text.disabled : Colors.semantic.error}
+                  />
+                  <Text
+                    style={[styles.deleteButtonText, isLoading && styles.deleteButtonTextDisabled]}
+                  >
+                    Delete
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {/* Submit button */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isEditMode ? 'Save changes' : 'Create cookbook'}
+                accessibilityState={{ disabled: !isValid || isLoading }}
                 style={[
-                  styles.submitButtonText,
-                  (!isValid || isLoading) && styles.submitButtonTextDisabled,
+                  styles.submitButton,
+                  isEditMode && onDelete ? styles.submitButtonFlex : undefined,
+                  (!isValid || isLoading) && styles.submitButtonDisabled,
                 ]}
+                onPress={handleSubmit}
+                disabled={!isValid || isLoading}
               >
-                {isLoading ? 'Creating...' : 'Create Cookbook'}
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.submitButtonText,
+                    (!isValid || isLoading) && styles.submitButtonTextDisabled,
+                  ]}
+                >
+                  {isLoading
+                    ? (isEditMode ? 'Saving...' : 'Creating...')
+                    : (isEditMode ? 'Save Changes' : 'Create Cookbook')}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -262,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    maxHeight: '80%',
+    maxHeight: '75%',
   },
   handleContainer: {
     alignItems: 'center',
@@ -281,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.xs,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
   title: {
     ...Typography.h2,
@@ -357,6 +422,31 @@ const styles = StyleSheet.create({
   imageActionTextDanger: {
     color: Colors.semantic.error,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.semantic.error,
+  },
+  deleteButtonDisabled: {
+    borderColor: Colors.text.disabled,
+  },
+  deleteButtonText: {
+    ...Typography.label,
+    color: Colors.semantic.error,
+  },
+  deleteButtonTextDisabled: {
+    color: Colors.text.disabled,
+  },
   submitContainer: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
@@ -367,6 +457,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  submitButtonFlex: {
+    flex: 1,
   },
   submitButtonDisabled: {
     backgroundColor: Colors.background.tertiary,
