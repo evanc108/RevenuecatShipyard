@@ -48,6 +48,7 @@ import {
   Download,
   FileEdit,
   LayoutGrid,
+  Layers,
 
   // Auth & Branding
   Apple,
@@ -153,6 +154,7 @@ const ICON_MAP = {
   'create-outline': FileEdit,
   apps: LayoutGrid,
   'apps-outline': LayoutGrid,
+  layers: Layers,
 
   // Auth & Branding
   'logo-apple': Apple,

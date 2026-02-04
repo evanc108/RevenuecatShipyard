@@ -69,14 +69,84 @@ export const create = mutation({
       }
     }
 
+    // Check if this is the user's first cookbook
+    const existingCookbook = await ctx.db
+      .query('cookbooks')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .first();
+
+    const isFirstCookbook = existingCookbook === null;
+
     const now = Date.now();
-    return ctx.db.insert('cookbooks', {
+    const cookbookId = await ctx.db.insert('cookbooks', {
       userId: user._id,
       name: args.name,
       description: args.description,
       coverImageUrl,
       createdAt: now,
       updatedAt: now,
+    });
+
+    // Auto-populate the first cookbook with all existing recipes
+    if (isFirstCookbook) {
+      const allRecipes = await ctx.db.query('recipes').collect();
+      await Promise.all(
+        allRecipes.map((recipe) =>
+          ctx.db.insert('cookbookRecipes', {
+            cookbookId,
+            recipeId: recipe._id,
+            addedAt: now,
+          })
+        )
+      );
+    }
+
+    return cookbookId;
+  },
+});
+
+/**
+ * Update an existing cookbook (name, description, cover image).
+ */
+export const update = mutation({
+  args: {
+    cookbookId: v.id('cookbooks'),
+    name: v.string(),
+    description: v.optional(v.string()),
+    coverImageStorageId: v.optional(v.id('_storage')),
+    coverImageUrl: v.optional(v.string()),
+    removeCoverImage: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook) throw new Error('Cookbook not found');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    let coverImageUrl: string | undefined = args.coverImageUrl ?? cookbook.coverImageUrl;
+    if (args.coverImageStorageId) {
+      const url = await ctx.storage.getUrl(args.coverImageStorageId);
+      if (url) {
+        coverImageUrl = url;
+      }
+    }
+    if (args.removeCoverImage) {
+      coverImageUrl = undefined;
+    }
+
+    await ctx.db.patch(args.cookbookId, {
+      name: args.name,
+      description: args.description,
+      coverImageUrl,
+      updatedAt: Date.now(),
     });
   },
 });
@@ -146,7 +216,8 @@ export const remove = mutation({
 });
 
 /**
- * Get all recipes in a cookbook with full recipe details.
+ * Get all recipes in a cookbook, with fields needed by the detail screen.
+ * Returns a lightweight projection (no ingredients/instructions).
  */
 export const getRecipes = query({
   args: { cookbookId: v.id('cookbooks') },
@@ -173,8 +244,20 @@ export const getRecipes = query({
       cookbookRecipes.map(async (cr) => {
         const recipe = await ctx.db.get(cr.recipeId);
         if (!recipe) return null;
+
         return {
-          ...recipe,
+          _id: recipe._id,
+          title: recipe.title,
+          description: recipe.description,
+          cuisine: recipe.cuisine,
+          difficulty: recipe.difficulty,
+          imageUrl: recipe.imageUrl,
+          totalTimeMinutes: recipe.totalTimeMinutes,
+          prepTimeMinutes: recipe.prepTimeMinutes,
+          cookTimeMinutes: recipe.cookTimeMinutes,
+          servings: recipe.servings,
+          calories: recipe.calories,
+          createdAt: recipe.createdAt,
           addedAt: cr.addedAt,
         };
       })

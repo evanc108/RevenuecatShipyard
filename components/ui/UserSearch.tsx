@@ -139,7 +139,6 @@ export function UserSearch({
           data={users ?? []}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          estimatedItemSize={64}
           ListEmptyComponent={ListEmptyComponent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

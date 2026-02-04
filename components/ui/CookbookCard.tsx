@@ -1,9 +1,9 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Icon } from '@/components/ui/Icon';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Icon } from '@/components/ui/Icon';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type CookbookCardProps = {
   name: string;
@@ -11,6 +11,7 @@ type CookbookCardProps = {
   recipeCount: number;
   coverImageUrl?: string | null;
   onPress: () => void;
+  onMorePress?: () => void;
   variant?: 'grid' | 'carousel';
 };
 
@@ -37,6 +38,7 @@ export const CookbookCard = memo(function CookbookCard({
   recipeCount,
   coverImageUrl,
   onPress,
+  onMorePress,
   variant = 'grid',
 }: CookbookCardProps): React.ReactElement {
   const pastelBg = getPastelForName(name);
@@ -115,14 +117,20 @@ export const CookbookCard = memo(function CookbookCard({
         ) : null}
       </View>
 
-      {/* Clickable indicator */}
-      <View style={[styles.moreIcon, isCarousel && styles.moreIconCarousel]}>
+      {/* More button */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Cookbook options"
+        style={[styles.moreIcon, isCarousel && styles.moreIconCarousel]}
+        onPress={onMorePress}
+        hitSlop={12}
+      >
         <Icon
           name="apps"
           size={isCarousel ? 24 : 18}
           color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
         />
-      </View>
+      </Pressable>
     </Pressable>
   );
 });

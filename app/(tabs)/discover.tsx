@@ -487,7 +487,6 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
           data={validPosts}
           renderItem={renderFeedItem}
           keyExtractor={keyExtractor}
-          estimatedItemSize={320}
           ListEmptyComponent={EmptyFeedComponent}
           showsVerticalScrollIndicator={false}
         />
@@ -507,16 +506,20 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
 export default function DiscoverScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('discover');
 
+  const handleFindPeople = useCallback(() => {
+    setActiveTab('discover');
+  }, []);
+
   const content = useMemo(() => {
     switch (activeTab) {
       case 'discover':
         return <DiscoverContent />;
       case 'feed':
-        return <FeedContent />;
+        return <FeedContent onFindPeople={handleFindPeople} />;
       default:
         return <DiscoverContent />;
     }
-  }, [activeTab]);
+  }, [activeTab, handleFindPeople]);
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>

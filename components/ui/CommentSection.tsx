@@ -219,7 +219,6 @@ export const CommentSection = memo(function CommentSection({
             data={comments}
             renderItem={renderComment}
             keyExtractor={keyExtractor}
-            estimatedItemSize={80}
             ListEmptyComponent={ListEmptyComponent}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
