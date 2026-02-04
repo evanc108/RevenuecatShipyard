@@ -19,6 +19,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -281,7 +282,7 @@ export default function CookbookScreen() {
             accessibilityRole="button"
             accessibilityLabel={COPY.newCookbook}
             style={[
-              styles.emptyCard,
+              styles.emptyCardOuter,
               {
                 width: screenWidth * 0.85,
                 height: screenHeight * 0.65,
@@ -289,19 +290,60 @@ export default function CookbookScreen() {
             ]}
             onPress={() => setIsCreateModalVisible(true)}
           >
-            <Text style={styles.emptyCardTitle}>Add Cookbook</Text>
-            <View style={styles.emptyCardImageContainer}>
+            <View style={styles.emptyCardInner}>
+              {/* Top-right plus icon */}
+              <Ionicons
+                name="add"
+                size={30}
+                color={Colors.accent}
+                style={styles.emptyPlusIcon}
+              />
+
+              {/* Decorative brush stroke behind image */}
+              <Svg
+                style={styles.emptyStroke}
+                viewBox="0 0 200 160"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <Path
+                  d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
+                  fill="#EEEEF3"
+                />
+                <Path
+                  d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
+                  fill="#F2F2F6"
+                />
+                <Path
+                  d="M25,105 C30,98 45,100 40,112 C35,120 22,115 25,105Z"
+                  fill="#F2F2F6"
+                />
+              </Svg>
+
+              {/* Centered illustration */}
               <Image
                 source={require('@/assets/images/create-cookbook-icon.png')}
                 style={styles.emptyCardImage}
                 contentFit="contain"
               />
+
+              {/* Bottom fade — white, over image only */}
+              <LinearGradient
+                colors={[
+                  'rgba(255,255,255,0)',
+                  'rgba(255,255,255,0.15)',
+                  'rgba(255,255,255,0.4)',
+                  'rgba(255,255,255,0.7)',
+                  'rgba(255,255,255,1)',
+                ]}
+                locations={[0, 0.25, 0.5, 0.75, 1]}
+                style={styles.emptyCardGradient}
+              />
+
+              {/* Bottom-left label */}
+              <View style={styles.emptyBottom}>
+                <Text style={styles.emptyCardTitle}>{'Add\nCookbook'}</Text>
+              </View>
             </View>
-            <LinearGradient
-              colors={['transparent', 'rgba(245,245,247,0.6)', Colors.background.secondary]}
-              locations={[0.3, 0.6, 1]}
-              style={styles.emptyCardGradient}
-            />
           </Pressable>
         </View>
       ) : (
@@ -445,40 +487,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Empty ghost card
+  // Empty ghost card — outer for shadow, inner for clip
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingBottom: Spacing.xxl,
   },
-  emptyCard: {
+  emptyCardOuter: {
     borderRadius: Radius.xl,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.background.primary,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  emptyCardInner: {
+    flex: 1,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.background.primary,
     overflow: 'hidden',
   },
-  emptyCardTitle: {
-    ...Typography.h2,
-    color: Colors.text.primary,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxl,
+  emptyPlusIcon: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    zIndex: 1,
   },
-  emptyCardImageContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xl,
+  emptyStroke: {
+    position: 'absolute',
+    width: '92%',
+    height: '65%',
+    top: '8%',
+    left: '4%',
   },
   emptyCardImage: {
-    width: '70%',
-    height: '70%',
+    position: 'absolute',
+    width: '88%',
+    height: '80%',
+    top: '5%',
+    left: '6%',
   },
   emptyCardGradient: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
+    left: -1,
+    right: -1,
+    height: '75%',
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+  },
+  emptyBottom: {
+    position: 'absolute',
+    bottom: Spacing.lg,
+    left: Spacing.lg,
+  },
+  emptyCardTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    lineHeight: 34,
+    letterSpacing: -0.3,
   },
 
   // FAB

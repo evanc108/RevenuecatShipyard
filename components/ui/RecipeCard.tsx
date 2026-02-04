@@ -1,9 +1,9 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type RecipeCardProps = {
   title: string;
@@ -64,7 +64,7 @@ export const RecipeCard = memo(function RecipeCard({
       style={styles.card}
       onPress={onPress}
     >
-      {/* Hero image */}
+      {/* Image fills entire card as background */}
       <View style={[styles.imageContainer, !imageUrl && { backgroundColor: fallbackBg }]}>
         {imageUrl ? (
           <Image
@@ -79,14 +79,13 @@ export const RecipeCard = memo(function RecipeCard({
         )}
       </View>
 
-      {/* Info section */}
+      {/* Info overlays on image, right-aligned */}
       <View style={styles.infoSection}>
         <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
           {title}
         </Text>
 
         <View style={styles.metaRow}>
-          {/* Time */}
           <View style={styles.timeChip}>
             <Ionicons name="time-outline" size={14} color={Colors.text.secondary} />
             <Text style={styles.timeText}>
@@ -94,7 +93,6 @@ export const RecipeCard = memo(function RecipeCard({
             </Text>
           </View>
 
-          {/* Cuisine tag */}
           {cuisine ? (
             <View style={styles.cuisineChip}>
               <Text style={styles.cuisineText}>{cuisine}</Text>
@@ -102,7 +100,6 @@ export const RecipeCard = memo(function RecipeCard({
           ) : null}
         </View>
 
-        {/* Difficulty */}
         <DifficultyStars difficulty={difficulty} />
       </View>
     </Pressable>
@@ -111,14 +108,12 @@ export const RecipeCard = memo(function RecipeCard({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     borderRadius: Radius.xl,
-    backgroundColor: Colors.background.primary,
     overflow: 'hidden',
-    ...Shadow.surface,
   },
   imageContainer: {
-    width: '100%',
-    aspectRatio: 16 / 10,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.background.secondary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -130,10 +125,12 @@ const styles = StyleSheet.create({
   infoSection: {
     padding: Spacing.md,
     gap: Spacing.sm,
+    alignItems: 'flex-end',
   },
   title: {
-    ...Typography.h3,
+    ...Typography.h1,
     color: Colors.text.primary,
+    textAlign: 'right',
   },
   metaRow: {
     flexDirection: 'row',
@@ -144,7 +141,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.background.secondary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
@@ -154,7 +150,6 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   cuisineChip: {
-    backgroundColor: Colors.accentLight,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,

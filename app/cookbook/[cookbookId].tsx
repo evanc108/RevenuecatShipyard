@@ -1,5 +1,5 @@
-import { RecipeCard } from '@/components/ui/RecipeCard';
 import { RecentCookCard } from '@/components/ui/RecentCookCard';
+import { RecipeCard } from '@/components/ui/RecipeCard';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
@@ -14,18 +14,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
   interpolate,
-  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -143,12 +143,12 @@ const SORT_OPTIONS: readonly { mode: SortMode; label: string }[] = [
 const SEARCH_ICON_SIZE = 40;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 
-// Cards extend past screen edges for "clipped" look
-const CARD_WIDTH_RATIO = 1.08;
-const CARD_HEIGHT_RATIO = 0.48;
-const SCALE_STEP = 0.04;
-// Tighter spacing so second card is more visible
-const CARD_SPACING_RATIO = 0.78;
+// Main card hugs left wall — wider so info text is visible
+const CARD_WIDTH_RATIO = 0.62;
+const SCALE_STEP = 0.1;
+// Ghost card offset (peeks right + drops down behind main)
+const GHOST_OFFSET_X = 160;
+const GHOST_OFFSET_Y = 60;
 
 const SNAP_SPRING = {
   damping: 20,
@@ -166,7 +166,6 @@ type StackedCardProps = {
   index: number;
   translateX: SharedValue<number>;
   cardWidth: number;
-  cardHeight: number;
   cardStep: number;
   screenWidth: number;
   onPress: () => void;
@@ -177,41 +176,43 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
   index,
   translateX,
   cardWidth,
-  cardHeight,
   cardStep,
   screenWidth,
   onPress,
 }: StackedCardProps): React.ReactElement {
-  // Center the card (it's wider than screen, so left goes negative)
-  const cardLeft = (screenWidth - cardWidth) / 2;
-
   const animatedStyle = useAnimatedStyle(() => {
     const activeIndex = -translateX.value / cardStep;
     const distance = index - activeIndex;
     const absDistance = Math.abs(distance);
 
-    const cardTranslateX = distance * screenWidth * CARD_SPACING_RATIO;
+    // Active card flush left; ghost peeks right; exiting slides left
+    const cardTranslateX = interpolate(
+      distance,
+      [-1, 0, 1, 2],
+      [-screenWidth * 0.6, 0, GHOST_OFFSET_X, GHOST_OFFSET_X * 2],
+      Extrapolation.CLAMP,
+    );
+
+    // Ghost card drops lower
+    const translateY = interpolate(
+      distance,
+      [-1, 0, 1, 2],
+      [0, 0, GHOST_OFFSET_Y, GHOST_OFFSET_Y * 1.5],
+      Extrapolation.CLAMP,
+    );
 
     const scale = interpolate(
       absDistance,
-      [0, 1, 2, 3],
-      [1, 1 - SCALE_STEP, 1 - SCALE_STEP * 2, 1 - SCALE_STEP * 3],
-      Extrapolation.CLAMP,
-    );
-
-    // Second card peeks up more visibly
-    const translateY = interpolate(
-      absDistance,
       [0, 1, 2],
-      [0, 16, 28],
+      [1, 1 - SCALE_STEP, 1 - SCALE_STEP * 2],
       Extrapolation.CLAMP,
     );
 
-    // Adjacent cards much more visible
+    // Ghost visible, 3rd card+ fully hidden to prevent text clipping
     const opacity = interpolate(
       absDistance,
       [0, 1, 2, 3],
-      [1, 0.7, 0.25, 0],
+      [1, 0.6, 0, 0],
       Extrapolation.CLAMP,
     );
 
@@ -234,14 +235,17 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
         {
           position: 'absolute',
           width: cardWidth,
-          height: cardHeight,
-          left: cardLeft,
           top: 0,
+          bottom: 0,
+          left: 0,
+          borderRadius: Radius.xl,
+          backgroundColor: Colors.background.primary,
         },
+        Shadow.elevated,
         animatedStyle,
       ]}
     >
-      <View style={stackStyles.cardWrapper}>
+      <View style={stackStyles.cardInner}>
         <RecipeCard
           title={recipe.title}
           imageUrl={recipe.imageUrl}
@@ -256,11 +260,10 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
 });
 
 const stackStyles = StyleSheet.create({
-  cardWrapper: {
+  cardInner: {
     flex: 1,
     borderRadius: Radius.xl,
     overflow: 'hidden',
-    ...Shadow.elevated,
   },
 });
 
@@ -305,7 +308,7 @@ const PaginationDot = memo(function PaginationDot({
 export default function CookbookDetailScreen(): React.ReactElement {
   const { cookbookId } = useLocalSearchParams<{ cookbookId: string }>();
   const router = useRouter();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
 
   const cookbook = useQuery(
     api.cookbooks.getById,
@@ -326,7 +329,6 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const contextX = useSharedValue(0);
 
   const cardWidth = screenWidth * CARD_WIDTH_RATIO;
-  const cardHeight = screenHeight * CARD_HEIGHT_RATIO;
   const cardStep = screenWidth * 0.35;
 
   // Most recent recipe for the "recently cooked" card
@@ -612,7 +614,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
         ) : (
           <View style={styles.carouselSection}>
             <GestureDetector gesture={panGesture}>
-              <Animated.View style={[styles.carouselTrack, { height: cardHeight }]}>
+              <Animated.View style={styles.carouselTrack}>
                 {sortedRecipes.map((recipe, idx) => (
                   <StackedRecipeCard
                     key={recipe.id}
@@ -620,7 +622,6 @@ export default function CookbookDetailScreen(): React.ReactElement {
                     index={idx}
                     translateX={translateX}
                     cardWidth={cardWidth}
-                    cardHeight={cardHeight}
                     cardStep={cardStep}
                     screenWidth={screenWidth}
                     onPress={() => handleRecipePress(recipe.id)}
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
   },
   headerTitle: {
-    ...Typography.h2,
+    ...Typography.h1,
     color: Colors.text.primary,
     flex: 1,
   },
@@ -799,8 +800,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   carouselTrack: {
-    position: 'relative',
-    overflow: 'visible',
+    flex: 1,
   },
 
   // Empty

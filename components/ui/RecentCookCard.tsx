@@ -1,9 +1,9 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type RecentCookCardProps = {
   title: string;
@@ -14,7 +14,7 @@ type RecentCookCardProps = {
   onCook: () => void;
 };
 
-const CARD_HEIGHT = 100;
+const CARD_HEIGHT = 130;
 
 const PASTEL_FALLBACKS: readonly string[] = [
   '#FFE8D6',
@@ -44,11 +44,11 @@ export const RecentCookCard = memo(function RecentCookCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${title}, ${totalTimeMinutes} ${COPY.cookbookDetail.minuteShort}`}
-      style={styles.card}
+      style={[styles.card, { backgroundColor: fallbackBg }]}
       onPress={onPress}
     >
       {/* Thumbnail */}
-      <View style={[styles.imageContainer, !imageUrl && { backgroundColor: fallbackBg }]}>
+      <View style={[styles.imageContainer, !imageUrl && { backgroundColor: 'rgba(255,255,255,0.45)' }]}>
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
@@ -68,7 +68,7 @@ export const RecentCookCard = memo(function RecentCookCard({
           {title}
         </Text>
         <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={13} color={Colors.text.tertiary} />
+          <Ionicons name="time-outline" size={13} color={Colors.text.primary} />
           <Text style={styles.metaText}>
             {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
           </Text>
@@ -98,22 +98,20 @@ const styles = StyleSheet.create({
   card: {
     height: CARD_HEIGHT,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.background.primary,
     flexDirection: 'row',
     alignItems: 'center',
     paddingLeft: Spacing.sm,
-    paddingRight: Spacing.md,
-    gap: Spacing.md,
+    paddingRight: Spacing.sm,
+    gap: Spacing.sm,
     ...Shadow.surface,
   },
   imageContainer: {
-    width: 76,
-    height: 76,
+    width: 90,
+    height: 90,
     borderRadius: Radius.md,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background.secondary,
   },
   image: {
     width: '100%',
@@ -134,22 +132,25 @@ const styles = StyleSheet.create({
   },
   metaText: {
     ...Typography.caption,
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
   },
   metaDot: {
     ...Typography.caption,
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
   },
   cookButton: {
     backgroundColor: Colors.text.primary,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
+    width: 40,
+    height: 100,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cookText: {
     color: Colors.text.inverse,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,
+    transform: [{ rotate: '-90deg' }],
   },
 });
