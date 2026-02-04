@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # OpenAI Configuration (GPT + Whisper)
     openai_api_key: str
 
+    # Convex Configuration (for posting recipes)
+    convex_url: str = ""
+
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000

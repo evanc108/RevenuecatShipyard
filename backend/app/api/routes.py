@@ -15,6 +15,7 @@ from pydantic import BaseModel, HttpUrl
 
 from app.schemas import Recipe
 from app.services.extraction_pipeline import ExtractionPipeline
+from app.services.recipe_populator import RecipePopulator
 
 logger = logging.getLogger(__name__)
 
@@ -243,3 +244,97 @@ async def health_check() -> dict:
         "status": "healthy",
         "service": "recipe-extractor",
     }
+
+
+class PopulateRequest(BaseModel):
+    """Request payload for populating discover recipes."""
+
+    count: int = 10
+    dietary_restrictions: list[str] | None = None
+    exclude_ingredients: list[str] | None = None
+
+
+class PopulatedRecipeResponse(BaseModel):
+    """Single populated recipe in response."""
+
+    sourceId: str
+    sourceUrl: str
+    title: str
+    description: str | None = None
+    cuisine: str | None = None
+    difficulty: str | None = None
+    imageUrl: str | None = None
+    servings: int | None = None
+    prepTimeMinutes: int | None = None
+    cookTimeMinutes: int | None = None
+    totalTimeMinutes: int | None = None
+    calories: int | None = None
+    proteinGrams: float | None = None
+    carbsGrams: float | None = None
+    fatGrams: float | None = None
+    dietaryTags: list[str] = []
+    keywords: list[str] = []
+    equipment: list[str] = []
+    creatorName: str | None = None
+    creatorProfileUrl: str | None = None
+    ingredients: list[dict]
+    instructions: list[dict]
+
+
+class PopulateResponse(BaseModel):
+    """Response for populate recipes endpoint."""
+
+    success: bool
+    count: int
+    recipes: list[PopulatedRecipeResponse]
+    error: str | None = None
+
+
+@router.post(
+    "/populate-discover",
+    response_model=PopulateResponse,
+    summary="Populate discover recipes",
+    description="Fetches recipes from TheMealDB and enriches them with OpenAI for the discover feed.",
+)
+async def populate_discover_recipes(request: PopulateRequest) -> PopulateResponse:
+    """Populate discover recipes from TheMealDB.
+
+    Fetches random recipes from TheMealDB API, then processes each
+    through the website extractor to get OpenAI-enhanced recipe data.
+
+    This endpoint is meant to be called periodically or when the
+    discover feed runs low on recipes.
+
+    Returns:
+        List of enriched recipes ready for storage in Convex.
+    """
+    try:
+        populator = RecipePopulator()
+        recipes = await populator.populate_recipes(
+            count=request.count,
+            dietary_restrictions=request.dietary_restrictions,
+            exclude_ingredients=request.exclude_ingredients,
+        )
+
+        return PopulateResponse(
+            success=True,
+            count=len(recipes),
+            recipes=[PopulatedRecipeResponse(**r.to_dict()) for r in recipes],
+        )
+
+    except ValueError as e:
+        # Missing API key or configuration
+        logger.error(f"Configuration error: {e}")
+        return PopulateResponse(
+            success=False,
+            count=0,
+            recipes=[],
+            error=str(e),
+        )
+
+    except Exception as e:
+        logger.exception("Failed to populate discover recipes")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to populate recipes: {str(e)}",
+        )
