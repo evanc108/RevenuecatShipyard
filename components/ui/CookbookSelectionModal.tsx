@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -19,6 +18,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
 
 type Recipe = {
   title: string;
@@ -40,31 +40,24 @@ export function CookbookSelectionModal({
   onClose,
   onSelect,
   isLoading = false,
-}: CookbookSelectionModalProps): React.ReactElement {
+}: CookbookSelectionModalProps): React.ReactElement | null {
   const insets = useSafeAreaInsets();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newCookbookName, setNewCookbookName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const slideAnim = useRef(new Animated.Value(400)).current;
+
+  // Use shared modal animation
+  const { isRendered, backdropOpacity, modalTranslateY } = useModalAnimation({
+    visible,
+    onAnimationComplete: () => {
+      setShowCreateForm(false);
+      setNewCookbookName('');
+    },
+  });
 
   const cookbooks = useQuery(api.cookbooks.list);
   const createCookbook = useMutation(api.cookbooks.create);
-
-  useEffect(() => {
-    if (visible) {
-      slideAnim.setValue(400);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 65,
-        friction: 11,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      setShowCreateForm(false);
-      setNewCookbookName('');
-    }
-  }, [visible]);
 
   useEffect(() => {
     if (showCreateForm) {
@@ -101,21 +94,23 @@ export function CookbookSelectionModal({
 
   const isCreateValid = newCookbookName.trim().length > 0;
 
+  if (!isRendered) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
+        pointerEvents="box-none"
       >
-        <Pressable style={styles.backdrop} onPress={handleClose} />
+        {/* Animated Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
 
+        {/* Animated Modal Content */}
         <Animated.View
-          style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}
+          style={[styles.modalContent, { transform: [{ translateY: modalTranslateY }] }]}
         >
           {/* Handle bar */}
           <View style={styles.handleContainer}>
@@ -262,26 +257,28 @@ export function CookbookSelectionModal({
                     onPress={() => handleSelectCookbook(cookbook._id)}
                     disabled={isLoading || isCreating}
                   >
-                    {cookbook.coverImageUrl ? (
-                      <Image
-                        source={{ uri: cookbook.coverImageUrl }}
-                        style={styles.cookbookImage}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <View style={[styles.cookbookImage, styles.cookbookImagePlaceholder]}>
-                        <Ionicons name="book-outline" size={20} color={Colors.text.tertiary} />
+                    <View style={styles.cookbookItemContent}>
+                      {cookbook.coverImageUrl ? (
+                        <Image
+                          source={{ uri: cookbook.coverImageUrl }}
+                          style={styles.cookbookImage}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={[styles.cookbookImage, styles.cookbookImagePlaceholder]}>
+                          <Ionicons name="book-outline" size={20} color={Colors.text.tertiary} />
+                        </View>
+                      )}
+                      <View style={styles.cookbookInfo}>
+                        <Text style={styles.cookbookName} numberOfLines={1}>
+                          {cookbook.name}
+                        </Text>
+                        <Text style={styles.cookbookCount}>
+                          {cookbook.recipeCount} {cookbook.recipeCount === 1 ? 'recipe' : 'recipes'}
+                        </Text>
                       </View>
-                    )}
-                    <View style={styles.cookbookInfo}>
-                      <Text style={styles.cookbookName} numberOfLines={1}>
-                        {cookbook.name}
-                      </Text>
-                      <Text style={styles.cookbookCount}>
-                        {cookbook.recipeCount} {cookbook.recipeCount === 1 ? 'recipe' : 'recipes'}
-                      </Text>
+                      <Ionicons name="chevron-forward" size={18} color={Colors.text.tertiary} />
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={Colors.text.tertiary} />
                   </Pressable>
                 ))}
               </View>
@@ -297,7 +294,7 @@ export function CookbookSelectionModal({
           )}
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
@@ -311,6 +308,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.overlay,
   },
   modalContent: {
+    width: '100%',
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
@@ -470,15 +468,17 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   cookbookItem: {
+    borderRadius: Radius.md,
+  },
+  cookbookItemPressed: {
+    backgroundColor: Colors.background.secondary,
+  },
+  cookbookItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.md,
-  },
-  cookbookItemPressed: {
-    backgroundColor: Colors.background.secondary,
   },
   cookbookImage: {
     width: 48,

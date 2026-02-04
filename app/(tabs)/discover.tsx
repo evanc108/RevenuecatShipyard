@@ -17,13 +17,12 @@ import { TabSlider } from '@/components/ui/TabSlider';
 import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
 import { CookbookSelectionModal } from '@/components/ui/CookbookSelectionModal';
 import { FeedPost } from '@/components/ui/FeedPost';
-import { UserSearch } from '@/components/ui/UserSearch';
 import { COPY } from '@/constants/copy';
 import type { Recipe } from '@/components/discover/RecipeCard';
 import type { Doc, Id } from '@/convex/_generated/dataModel';
 
 // --- Types ---
-type TabKey = 'discover' | 'feed' | 'following';
+type TabKey = 'discover' | 'feed';
 
 type DiscoverRecipe = Doc<'discoverRecipes'>;
 type RecipeWithId = Recipe & { _discoverRecipeId: Id<'discoverRecipes'> };
@@ -64,7 +63,6 @@ type FeedPostData = {
 const TABS = [
   { key: 'discover' as const, label: COPY.discover.tabs.discover },
   { key: 'feed' as const, label: COPY.discover.tabs.feed },
-  { key: 'following' as const, label: COPY.discover.tabs.following },
 ];
 
 const LOW_RECIPE_THRESHOLD = 8;
@@ -378,7 +376,7 @@ function DiscoverContent() {
 }
 
 // --- Feed Content Component ---
-function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
+function FeedContent() {
   const currentUser = useQuery(api.users.current);
   const feedPosts = useQuery(api.posts.socialFeed, { limit: 50 });
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
@@ -454,17 +452,9 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
         <Ionicons name="newspaper-outline" size={64} color={Colors.text.tertiary} />
         <Text style={styles.emptyTitle}>{COPY.socialFeed.emptyFeedTitle}</Text>
         <Text style={styles.emptySubtitle}>{COPY.socialFeed.emptyFeedSubtitle}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={COPY.socialFeed.findPeople}
-          style={styles.findPeopleButton}
-          onPress={onFindPeople}
-        >
-          <Text style={styles.findPeopleText}>{COPY.socialFeed.findPeople}</Text>
-        </Pressable>
       </View>
     );
-  }, [feedPosts, onFindPeople]);
+  }, [feedPosts]);
 
   const validPosts: FeedPostData[] = useMemo(() => {
     if (!feedPosts) return [];
@@ -514,9 +504,7 @@ export default function DiscoverScreen() {
       case 'discover':
         return <DiscoverContent />;
       case 'feed':
-        return <FeedContent onFindPeople={() => setActiveTab('following')} />;
-      case 'following':
-        return <UserSearch showSuggestions />;
+        return <FeedContent />;
       default:
         return <DiscoverContent />;
     }
@@ -626,17 +614,5 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginTop: Spacing.xs,
     textAlign: 'center',
-  },
-  findPeopleButton: {
-    marginTop: Spacing.lg,
-    backgroundColor: Colors.accent,
-    paddingVertical: Spacing.sm + 2,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: 20,
-  },
-  findPeopleText: {
-    ...Typography.label,
-    color: Colors.text.inverse,
-    fontWeight: '600',
   },
 });

@@ -150,6 +150,7 @@ export const COPY = {
     },
     sharePost: {
       title: 'Share a Meal',
+      selectRecipe: 'Select Recipe',
       searchPlaceholder: 'Search your recipes...',
       ratings: {
         ease: 'How easy was it?',
@@ -194,6 +195,32 @@ export const COPY = {
     },
     emptyTitle: 'No Posts Yet',
     emptySubtitle: 'Share your first recipe to see it here',
+  },
+  shareIntent: {
+    title: 'Save Recipe',
+    selectCookbook: 'Choose a cookbook',
+    import: 'Import',
+    cancel: 'Cancel',
+    urlPreview: 'Recipe from',
+    progress: {
+      queued: 'Queued...',
+      checking: 'Checking...',
+      extracting: 'Extracting...',
+      saving: 'Saving...',
+    },
+    success: {
+      title: 'Recipe saved',
+      viewRecipe: 'View',
+    },
+    error: {
+      title: 'Import failed',
+      retry: 'Try Again',
+    },
+    clipboard: {
+      prompt: (domain: string) => `Import recipe from ${domain}?`,
+      import: 'Import',
+      dismiss: 'Dismiss',
+    },
   },
   recipeDetail: {
     title: 'Recipe',
