@@ -1,8 +1,14 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import type { Id } from '@/convex/_generated/dataModel';
+
+type OpenModalOptions = {
+  initialCookbookId?: Id<'cookbooks'>;
+};
 
 type AddModalContextType = {
   isVisible: boolean;
-  openModal: () => void;
+  initialCookbookId: Id<'cookbooks'> | null;
+  openModal: (options?: OpenModalOptions) => void;
   closeModal: () => void;
 };
 
@@ -14,8 +20,10 @@ type AddModalProviderProps = {
 
 export function AddModalProvider({ children }: AddModalProviderProps): React.ReactElement {
   const [isVisible, setIsVisible] = useState(false);
+  const [initialCookbookId, setInitialCookbookId] = useState<Id<'cookbooks'> | null>(null);
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((options?: OpenModalOptions) => {
+    setInitialCookbookId(options?.initialCookbookId ?? null);
     setIsVisible(true);
   }, []);
 
@@ -24,7 +32,7 @@ export function AddModalProvider({ children }: AddModalProviderProps): React.Rea
   }, []);
 
   return (
-    <AddModalContext.Provider value={{ isVisible, openModal, closeModal }}>
+    <AddModalContext.Provider value={{ isVisible, initialCookbookId, openModal, closeModal }}>
       {children}
     </AddModalContext.Provider>
   );

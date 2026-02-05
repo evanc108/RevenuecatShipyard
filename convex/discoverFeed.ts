@@ -278,3 +278,128 @@ export const getTotalCount = query({
     return recipes.length;
   },
 });
+
+/**
+ * Save a discover recipe to the recipes table and add it to a cookbook.
+ * Copies the discover recipe data into a user-owned recipe, deduplicating by sourceUrl.
+ */
+export const saveToCookbook = mutation({
+  args: {
+    discoverRecipeId: v.id('discoverRecipes'),
+    cookbookId: v.id('cookbooks'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook || cookbook.userId !== user._id) throw new Error('Cookbook not found');
+
+    const discoverRecipe = await ctx.db.get(args.discoverRecipeId);
+    if (!discoverRecipe) throw new Error('Recipe not found');
+
+    // Check if this recipe already exists in the recipes table by URL
+    let existingRecipe = await ctx.db
+      .query('recipes')
+      .withIndex('by_url', (q) => q.eq('url', discoverRecipe.sourceUrl))
+      .unique();
+
+    let recipeId;
+
+    if (existingRecipe) {
+      recipeId = existingRecipe._id;
+    } else {
+      // Copy discover recipe into the recipes table
+      recipeId = await ctx.db.insert('recipes', {
+        url: discoverRecipe.sourceUrl,
+        createdAt: Date.now(),
+        title: discoverRecipe.title,
+        description: discoverRecipe.description,
+        cuisine: discoverRecipe.cuisine,
+        difficulty: discoverRecipe.difficulty,
+        imageUrl: discoverRecipe.imageUrl,
+        servings: discoverRecipe.servings,
+        prepTimeMinutes: discoverRecipe.prepTimeMinutes,
+        cookTimeMinutes: discoverRecipe.cookTimeMinutes,
+        totalTimeMinutes: discoverRecipe.totalTimeMinutes,
+        calories: discoverRecipe.calories,
+        proteinGrams: discoverRecipe.proteinGrams,
+        carbsGrams: discoverRecipe.carbsGrams,
+        fatGrams: discoverRecipe.fatGrams,
+        dietaryTags: discoverRecipe.dietaryTags,
+        keywords: discoverRecipe.keywords,
+        equipment: discoverRecipe.equipment,
+        creatorName: discoverRecipe.creatorName,
+        creatorProfileUrl: discoverRecipe.creatorProfileUrl,
+        ingredients: discoverRecipe.ingredients,
+        instructions: discoverRecipe.instructions,
+        methodUsed: 'website',
+        ratingCount: 0,
+        ratingSum: 0,
+      });
+    }
+
+    // Add to cookbook if not already there
+    const existingEntry = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook_recipe', (q) =>
+        q.eq('cookbookId', args.cookbookId).eq('recipeId', recipeId)
+      )
+      .unique();
+
+    if (!existingEntry) {
+      await ctx.db.insert('cookbookRecipes', {
+        cookbookId: args.cookbookId,
+        recipeId,
+        addedAt: Date.now(),
+      });
+    }
+
+    // Also save to user's collection
+    const existingSave = await ctx.db
+      .query('userSavedRecipes')
+      .withIndex('by_user_recipe', (q) =>
+        q.eq('userId', user._id).eq('recipeId', recipeId)
+      )
+      .unique();
+
+    if (!existingSave) {
+      await ctx.db.insert('userSavedRecipes', {
+        userId: user._id,
+        recipeId,
+        savedAt: Date.now(),
+      });
+    }
+
+    // Mark as viewed/saved
+    const existingView = await ctx.db
+      .query('userViewedRecipes')
+      .withIndex('by_user_recipe', (q) =>
+        q.eq('userId', user._id).eq('discoverRecipeId', args.discoverRecipeId)
+      )
+      .unique();
+
+    if (existingView) {
+      await ctx.db.patch(existingView._id, {
+        action: 'saved',
+        viewedAt: Date.now(),
+      });
+    } else {
+      await ctx.db.insert('userViewedRecipes', {
+        userId: user._id,
+        discoverRecipeId: args.discoverRecipeId,
+        viewedAt: Date.now(),
+        action: 'saved',
+      });
+    }
+
+    return recipeId;
+  },
+});

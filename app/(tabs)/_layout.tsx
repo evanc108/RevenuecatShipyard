@@ -6,11 +6,10 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { AddModal } from '@/components/ui/AddModal';
 import { Icon } from '@/components/ui/Icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
+import { useAddModal } from '@/context/AddModalContext';
 import { RecipePickerProvider } from '@/context/RecipePickerContext';
 import { RecipePickerSheet } from '@/components/features/pantry/RecipePickerSheet';
 
@@ -133,7 +132,6 @@ function TabLayoutContent() {
           }}
         />
       </Tabs>
-      <AddModal />
       <RecipePickerSheet />
     </>
   );
@@ -178,10 +176,8 @@ const styles = StyleSheet.create({
 
 export default function TabLayout() {
   return (
-    <AddModalProvider>
-      <RecipePickerProvider>
-        <TabLayoutContent />
-      </RecipePickerProvider>
-    </AddModalProvider>
+    <RecipePickerProvider>
+      <TabLayoutContent />
+    </RecipePickerProvider>
   );
 }
