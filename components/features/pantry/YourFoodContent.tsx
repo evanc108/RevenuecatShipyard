@@ -1,9 +1,10 @@
 import { memo, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, SectionList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, SectionList } from 'react-native';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Icon } from '@/components/ui/Icon';
+import { Loading } from '@/components/ui/Loading';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useMealPlanGenerationStore } from '@/stores/useMealPlanGenerationStore';
@@ -112,7 +113,7 @@ function YourFoodContentComponent(): React.ReactElement {
   if (pantryItems === undefined) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={Colors.accent} />
+        <Loading size="small" color={Colors.accent} />
       </View>
     );
   }

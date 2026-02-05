@@ -1,5 +1,5 @@
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -7,6 +7,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useMealPlanStore } from '@/stores/useMealPlanStore';
 import type { MealType } from '@/stores/useMealPlanStore';
 import { useRecipePicker } from '@/context/RecipePickerContext';
+import { Loading } from '@/components/ui/Loading';
 import { WeekdayPicker } from './WeekdayPicker';
 import { MealSection } from './MealSection';
 
@@ -88,7 +89,7 @@ function MealPlanContentComponent(): React.ReactElement {
       <View style={styles.divider} />
       {entries === undefined ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={Colors.accent} />
+          <Loading size="small" color={Colors.accent} />
         </View>
       ) : (
         <ScrollView

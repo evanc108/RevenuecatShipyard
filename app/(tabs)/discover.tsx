@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   Pressable,
   TextInput,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { useAction, useMutation, useQuery } from 'convex/react';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
 import { UserListItem } from '@/components/ui/UserListItem';
+import { Loading } from '@/components/ui/Loading';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { TabSlider } from '@/components/ui/TabSlider';
@@ -319,7 +319,7 @@ function DiscoverContent() {
   if (unviewedRecipes === undefined || currentUser === undefined) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <Loading size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Loading recipes...</Text>
       </View>
     );
@@ -328,7 +328,7 @@ function DiscoverContent() {
   if (isPopulating && recipes.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <Loading size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Finding recipes for you...</Text>
         <Text style={styles.subText}>
           This may take a moment as we curate the best recipes
@@ -421,7 +421,7 @@ function FriendSearch(): React.ReactElement {
       </Text>
 
       {isLoading ? (
-        <ActivityIndicator size="small" color={Colors.accent} style={styles.searchLoading} />
+        <Loading size="small" color={Colors.accent} style={styles.searchLoading} />
       ) : users && users.length > 0 ? (
         <View style={styles.usersList}>
           {users.map((user) => (
@@ -509,7 +509,7 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
     if (feedPosts === undefined) {
       return (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
+          <Loading size="large" color={Colors.accent} />
         </View>
       );
     }

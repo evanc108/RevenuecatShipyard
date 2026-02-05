@@ -57,7 +57,7 @@ function TabLayoutContent() {
     <>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors.text.primary,
+          tabBarActiveTintColor: Colors.accent,
           tabBarInactiveTintColor: Colors.text.tertiary,
           headerShown: false,
           tabBarButton: HapticTab,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 16,
     backgroundColor: Colors.accent,
-    opacity: 0.18,
+    opacity: 0.25,
     transform: [{ rotate: '-5deg' }, { scaleX: 1.05 }],
   },
   // Elevated circular add button
