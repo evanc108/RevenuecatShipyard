@@ -5,15 +5,15 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo, useCallback, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Extrapolation,
-  interpolate,
-  type SharedValue,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
+    Extrapolation,
+    interpolate,
+    type SharedValue,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
@@ -74,7 +74,7 @@ type PaginationDotProps = {
 
 // --- Constants ---
 
-const CARD_WIDTH_RATIO = 0.85;
+const CARD_WIDTH_RATIO = 0.90;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 const DOT_SIZE = 6;
 const DOT_ACTIVE_WIDTH = 18;
@@ -563,6 +563,8 @@ export function CookbookCarousel({
 
   // Grid item width accounting for gaps and padding
   const gridItemWidth = (screenWidth - Spacing.lg * 2 - GRID_GAP) / GRID_COLUMNS;
+  const cardAspectRatio = 0.65; // From CookbookCard.tsx default
+  const sliderHeight = screenWidth * CARD_WIDTH_RATIO / cardAspectRatio;
 
   return (
     <View style={styles.carouselContainer}>
@@ -577,7 +579,7 @@ export function CookbookCarousel({
 
       {viewMode === 'slider' ? (
         <GestureDetector gesture={panGesture}>
-          <Animated.View style={styles.carouselTrack}>
+          <Animated.View style={[styles.carouselTrack, { height: sliderHeight }]}>
             {cookbooks.map((cookbook, idx) => (
               <CarouselCard
                 key={cookbook._id}
@@ -604,41 +606,39 @@ export function CookbookCarousel({
           </Animated.View>
         </GestureDetector>
       ) : (
-        <ScrollView
-          style={styles.gridContainer}
-          contentContainerStyle={styles.gridContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.gridRow}>
-            {cookbooks.map((cookbook) => (
+        <View style={styles.gridContainer}>
+          <View style={styles.gridContent}>
+            <View style={styles.gridRow}>
+              {cookbooks.map((cookbook) => (
+                <View
+                  key={cookbook._id}
+                  style={[
+                    { width: gridItemWidth, marginBottom: GRID_GAP, borderRadius: Radius.xl },
+                    styles.gridCardShadow,
+                  ]}
+                >
+                  <CookbookCard
+                    name={cookbook.name}
+                    description={cookbook.description}
+                    recipeCount={cookbook.recipeCount}
+                    coverImageUrl={cookbook.coverImageUrl}
+                    variant="grid"
+                    onPress={() => handleCardPress(cookbook._id)}
+                    onMorePress={() => onMorePress(cookbook._id)}
+                  />
+                </View>
+              ))}
               <View
-                key={cookbook._id}
                 style={[
                   { width: gridItemWidth, marginBottom: GRID_GAP, borderRadius: Radius.xl },
                   styles.gridCardShadow,
                 ]}
               >
-                <CookbookCard
-                  name={cookbook.name}
-                  description={cookbook.description}
-                  recipeCount={cookbook.recipeCount}
-                  coverImageUrl={cookbook.coverImageUrl}
-                  variant="grid"
-                  onPress={() => handleCardPress(cookbook._id)}
-                  onMorePress={() => onMorePress(cookbook._id)}
-                />
+                <GridAddCard onPress={onAddPress} />
               </View>
-            ))}
-            <View
-              style={[
-                { width: gridItemWidth, marginBottom: GRID_GAP, borderRadius: Radius.xl },
-                styles.gridCardShadow,
-              ]}
-            >
-              <GridAddCard onPress={onAddPress} />
             </View>
           </View>
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -648,11 +648,13 @@ export function CookbookCarousel({
 
 const styles = StyleSheet.create({
   carouselContainer: {
-    flex: 1,
+    // Flex removed to allow sizing by parent scrollview or fixed height
+    paddingBottom: Spacing.md,
   },
   carouselTrack: {
-    flex: 1,
+    // Flex removed, height now controlled by prop
     overflow: 'visible',
+    marginBottom: Spacing.sm,
   },
   cardPressable: {
     flex: 1,
@@ -715,7 +717,7 @@ const styles = StyleSheet.create({
 
   // Grid view
   gridContainer: {
-    flex: 1,
+    // Flex removed
   },
   gridContent: {
     paddingHorizontal: Spacing.lg,
@@ -723,7 +725,7 @@ const styles = StyleSheet.create({
   },
   gridAddCard: {
     width: '100%',
-    aspectRatio: 0.7,
+    aspectRatio: 0.65,
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
     overflow: 'hidden',

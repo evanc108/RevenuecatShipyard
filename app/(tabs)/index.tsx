@@ -1,12 +1,11 @@
-import { ClipboardPrompt } from '@/components/ui/ClipboardPrompt';
 import { CookbookCarousel } from '@/components/cookbook/CookbookCarousel';
 import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
+import { PendingImportRow } from '@/components/cookbook/PendingImportRow';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useShareIntent } from '@/context/ShareIntentContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { useClipboardDetection } from '@/hooks/useClipboardDetection';
 import { useMutation, useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -60,16 +59,8 @@ export default function CookbookScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Clipboard detection for recipe URLs
-  const { detectedUrl, detectedDomain, dismissDetection, clearDetection } = useClipboardDetection();
+  // Share intent context
   const { triggerImport } = useShareIntent();
-
-  const handleClipboardImport = useCallback(() => {
-    if (detectedUrl) {
-      clearDetection();
-      triggerImport(detectedUrl);
-    }
-  }, [detectedUrl, clearDetection, triggerImport]);
 
   const searchProgress = useSharedValue(0);
   const inputRef = useRef<TextInput>(null);
@@ -247,68 +238,69 @@ export default function CookbookScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.titleColumn}>
-          <Icon name="book" size={36} color={Colors.text.primary} />
-          <Text style={styles.titleTop}>{COPY.titleTop}</Text>
-          <Text style={styles.titleBottom}>{COPY.titleBottom}</Text>
-        </View>
+      {/* Scrollable Content */}
+      <Animated.ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.titleColumn}>
+            <Icon name="book" size={36} color={Colors.text.primary} />
+            <Text style={styles.titleTop}>{COPY.titleTop}</Text>
+            <Text style={styles.titleBottom}>{COPY.titleBottom}</Text>
+          </View>
 
-        {/* Top-right actions */}
-        <View style={styles.headerActions}>
-          {/* Search — black button, expands left */}
-          <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Search"
-              onPress={!isSearchActive ? handleOpenSearch : undefined}
-              style={styles.searchIconButton}
-            >
-              <Icon
-                name="search"
-                size={22}
-                strokeWidth={2.5}
-                color={isSearchActive ? Colors.text.inverse : Colors.text.inverse}
-              />
-            </Pressable>
-
-            {isSearchActive ? (
-              <Animated.View style={[styles.searchInputContainer, searchInputOpacity]}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close search"
-                  onPress={handleCloseSearch}
-                  style={styles.searchCloseButton}
-                  hitSlop={8}
-                >
-                  <Icon name="close" size={18} strokeWidth={2.5} color="rgba(255,255,255,0.7)" />
-                </Pressable>
-                <TextInput
-                  ref={inputRef}
-                  style={styles.searchInput}
-                  placeholder={COPY.searchPlaceholder}
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  accessibilityLabel={COPY.searchPlaceholder}
+          {/* Top-right actions */}
+          <View style={styles.headerActions}>
+            {/* Search — black button, expands left */}
+            <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Search"
+                onPress={!isSearchActive ? handleOpenSearch : undefined}
+                style={styles.searchIconButton}
+              >
+                <Icon
+                  name="search"
+                  size={22}
+                  strokeWidth={2.5}
+                  color={isSearchActive ? Colors.text.inverse : Colors.text.inverse}
                 />
-              </Animated.View>
-            ) : null}
-          </Animated.View>
-        </View>
-      </View>
+              </Pressable>
 
-      {/* Clipboard Prompt */}
-      {detectedUrl && detectedDomain && (
-        <ClipboardPrompt
-          domain={detectedDomain}
-          onImport={handleClipboardImport}
-          onDismiss={dismissDetection}
-        />
-      )}
+              {isSearchActive ? (
+                <Animated.View style={[styles.searchInputContainer, searchInputOpacity]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close search"
+                    onPress={handleCloseSearch}
+                    style={styles.searchCloseButton}
+                    hitSlop={8}
+                  >
+                    <Icon name="close" size={18} strokeWidth={2.5} color="rgba(255,255,255,0.7)" />
+                  </Pressable>
+                  <TextInput
+                    ref={inputRef}
+                    style={styles.searchInput}
+                    placeholder={COPY.searchPlaceholder}
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel={COPY.searchPlaceholder}
+                  />
+                </Animated.View>
+              ) : null}
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Pending Imports Row */}
+        <PendingImportRow />
 
       {/* Content */}
       {isLoading ? (
@@ -325,6 +317,7 @@ export default function CookbookScreen() {
           onToggleViewMode={() => setViewMode((m) => (m === 'slider' ? 'grid' : 'slider'))}
         />
       )}
+      </Animated.ScrollView>
 
       {/* Create Modal */}
       <CreateCookbookModal
@@ -358,27 +351,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: Spacing.xl, // Space for tab bar
+  },
 
   // Header
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
   },
   titleColumn: {
     flexDirection: 'column',
     gap: Spacing.xs,
   },
   titleTop: {
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '400',
     color: Colors.text.primary,
     letterSpacing: -0.2,
   },
   titleBottom: {
-    fontSize: 38,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 36,
     fontWeight: '700',
     color: Colors.text.primary,
     letterSpacing: -0.3,

@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   cardGrid: {
     width: '100%',
-    aspectRatio: 0.85,
+    aspectRatio: 0.65,
   },
   cardCarousel: {
     flex: 1,

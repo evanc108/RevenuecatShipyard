@@ -5,13 +5,14 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { RecipePickerSheet } from '@/components/features/pantry/RecipePickerSheet';
 import { HapticTab } from '@/components/haptic-tab';
+import { FloatingUploadProgress } from '@/components/ui/FloatingUploadProgress';
 import { Icon } from '@/components/ui/Icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useAddModal } from '@/context/AddModalContext';
 import { RecipePickerProvider } from '@/context/RecipePickerContext';
-import { RecipePickerSheet } from '@/components/features/pantry/RecipePickerSheet';
 
 // --- Playful brush stroke behind active tab icon ---
 
@@ -64,14 +65,15 @@ function TabLayoutContent() {
             paddingHorizontal: 12,
             height: 88,
             backgroundColor: Colors.background.primary,
-            borderTopWidth: 0,
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(0,0,0,0.05)',
             overflow: 'visible',
             // Upward shadow for elevated / floating look
             shadowColor: '#000000',
-            shadowOffset: { width: 0, height: -3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 12,
-            elevation: 10,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2,
           },
         }}>
         <Tabs.Screen
@@ -133,6 +135,7 @@ function TabLayoutContent() {
         />
       </Tabs>
       <RecipePickerSheet />
+      <FloatingUploadProgress />
     </>
   );
 }
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    top: -24,
+    top: -16,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

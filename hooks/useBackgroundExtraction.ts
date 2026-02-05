@@ -6,13 +6,12 @@
  * extractions.
  */
 
-import { useCallback, useRef, useEffect } from 'react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
-import EventSource from 'react-native-sse';
+import { useCallback, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
+import EventSource from 'react-native-sse';
 
 import { api } from '@/convex/_generated/api';
-import type { Id } from '@/convex/_generated/dataModel';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 
 /** SSE event with data field */
@@ -187,7 +186,10 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
           updateProgress(uploadId, 0.8, 'Adding to your collection...');
 
           await saveToCollection({ recipeId: existingRecipe._id });
-          await addToCookbook({ cookbookId, recipeId: existingRecipe._id });
+
+          if (cookbookId) {
+            await addToCookbook({ cookbookId, recipeId: existingRecipe._id });
+          }
 
           setComplete(uploadId, existingRecipe._id, existingRecipe.title);
           return;
@@ -269,8 +271,10 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
             methodUsed: apiRecipe.method_used,
           });
 
-          // Add to cookbook
-          await addToCookbook({ cookbookId, recipeId });
+          // Add to cookbook if selected
+          if (cookbookId) {
+            await addToCookbook({ cookbookId, recipeId });
+          }
 
           setComplete(uploadId, recipeId, apiRecipe.title);
         } catch (err) {

@@ -5,19 +5,18 @@ import { useEffect, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { ClerkProvider, ClerkLoaded, useAuth, useUser } from '@clerk/clerk-expo';
-import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
-import { ConvexReactClient, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { ClerkLoaded, ClerkProvider, useAuth, useUser } from '@clerk/clerk-expo';
+import { tokenCache } from '@clerk/clerk-expo/token-cache';
+import { ConvexReactClient, useMutation, useQuery } from 'convex/react';
+import { ConvexProviderWithClerk } from 'convex/react-clerk';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
-import { ShareIntentProvider } from '@/context/ShareIntentContext';
-import { AddModalProvider } from '@/context/AddModalContext';
 import { AddModal } from '@/components/ui/AddModal';
-import { UploadProgressIndicator } from '@/components/ui/UploadProgressIndicator';
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { AddModalProvider } from '@/context/AddModalContext';
+import { ShareIntentProvider } from '@/context/ShareIntentContext';
 import '@/global.css';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -164,7 +163,6 @@ export default function RootLayout() {
                         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
                       </Stack>
                       <AddModal />
-                      <UploadProgressIndicator />
                     </AddModalProvider>
                   </ShareIntentProvider>
                 </AuthGuard>
