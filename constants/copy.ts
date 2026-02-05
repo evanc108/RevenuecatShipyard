@@ -350,6 +350,25 @@ export const COPY = {
       dismiss: 'Dismiss',
     },
   },
+  shareExtension: {
+    title: 'Save Recipe',
+    selectCookbook: 'Choose a cookbook',
+    save: 'Save',
+    cancel: 'Cancel',
+    urlPreview: 'Recipe from',
+    createNew: '+ New Cookbook',
+    createNewPlaceholder: 'Cookbook name',
+    create: 'Create',
+    noCookbooks: 'No cookbooks yet. Create one below.',
+    success: {
+      title: 'Recipe queued!',
+      subtitle: 'Open the app to see your recipe.',
+    },
+    errors: {
+      noUrl: 'No URL found to import.',
+      saveFailed: 'Could not save. Please try again.',
+    },
+  },
   recipeDetail: {
     title: 'Recipe',
     notFound: 'Recipe not found',

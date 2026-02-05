@@ -1,3 +1,5 @@
+import '@/components/share-extension'; // side-effect: registers AppRegistry component for share extension
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -23,6 +25,7 @@ import { AddModalProvider } from '@/context/AddModalContext';
 import { ShareIntentProvider } from '@/context/ShareIntentContext';
 import { AddPantryItemModal } from '@/components/features/pantry/AddPantryItemModal';
 import { GenerateMealPlanModal } from '@/components/features/pantry/GenerateMealPlanModal';
+import { useCookbookCacheSync } from '@/hooks/useCookbookCacheSync';
 import '@/global.css';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -69,6 +72,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       hasNavigated.current = false;
     }
   }, [isSignedIn]);
+
+  // Sync cookbooks to App Groups for the share extension
+  useCookbookCacheSync();
 
   // Auth routing — reads segments inside effect, not in deps (avoids redirect loops)
   useEffect(() => {

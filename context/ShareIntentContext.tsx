@@ -11,6 +11,7 @@
 import { ShareCookbookSheet } from '@/components/cookbook/ShareCookbookSheet';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { usePendingShareImports } from '@/hooks/usePendingShareImports';
 import { useShareHandler } from '@/hooks/useShareHandler';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 import {
@@ -42,6 +43,9 @@ export function ShareIntentProvider({
   const { pendingUrl, clearPendingUrl } = useShareHandler();
   const { startExtraction } = useBackgroundExtraction();
   const addUpload = usePendingUploadsStore((s) => s.addUpload);
+
+  // Pick up pending imports written by the share extension
+  usePendingShareImports();
 
   // Handle incoming URLs from share handler
   useEffect(() => {
