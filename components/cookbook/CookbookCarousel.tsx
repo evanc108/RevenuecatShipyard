@@ -448,14 +448,14 @@ function ViewModeToggle({
           <Icon
             name="layers"
             size={18}
-            color={viewMode === 'slider' ? Colors.text.inverse : Colors.text.tertiary}
+            color={viewMode === 'slider' ? Colors.text.inverse : Colors.accent}
           />
         </View>
         <View style={styles.toggleIconContainer}>
           <Icon
             name="apps"
             size={18}
-            color={viewMode === 'grid' ? Colors.text.inverse : Colors.text.tertiary}
+            color={viewMode === 'grid' ? Colors.text.inverse : Colors.accent}
           />
         </View>
       </View>
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   dot: {
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
   },
 
   // View mode toggle
@@ -692,7 +692,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.background.tertiary,
+    backgroundColor: Colors.background.secondary,
     alignItems: 'center',
     position: 'relative',
   },
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
     left: 2,
     top: 2,
   },

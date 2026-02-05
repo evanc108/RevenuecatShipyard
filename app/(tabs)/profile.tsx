@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  ActivityIndicator,
   Animated,
   Dimensions,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
+import { Loading } from '@/components/ui/Loading';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
@@ -271,7 +271,7 @@ export default function ProfileScreen(): React.ReactElement {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
+          <Loading size="large" color={Colors.accent} />
         </View>
       </SafeAreaView>
     );

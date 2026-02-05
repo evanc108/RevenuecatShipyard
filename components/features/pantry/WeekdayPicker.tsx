@@ -89,7 +89,7 @@ function WeekdayPickerComponent({
             hitSlop={8}
             style={styles.arrowButton}
           >
-            <Icon name="chevron-left" size={20} color={Colors.accent} />
+            <Icon name="chevron-left" size={20} color={Colors.text.inverse} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -98,7 +98,7 @@ function WeekdayPickerComponent({
             hitSlop={8}
             style={styles.arrowButton}
           >
-            <Icon name="chevron-right" size={20} color={Colors.accent} />
+            <Icon name="chevron-right" size={20} color={Colors.text.inverse} />
           </Pressable>
         </View>
       </View>
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: Radius.full,
-    backgroundColor: Colors.accentLight,
+    backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },

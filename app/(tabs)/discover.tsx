@@ -1,25 +1,25 @@
-import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
-import type { Recipe } from '@/components/discover/RecipeCard';
-import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
-import { FeedPost } from '@/components/ui/FeedPost';
-import { COPY } from '@/constants/copy';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { api } from '@/convex/_generated/api';
-import type { Doc, Id } from '@/convex/_generated/dataModel';
-import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { api } from '@/convex/_generated/api';
+import { Loading } from '@/components/ui/Loading';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
+import { FeedPost } from '@/components/ui/FeedPost';
+import { COPY } from '@/constants/copy';
+import type { Recipe } from '@/components/discover/RecipeCard';
+import type { Doc, Id } from '@/convex/_generated/dataModel';
 
 // --- Types ---
 type TabKey = 'discover' | 'feed';
@@ -311,7 +311,7 @@ function DiscoverContent() {
   if (unviewedRecipes === undefined || currentUser === undefined) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <Loading size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Loading recipes...</Text>
       </View>
     );
@@ -320,7 +320,7 @@ function DiscoverContent() {
   if (isPopulating && recipes.length === 0) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.accent} />
+        <Loading size="large" color={Colors.accent} />
         <Text style={styles.loadingText}>Finding recipes for you...</Text>
         <Text style={styles.subText}>
           This may take a moment as we curate the best recipes
@@ -437,7 +437,7 @@ function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; 
     if (feedPosts === undefined) {
       return (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
+          <Loading size="large" color={Colors.accent} />
         </View>
       );
     }
@@ -500,7 +500,6 @@ function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; 
           keyExtractor={keyExtractor}
           ListEmptyComponent={EmptyFeedComponent}
           showsVerticalScrollIndicator={false}
-          estimatedItemSize={300}
         />
       </View>
       <CookbookSelectionModal
@@ -613,6 +612,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
+    backgroundColor: Colors.background.primary,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     elevation: 6,
     zIndex: 1,
   },
