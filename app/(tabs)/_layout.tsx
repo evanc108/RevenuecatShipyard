@@ -11,6 +11,8 @@ import { Icon } from '@/components/ui/Icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { AddModalProvider, useAddModal } from '@/context/AddModalContext';
+import { RecipePickerProvider } from '@/context/RecipePickerContext';
+import { RecipePickerSheet } from '@/components/features/pantry/RecipePickerSheet';
 
 // --- Playful brush stroke behind active tab icon ---
 
@@ -132,6 +134,7 @@ function TabLayoutContent() {
         />
       </Tabs>
       <AddModal />
+      <RecipePickerSheet />
     </>
   );
 }
@@ -176,7 +179,9 @@ const styles = StyleSheet.create({
 export default function TabLayout() {
   return (
     <AddModalProvider>
-      <TabLayoutContent />
+      <RecipePickerProvider>
+        <TabLayoutContent />
+      </RecipePickerProvider>
     </AddModalProvider>
   );
 }

@@ -2,6 +2,16 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 /**
+ * Meal type enum values.
+ */
+export const mealType = v.union(
+  v.literal('breakfast'),
+  v.literal('lunch'),
+  v.literal('dinner'),
+  v.literal('snack')
+);
+
+/**
  * Extraction method enum values.
  */
 export const extractionMethod = v.union(
@@ -291,4 +301,18 @@ export default defineSchema({
     .index('by_post', ['postId'])
     .index('by_user', ['userId'])
     .index('by_post_user', ['postId', 'userId']),
+
+  /**
+   * Meal plan entries — recipes assigned to specific days and meal types.
+   */
+  mealPlanEntries: defineTable({
+    userId: v.id('users'),
+    date: v.string(), // "YYYY-MM-DD"
+    mealType: mealType,
+    recipeId: v.id('recipes'),
+    sortOrder: v.number(),
+    addedAt: v.number(),
+  })
+    .index('by_user_date', ['userId', 'date'])
+    .index('by_user_date_meal', ['userId', 'date', 'mealType']),
 });
