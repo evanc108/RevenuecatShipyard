@@ -1,5 +1,5 @@
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { memo, useCallback } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import {
   LayoutChangeEvent,
   Pressable,
@@ -25,39 +25,35 @@ type TabSliderProps = {
 };
 
 const SPRING_CONFIG = {
-  damping:  100,
-  stiffness: 700,
+  damping: 20,
+  stiffness: 300,
+  mass: 0.6,
 };
 
 function TabSliderComponent({ tabs, activeTab, onTabChange }: TabSliderProps) {
   const tabWidth = useSharedValue(0);
   const indicatorPosition = useSharedValue(0);
+  const hasLaidOut = useRef(false);
 
   const activeIndex = tabs.findIndex((tab) => tab.key === activeTab);
 
-  const handleLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const { width } = event.nativeEvent.layout;
-      const singleTabWidth = width / tabs.length;
-      tabWidth.value = singleTabWidth;
-      indicatorPosition.value = withSpring(
-        activeIndex * singleTabWidth,
-        SPRING_CONFIG
-      );
-    },
-    [activeIndex, tabs.length, tabWidth, indicatorPosition]
-  );
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const { width } = event.nativeEvent.layout;
+    const singleTabWidth = width / tabs.length;
+    tabWidth.value = singleTabWidth;
+    // Snap instantly on first layout
+    indicatorPosition.value = activeIndex * singleTabWidth;
+    hasLaidOut.current = true;
+  };
 
-  const handleTabPress = useCallback(
-    (tabKey: string, index: number) => {
-      indicatorPosition.value = withSpring(
-        index * tabWidth.value,
-        SPRING_CONFIG
-      );
-      onTabChange(tabKey);
-    },
-    [onTabChange, indicatorPosition, tabWidth]
-  );
+  // Animate indicator whenever activeIndex changes after initial layout
+  useEffect(() => {
+    if (!hasLaidOut.current) return;
+    indicatorPosition.value = withSpring(
+      activeIndex * tabWidth.value,
+      SPRING_CONFIG
+    );
+  }, [activeIndex, indicatorPosition, tabWidth]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     width: tabWidth.value - Spacing.xs * 2,
@@ -73,7 +69,7 @@ function TabSliderComponent({ tabs, activeTab, onTabChange }: TabSliderProps) {
           <Pressable
             key={tab.key}
             style={styles.tab}
-            onPress={() => handleTabPress(tab.key, index)}
+            onPress={() => onTabChange(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={tab.label}

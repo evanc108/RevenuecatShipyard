@@ -41,6 +41,7 @@ export const getEntriesForDate = query({
             cuisine: recipe.cuisine,
             totalTimeMinutes: recipe.totalTimeMinutes,
             difficulty: recipe.difficulty,
+            calories: recipe.calories,
           },
         };
       })
