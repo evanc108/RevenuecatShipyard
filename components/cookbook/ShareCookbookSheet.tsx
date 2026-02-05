@@ -1,33 +1,38 @@
 /**
- * Bottom sheet for cookbook selection when importing via share intent.
+ * Full-page modal for cookbook selection when importing via share intent.
  *
  * Shows:
+ * - "Importing this recipe" header
  * - URL preview (domain + truncated link)
- * - Cookbook dropdown for selection
- * - Import/Cancel buttons
+ * - Cookbook list for selection or "Create New"
+ * - Sticky Import button at the bottom
  */
 
-import { useState, useEffect } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Animated,
+    ActivityIndicator,
+    Animated,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
 
+import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
 import { Icon } from '@/components/ui/Icon';
-import { CookbookDropdown } from '@/components/cookbook/CookbookDropdown';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
-import { getDomainFromUrl } from '@/hooks/useShareHandler';
-import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { getDomainFromUrl } from '@/hooks/useShareHandler';
 
 const copy = COPY.shareIntent;
+const cookbooksCopy = COPY.cookbooks;
+const extractionCopy = COPY.extraction.cookbook;
 
 type ShareCookbookSheetProps = {
   visible: boolean;
@@ -44,75 +49,80 @@ export function ShareCookbookSheet({
 }: ShareCookbookSheetProps): React.ReactElement | null {
   const insets = useSafeAreaInsets();
   const [selectedCookbookId, setSelectedCookbookId] = useState<Id<'cookbooks'> | null>(null);
-  const [cookbookError, setCookbookError] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [fadeAnim] = useState(() => new Animated.Value(0));
 
-  // Use shared modal animation
-  const { isRendered, backdropOpacity, modalTranslateY } = useModalAnimation({
-    visible,
-    onAnimationComplete: () => {
-      setSelectedCookbookId(null);
-      setCookbookError(false);
-    },
-  });
-
-  // Get cookbooks to find selected name
   const cookbooks = useQuery(api.cookbooks.list);
-  const selectedCookbook = cookbooks?.find((c) => c._id === selectedCookbookId);
+  const createCookbook = useMutation(api.cookbooks.create);
 
-  // Reset error when modal opens
+  const selectedCookbook = cookbooks?.find((c) => c._id === selectedCookbookId);
+  const isLoading = cookbooks === undefined;
+
+  // Animate in/out
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, fadeAnim]);
+
+  // Reset state when modal opens
   useEffect(() => {
     if (visible) {
-      setCookbookError(false);
+      setSelectedCookbookId(null);
     }
   }, [visible]);
 
   const handleCookbookSelect = (id: Id<'cookbooks'>) => {
     setSelectedCookbookId(id);
-    setCookbookError(false);
   };
+
+  const handleCreateNew = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleCreateSubmit = useCallback(
+    async (name: string, description?: string, imageUri?: string) => {
+      setIsCreating(true);
+      try {
+        const newId = await createCookbook({
+          name,
+          description,
+          coverImageUrl: imageUri,
+        });
+        setShowCreateModal(false);
+        setSelectedCookbookId(newId);
+      } finally {
+        setIsCreating(false);
+      }
+    },
+    [createCookbook]
+  );
 
   const handleImport = () => {
-    if (!selectedCookbookId) {
-      setCookbookError(true);
-      return;
-    }
-
-    const cookbookName = selectedCookbook?.name ?? 'Cookbook';
-    onSubmit(selectedCookbookId, cookbookName);
+    if (!selectedCookbookId || !selectedCookbook) return;
+    onSubmit(selectedCookbookId, selectedCookbook.name);
   };
 
-  if (!isRendered || !url) return null;
+  if (!visible || !url) return null;
 
   const domain = getDomainFromUrl(url);
+  const isValid = selectedCookbookId !== null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      </Animated.View>
-
-      {/* Sheet */}
-      <Animated.View
-        style={[
-          styles.sheetContainer,
-          { transform: [{ translateY: modalTranslateY }] },
-        ]}
-      >
-        <View
-          style={[
-            styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md },
-          ]}
-        >
-          {/* Handle */}
-          <View style={styles.handleContainer}>
-            <View style={styles.handle} />
-          </View>
-
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onClose}
+    >
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        {/* Safe area padding at top */}
+        <View style={{ paddingTop: insets.top, backgroundColor: Colors.background.primary }}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>{copy.title}</Text>
             <Pressable
               onPress={onClose}
               hitSlop={12}
@@ -121,97 +131,116 @@ export function ShareCookbookSheet({
             >
               <Icon name="close" size={24} color={Colors.text.secondary} />
             </Pressable>
-          </View>
-
-          {/* Content */}
-          <View style={styles.content}>
-            {/* URL Preview */}
-            <View style={styles.urlPreview}>
-              <Icon name="link" size={20} color={Colors.accent} />
-              <View style={styles.urlTextContainer}>
-                <Text style={styles.urlDomain}>{copy.urlPreview} {domain}</Text>
-                <Text style={styles.urlFull} numberOfLines={1}>
-                  {url}
-                </Text>
-              </View>
-            </View>
-
-            {/* Cookbook Selection */}
-            <View style={styles.inputGroup}>
-              <CookbookDropdown
-                selectedId={selectedCookbookId}
-                onSelect={handleCookbookSelect}
-                error={cookbookError}
-              />
-            </View>
-
-            {/* Buttons */}
-            <View style={styles.buttons}>
-              <Pressable
-                style={styles.cancelButton}
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel={copy.cancel}
-              >
-                <Text style={styles.cancelButtonText}>{copy.cancel}</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.importButton,
-                  selectedCookbookId && styles.importButtonActive,
-                ]}
-                onPress={handleImport}
-                accessibilityRole="button"
-                accessibilityLabel={copy.import}
-              >
-                <Icon
-                  name="download"
-                  size={20}
-                  color={selectedCookbookId ? Colors.text.inverse : Colors.text.disabled}
-                />
-                <Text
-                  style={[
-                    styles.importButtonText,
-                    !selectedCookbookId && styles.importButtonTextDisabled,
-                  ]}
-                >
-                  {copy.import}
-                </Text>
-              </Pressable>
-            </View>
+            <Text style={styles.headerTitle}>Importing Recipe</Text>
+            <View style={{ width: 24 }} />
           </View>
         </View>
+
+        {/* Content */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* URL Preview */}
+          <View style={styles.urlPreview}>
+            <Icon name="link" size={20} color={Colors.accent} />
+            <View style={styles.urlTextContainer}>
+              <Text style={styles.urlDomain}>{copy.urlPreview} {domain}</Text>
+              <Text style={styles.urlFull} numberOfLines={2}>
+                {url}
+              </Text>
+            </View>
+          </View>
+
+          {/* Cookbook Selection Label */}
+          <Text style={styles.sectionTitle}>{extractionCopy.selectCookbook}</Text>
+
+          {/* Cookbook List */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={Colors.text.tertiary} />
+            </View>
+          ) : cookbooks && cookbooks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>{extractionCopy.noCookbooks}</Text>
+            </View>
+          ) : (
+            <View style={styles.cookbookList}>
+              {cookbooks?.map((cookbook) => (
+                <Pressable
+                  key={cookbook._id}
+                  style={[
+                    styles.cookbookItem,
+                    selectedCookbookId === cookbook._id && styles.cookbookItemSelected,
+                  ]}
+                  onPress={() => handleCookbookSelect(cookbook._id)}
+                >
+                  <View style={styles.cookbookInfo}>
+                    <Text
+                      style={[
+                        styles.cookbookName,
+                        selectedCookbookId === cookbook._id && styles.cookbookNameSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {cookbook.name}
+                    </Text>
+                    <Text style={styles.cookbookCount}>
+                      {cookbooksCopy.recipeCount(cookbook.recipeCount)}
+                    </Text>
+                  </View>
+                  {selectedCookbookId === cookbook._id && (
+                    <Icon name="checkmark-circle" size={24} color={Colors.accent} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {/* Create New Cookbook Option */}
+          <Pressable style={styles.createOption} onPress={handleCreateNew}>
+            <Icon name="add-circle-outline" size={22} color={Colors.accent} />
+            <Text style={styles.createOptionText}>{extractionCopy.createNew}</Text>
+          </Pressable>
+        </ScrollView>
+
+        {/* Sticky Footer */}
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+          <Pressable
+            style={[styles.importButton, isValid && styles.importButtonActive]}
+            onPress={handleImport}
+            disabled={!isValid}
+            accessibilityRole="button"
+            accessibilityLabel={copy.import}
+          >
+            <Icon
+              name="download"
+              size={20}
+              color={isValid ? Colors.text.inverse : Colors.text.disabled}
+            />
+            <Text style={[styles.importButtonText, !isValid && styles.importButtonTextDisabled]}>
+              {copy.import}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Create Cookbook Modal */}
+        <CreateCookbookModal
+          visible={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateSubmit}
+          isLoading={isCreating}
+        />
       </Animated.View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.background.overlay,
-  },
-  sheetContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  sheet: {
+  container: {
+    flex: 1,
     backgroundColor: Colors.background.primary,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -222,12 +251,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  title: {
+  headerTitle: {
     ...Typography.h2,
     color: Colors.text.primary,
   },
-  content: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: Spacing.lg,
+    paddingBottom: Spacing.xl,
   },
   urlPreview: {
     flexDirection: 'row',
@@ -235,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.secondary,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
     gap: Spacing.sm,
   },
   urlTextContainer: {
@@ -250,29 +283,77 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
     marginTop: 2,
   },
-  inputGroup: {
-    marginBottom: Spacing.lg,
-  },
-  buttons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  cancelButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cancelButtonText: {
+  sectionTitle: {
     ...Typography.label,
     color: Colors.text.primary,
+    marginBottom: Spacing.md,
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.xl,
+    alignItems: 'center',
+  },
+  emptyState: {
+    paddingVertical: Spacing.xl,
+    alignItems: 'center',
+  },
+  emptyText: {
+    ...Typography.body,
+    color: Colors.text.tertiary,
+  },
+  cookbookList: {
+    gap: Spacing.sm,
+  },
+  cookbookItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cookbookItemSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accentLight,
+  },
+  cookbookInfo: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  cookbookName: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    fontWeight: '500',
+  },
+  cookbookNameSelected: {
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+  cookbookCount: {
+    ...Typography.caption,
+    color: Colors.text.tertiary,
+    marginTop: 2,
+  },
+  createOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  createOptionText: {
+    ...Typography.label,
+    color: Colors.accent,
+  },
+  footer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background.primary,
   },
   importButton: {
-    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

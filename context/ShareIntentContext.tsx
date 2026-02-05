@@ -8,19 +8,19 @@
  * - Starts background extraction on submit
  */
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  ReactNode,
-} from 'react';
-import { useShareHandler } from '@/hooks/useShareHandler';
-import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
-import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 import { ShareCookbookSheet } from '@/components/cookbook/ShareCookbookSheet';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { useShareHandler } from '@/hooks/useShareHandler';
+import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 
 type ShareIntentContextType = {
   /** Trigger an import with a URL - shows cookbook selection sheet */
@@ -46,12 +46,15 @@ export function ShareIntentProvider({
   // Handle incoming URLs from share handler
   useEffect(() => {
     if (pendingUrl) {
-      setSheetUrl(pendingUrl);
+      // Direct import for shared URLs - bypass modal
+      const uploadId = addUpload(pendingUrl, undefined, 'Cookbook'); // Add to general/default
+      startExtraction(uploadId);
       clearPendingUrl();
     }
-  }, [pendingUrl, clearPendingUrl]);
+  }, [pendingUrl, clearPendingUrl, addUpload, startExtraction]);
 
   const triggerImport = useCallback((url: string) => {
+    // When triggering manually (e.g. from clipboard), show sheet to let user choose
     setSheetUrl(url);
   }, []);
 

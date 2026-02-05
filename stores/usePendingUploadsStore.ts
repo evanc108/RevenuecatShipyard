@@ -5,16 +5,16 @@
  * to enable background extraction with progress tracking.
  */
 
-import { create } from 'zustand';
 import type { Id } from '@/convex/_generated/dataModel';
+import { create } from 'zustand';
 
 export type UploadStatus = 'queued' | 'checking' | 'extracting' | 'saving' | 'complete' | 'error';
 
 export type PendingUpload = {
   id: string;
   url: string;
-  cookbookId: Id<'cookbooks'>;
-  cookbookName: string;
+  cookbookId?: Id<'cookbooks'>;
+  cookbookName?: string;
   status: UploadStatus;
   progress: number;
   message: string;
@@ -31,7 +31,7 @@ type PendingUploadsState = {
   activeUploadId: string | null;
 
   // Actions
-  addUpload: (url: string, cookbookId: Id<'cookbooks'>, cookbookName: string) => string;
+  addUpload: (url: string, cookbookId?: Id<'cookbooks'>, cookbookName?: string) => string;
   updateStatus: (id: string, status: UploadStatus) => void;
   updateProgress: (id: string, progress: number, message: string, tier?: string | null) => void;
   setComplete: (id: string, recipeId: Id<'recipes'>, recipeTitle: string) => void;
