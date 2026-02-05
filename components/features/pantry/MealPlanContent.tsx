@@ -1,5 +1,5 @@
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -85,21 +85,27 @@ function MealPlanContentComponent(): React.ReactElement {
         onDateChange={setSelectedDate}
       />
       <View style={styles.divider} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {enabledMealTypes.map((mealType) => (
-          <MealSection
-            key={mealType}
-            mealType={mealType}
-            entries={grouped[mealType] ?? []}
-            onAddPress={() => handleOpenPicker(mealType)}
-            onRemoveEntry={handleRemoveEntry}
-          />
-        ))}
-      </ScrollView>
+      {entries === undefined ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={Colors.accent} />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {enabledMealTypes.map((mealType) => (
+            <MealSection
+              key={mealType}
+              mealType={mealType}
+              entries={grouped[mealType] ?? []}
+              onAddPress={() => handleOpenPicker(mealType)}
+              onRemoveEntry={handleRemoveEntry}
+            />
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -112,6 +118,11 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: Colors.accentLight,
     marginHorizontal: Spacing.md,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
