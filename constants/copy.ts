@@ -290,6 +290,7 @@ export const COPY = {
     },
     cook: 'Cook',
     mealPlan: 'Meal Plan',
+    saveToCookbook: 'Save',
   },
   socialFeed: {
     title: 'Feed',
