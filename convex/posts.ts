@@ -86,6 +86,91 @@ export const listByUser = query({
 });
 
 /**
+ * List posts by a specific user with full enriched data for feed display.
+ * Returns posts with user, recipe, likes, comments data.
+ */
+export const listByUserEnriched = query({
+  args: { userId: v.id('users') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    // Get current user for checking isLiked/isSaved
+    const currentUser = identity
+      ? await ctx.db
+          .query('users')
+          .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+          .unique()
+      : null;
+
+    // Get the profile user
+    const profileUser = await ctx.db.get(args.userId);
+    if (!profileUser) return [];
+
+    const posts = await ctx.db
+      .query('posts')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .order('desc')
+      .collect();
+
+    // Join with recipe, likes, comments, and save data
+    const postsWithData = await Promise.all(
+      posts.map(async (post) => {
+        const [recipe, likes, comments, savedByUser] = await Promise.all([
+          ctx.db.get(post.recipeId),
+          ctx.db
+            .query('postLikes')
+            .withIndex('by_post', (q) => q.eq('postId', post._id))
+            .collect(),
+          ctx.db
+            .query('postComments')
+            .withIndex('by_post', (q) => q.eq('postId', post._id))
+            .collect(),
+          currentUser
+            ? ctx.db
+                .query('savedPosts')
+                .withIndex('by_post_user', (q) =>
+                  q.eq('postId', post._id).eq('userId', currentUser._id)
+                )
+                .unique()
+            : null,
+        ]);
+
+        const isLikedByUser = currentUser
+          ? likes.some((like) => like.userId === currentUser._id)
+          : false;
+
+        return {
+          ...post,
+          user: {
+            _id: profileUser._id,
+            firstName: profileUser.firstName,
+            lastName: profileUser.lastName,
+            username: profileUser.username,
+            imageUrl: profileUser.imageUrl,
+          },
+          recipe: recipe
+            ? {
+                _id: recipe._id,
+                title: recipe.title,
+                imageUrl: recipe.imageUrl,
+                totalTimeMinutes: recipe.totalTimeMinutes,
+                url: recipe.url,
+              }
+            : null,
+          likeCount: likes.length,
+          commentCount: comments.length,
+          isLiked: isLikedByUser,
+          isSaved: savedByUser !== null,
+        };
+      })
+    );
+
+    // Filter out posts where recipe was deleted
+    return postsWithData.filter((post) => post.recipe !== null);
+  },
+});
+
+/**
  * List posts for current user's profile.
  */
 export const listMine = query({
