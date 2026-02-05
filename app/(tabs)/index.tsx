@@ -12,18 +12,18 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
+	Alert,
+	Pressable,
+	StyleSheet,
+	Text,
+	TextInput,
+	View
 } from 'react-native';
 import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
+	interpolate,
+	useAnimatedStyle,
+	useSharedValue,
+	withTiming
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -413,7 +413,8 @@ const styles = StyleSheet.create({
 	header: {
 		paddingHorizontal: Spacing.lg,
 		paddingTop: Spacing.sm,
-		paddingBottom: Spacing.sm
+		paddingBottom: Spacing.sm,
+		backgroundColor: Colors.background.primary,
 	},
 	titleColumn: {
 		flexDirection: 'column',

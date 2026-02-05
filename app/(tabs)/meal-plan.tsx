@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
+    backgroundColor: Colors.background.primary,
   },
   tabSliderWrapper: {
     flex: 1,

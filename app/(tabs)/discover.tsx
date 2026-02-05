@@ -1,28 +1,26 @@
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
+import type { Recipe } from '@/components/discover/RecipeCard';
+import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
+import { FeedPost } from '@/components/ui/FeedPost';
+import { Icon } from '@/components/ui/Icon';
+import { Loading } from '@/components/ui/Loading';
+import { COPY } from '@/constants/copy';
+import { Colors, FontFamily, Radius, Spacing, Typography } from '@/constants/theme';
+import { api } from '@/convex/_generated/api';
+import type { Doc, Id } from '@/convex/_generated/dataModel';
 import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { Ionicons } from '@expo/vector-icons';
-import { api } from '@/convex/_generated/api';
-import { UserListItem } from '@/components/ui/UserListItem';
-import { Loading } from '@/components/ui/Loading';
-import { useDebounce } from '@/hooks/useDebounce';
-import { Colors, Spacing, Typography } from '@/constants/theme';
-import { TabSlider } from '@/components/ui/TabSlider';
-import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
-import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
-import { FeedPost } from '@/components/ui/FeedPost';
-import { COPY } from '@/constants/copy';
-import type { Recipe } from '@/components/discover/RecipeCard';
-import type { Doc, Id } from '@/convex/_generated/dataModel';
+import { Image } from 'expo-image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- Types ---
 type TabKey = 'discover' | 'feed';
@@ -63,11 +61,6 @@ type FeedPostData = {
 };
 
 // --- Constants ---
-const TABS = [
-  { key: 'discover' as const, label: COPY.discover.tabs.discover },
-  { key: 'feed' as const, label: COPY.discover.tabs.feed },
-];
-
 const LOW_RECIPE_THRESHOLD = 8;
 const POPULATE_COUNT = 15;
 const MAX_POPULATE_ATTEMPTS = 3;
@@ -378,72 +371,8 @@ function DiscoverContent() {
   );
 }
 
-// --- Friend Search Component ---
-function FriendSearch(): React.ReactElement {
-  const [searchQuery, setSearchQuery] = useState('');
-  const debouncedQuery = useDebounce(searchQuery, 300);
-
-  const suggestedUsers = useQuery(api.users.suggested, { limit: 10 });
-  const searchResults = useQuery(
-    api.users.search,
-    debouncedQuery.length >= 2 ? { query: debouncedQuery, limit: 10 } : 'skip'
-  );
-
-  const isSearching = debouncedQuery.length >= 2;
-  const users = isSearching ? searchResults : suggestedUsers;
-  const isLoading = users === undefined;
-
-  return (
-    <View style={styles.searchSection}>
-      <View style={styles.searchHeader}>
-        <Text style={styles.searchTitle}>{COPY.socialFeed.searchTitle}</Text>
-      </View>
-      <View style={styles.searchInputContainer}>
-        <Ionicons name="search" size={18} color={Colors.text.tertiary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={COPY.socialFeed.searchPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={Colors.text.tertiary} />
-          </Pressable>
-        )}
-      </View>
-
-      <Text style={styles.searchSectionLabel}>
-        {isSearching ? COPY.socialFeed.searchResults : COPY.socialFeed.suggestedUsers}
-      </Text>
-
-      {isLoading ? (
-        <Loading size="small" color={Colors.accent} style={styles.searchLoading} />
-      ) : users && users.length > 0 ? (
-        <View style={styles.usersList}>
-          {users.map((user) => (
-            <UserListItem key={user._id} user={user} showFollowButton />
-          ))}
-        </View>
-      ) : (
-        <View style={styles.noResults}>
-          <Text style={styles.noResultsText}>
-            {isSearching ? COPY.socialFeed.noResults : COPY.socialFeed.noSuggestions}
-          </Text>
-          {isSearching && (
-            <Text style={styles.noResultsSubtext}>{COPY.socialFeed.tryDifferentSearch}</Text>
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
-
 // --- Feed Content Component ---
-function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
+function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; searchQuery: string }) {
   const currentUser = useQuery(api.users.current);
   const feedPosts = useQuery(api.posts.socialFeed, { limit: 50 });
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
@@ -516,7 +445,7 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
 
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="newspaper-outline" size={64} color={Colors.text.tertiary} />
+        <Icon name="book" size={64} color={Colors.text.tertiary} />
         <Text style={styles.emptyTitle}>{COPY.socialFeed.emptyFeedTitle}</Text>
         <Text style={styles.emptySubtitle}>{COPY.socialFeed.emptyFeedSubtitle}</Text>
         <Pressable
@@ -533,21 +462,35 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
 
   const validPosts: FeedPostData[] = useMemo(() => {
     if (!feedPosts) return [];
-    return feedPosts.filter(
+    const posts = feedPosts.filter(
       (post) => post.user !== null && post.recipe !== null
     ) as FeedPostData[];
-  }, [feedPosts]);
+
+    if (searchQuery.trim().length === 0) return posts;
+
+    const q = searchQuery.toLowerCase().trim();
+    return posts.filter((post) => {
+      const username = post.user.username?.toLowerCase() ?? '';
+      const firstName = post.user.firstName?.toLowerCase() ?? '';
+      const lastName = post.user.lastName?.toLowerCase() ?? '';
+      const recipeTitle = post.recipe.title?.toLowerCase() ?? '';
+      return (
+        username.includes(q) ||
+        firstName.includes(q) ||
+        lastName.includes(q) ||
+        recipeTitle.includes(q)
+      );
+    });
+  }, [feedPosts, searchQuery]);
 
   // Convert FeedRecipeInfo to CookbookSelectionModal's expected format
   const modalRecipe = pendingRecipe
     ? {
-        title: pendingRecipe.title,
-        imageUrl: pendingRecipe.imageUrl,
-        url: pendingRecipe.url,
-      }
+      title: pendingRecipe.title,
+      imageUrl: pendingRecipe.imageUrl,
+      url: pendingRecipe.url,
+    }
     : null;
-
-  const ListHeader = useMemo(() => <FriendSearch />, []);
 
   return (
     <>
@@ -556,10 +499,8 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
           data={validPosts}
           renderItem={renderFeedItem}
           keyExtractor={keyExtractor}
-          ListHeaderComponent={ListHeader}
           ListEmptyComponent={EmptyFeedComponent}
           showsVerticalScrollIndicator={false}
-          estimatedItemSize={300}
         />
       </View>
       <CookbookSelectionModal
@@ -576,9 +517,17 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
 // --- Main Screen Component ---
 export default function DiscoverScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('discover');
+  const [feedSearchQuery, setFeedSearchQuery] = useState('');
 
   const handleFindPeople = useCallback(() => {
     setActiveTab('discover');
+  }, []);
+
+  const handleTabChange = useCallback((tab: TabKey) => {
+    setActiveTab(tab);
+    if (tab !== 'feed') {
+      setFeedSearchQuery('');
+    }
   }, []);
 
   const content = useMemo(() => {
@@ -586,27 +535,87 @@ export default function DiscoverScreen() {
       case 'discover':
         return <DiscoverContent />;
       case 'feed':
-        return <FeedContent onFindPeople={handleFindPeople} />;
+        return <FeedContent onFindPeople={handleFindPeople} searchQuery={feedSearchQuery} />;
       default:
         return <DiscoverContent />;
     }
-  }, [activeTab, handleFindPeople]);
+  }, [activeTab, handleFindPeople, feedSearchQuery]);
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{COPY.discover.title}</Text>
-        </View>
-        <View style={styles.tabContainer}>
-          <View style={styles.tabSliderWrapper}>
-            <TabSlider
-              tabs={TABS}
-              activeTab={activeTab}
-              onTabChange={(key) => setActiveTab(key as TabKey)}
-            />
+        <View style={styles.tabHeader}>
+          <Image
+            source={require('@/assets/images/header_icon.svg')}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
+          <View style={styles.tabRow}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'discover' }}
+              accessibilityLabel={COPY.discover.tabs.discover}
+              onPress={() => handleTabChange('discover')}
+            >
+              <Text style={activeTab === 'discover' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {COPY.discover.tabs.discover}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'feed' }}
+              accessibilityLabel={COPY.discover.tabs.feed}
+              onPress={() => handleTabChange('feed')}
+            >
+              <Text style={activeTab === 'feed' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {COPY.discover.tabs.feed}
+              </Text>
+            </Pressable>
           </View>
+
+          <View style={styles.headerSpacer} />
+
+          {/* Bell notification button */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            style={styles.bellButton}
+            hitSlop={8}
+            onPress={() => {
+              // TODO: open notifications
+            }}
+          >
+            <Icon name="bell" size={28} color={Colors.text.primary} strokeWidth={2} />
+            <View style={styles.notiBadge}>
+              <Text style={styles.notiCount}>3</Text>
+            </View>
+          </Pressable>
         </View>
+        {activeTab === 'feed' ? (
+          <View style={styles.searchBarContainer}>
+            <Icon name="search" size={18} color={Colors.text.tertiary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search people & recipes..."
+              placeholderTextColor={Colors.text.tertiary}
+              value={feedSearchQuery}
+              onChangeText={setFeedSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel="Search people and recipes"
+            />
+            {feedSearchQuery.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                onPress={() => setFeedSearchQuery('')}
+                hitSlop={8}
+              >
+                <Icon name="close-circle" size={18} color={Colors.text.tertiary} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.content}>{content}</View>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -621,21 +630,93 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-  },
-  title: {
-    ...Typography.h1,
-    color: Colors.text.primary,
-  },
-  tabContainer: {
+  tabHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: Spacing.md,
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    backgroundColor: Colors.background.primary,
   },
-  tabSliderWrapper: {
-    width: '55%',
+  headerLogo: {
+    width: 100,
+    height: 60,
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  bellButton: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notiBadge: {
+    position: 'absolute',
+    top: 30,
+    right: 8,
+    backgroundColor: Colors.accent,
+    minWidth: 20,
+    height: 20,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    borderWidth: 2,
+    borderColor: Colors.background.primary,
+  },
+  notiCount: {
+    fontSize: 9,
+    fontFamily: FontFamily.bold,
+    fontWeight: '700' as const,
+    color: Colors.text.inverse,
+    lineHeight: 12,
+  },
+  tabRow: {
+    paddingLeft: Spacing.sm,
+    paddingTop: Spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  tabLabelActive: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: FontFamily.bold,
+    fontWeight: '800' as const,
+    color: '#000000',
+    letterSpacing: -0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 10,
+  },
+  tabLabelInactive: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: FontFamily.bold,
+    fontWeight: '800' as const,
+    color: '#D1D1D6',
+    letterSpacing: -0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.08)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.lg,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    color: Colors.text.primary,
+    paddingVertical: 0,
   },
   content: {
     flex: 1,
@@ -713,64 +794,5 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.text.inverse,
     fontWeight: '600',
-  },
-  // Friend search styles
-  searchSection: {
-    backgroundColor: Colors.background.primary,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  searchHeader: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-  },
-  searchTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 12,
-    gap: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    ...Typography.body,
-    color: Colors.text.primary,
-    paddingVertical: 0,
-  },
-  searchSectionLabel: {
-    ...Typography.label,
-    color: Colors.text.secondary,
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
-  },
-  usersList: {
-    marginTop: Spacing.xs,
-  },
-  searchLoading: {
-    paddingVertical: Spacing.lg,
-  },
-  noResults: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    alignItems: 'center',
-  },
-  noResultsText: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-  },
-  noResultsSubtext: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
-    marginTop: Spacing.xs,
   },
 });

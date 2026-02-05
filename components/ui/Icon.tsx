@@ -75,6 +75,8 @@ import {
   Eye,
   EyeOff,
   Info,
+  Bell,
+  MessageCircle,
 } from 'lucide-react-native';
 import type { OpaqueColorValue, StyleProp, ViewStyle } from 'react-native';
 
@@ -201,6 +203,10 @@ const ICON_MAP = {
   'eye-off-outline': EyeOff,
   info: Info,
   'info-outline': Info,
+  bell: Bell,
+  'bell-outline': Bell,
+  'message-circle': MessageCircle,
+  'chatbubble-outline': MessageCircle,
 } as const;
 
 export type IconName = keyof typeof ICON_MAP;

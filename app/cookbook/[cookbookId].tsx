@@ -295,6 +295,7 @@ const AddRecipeStackedCard = memo(function AddRecipeStackedCard({
           borderRadius: Radius.xl,
         },
         Shadow.elevated,
+        { shadowOffset: { width: 0, height: 16 } },
         animatedStyle,
       ]}
     >
@@ -1079,9 +1080,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
           pointerEvents="none"
         >
           <Animated.View style={successIconAnimatedStyle}>
-            <View style={styles.successIconCircle}>
-              <Icon name="check" size={40} color={Colors.background.primary} strokeWidth={3} />
-            </View>
+            <Image
+              source={require('@/assets/images/loading_icon.svg')}
+              style={styles.successIcon}
+              contentFit="contain"
+            />
           </Animated.View>
         </Animated.View>
       ) : null}
@@ -1382,5 +1385,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.semantic.success,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  successIcon: {
+    width: 120,
+    height: 120,
   },
 });

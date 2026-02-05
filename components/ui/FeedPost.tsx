@@ -177,7 +177,7 @@ export const FeedPost = memo(function FeedPost({
             imageUrl={avatarUrl}
             firstName={user.firstName || 'U'}
             lastName={user.lastName || 'N'}
-            size="sm"
+            size="md"
           />
           <View>
             <Text style={styles.username}>{displayName}</Text>
@@ -254,8 +254,8 @@ export const FeedPost = memo(function FeedPost({
         >
           <Ionicons
             name={isLiked ? 'heart' : 'heart-outline'}
-            size={20}
-            color={isLiked ? Colors.accent : Colors.text.secondary}
+            size={24}
+            color={isLiked ? Colors.accent : '#000000'}
           />
           {likeCount > 0 && (
             <Text
@@ -277,8 +277,8 @@ export const FeedPost = memo(function FeedPost({
         >
           <Ionicons
             name="chatbubble-outline"
-            size={18}
-            color={Colors.text.secondary}
+            size={22}
+            color="#000000"
           />
           {commentCount > 0 && (
             <Text style={styles.footerCount}>{commentCount}</Text>
@@ -293,8 +293,8 @@ export const FeedPost = memo(function FeedPost({
         >
           <Ionicons
             name={isSaved ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={isSaved ? Colors.accent : Colors.text.secondary}
+            size={24}
+            color={isSaved ? Colors.accent : '#000000'}
           />
         </Pressable>
       </View>
@@ -330,16 +330,20 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   username: {
-    ...Typography.label,
-    color: Colors.text.primary,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700' as const,
+    color: '#000000',
   },
   timestamp: {
-    ...Typography.caption,
-    color: Colors.text.tertiary,
-    marginTop: 1,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '400' as const,
+    color: Colors.text.secondary,
+    marginTop: 2,
   },
   captionContainer: {
     paddingHorizontal: Spacing.md,
@@ -384,7 +388,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.lg,
+    gap: Spacing.md,
     paddingHorizontal: Spacing.md,
     marginTop: Spacing.sm,
   },
@@ -392,9 +396,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
+    minWidth: 44,
   },
   footerCount: {
-    ...Typography.caption,
-    color: Colors.text.secondary,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '600' as const,
+    color: '#000000',
   },
 });

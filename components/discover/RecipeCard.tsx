@@ -2,11 +2,13 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
+import { Colors, FontFamily, Spacing, Radius, Typography } from '@/constants/theme';
+import { memo } from 'react';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 32;
 const CARD_HEIGHT = CARD_WIDTH * 1.4;
+const MAX_STARS = 5;
 
 /**
  * Ingredient type matching the recipes schema
@@ -81,12 +83,43 @@ type RecipeCardProps = {
   recipe: Recipe;
 };
 
-export function RecipeCard({ recipe }: RecipeCardProps) {
+function parseDifficulty(difficulty?: string): number {
+  if (!difficulty) return 0;
+  const lower = difficulty.toLowerCase();
+  if (lower === 'easy') return 1;
+  if (lower === 'medium' || lower === 'moderate') return 3;
+  if (lower === 'hard' || lower === 'difficult') return 5;
+  const parsed = parseInt(difficulty, 10);
+  if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) return parsed;
+  return 0;
+}
+
+const DifficultyStars = memo(function DifficultyStars({
+  difficulty,
+}: {
+  difficulty: number;
+}): React.ReactElement {
+  return (
+    <View style={styles.starsRow}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Icon
+          key={star}
+          name="star"
+          size={14}
+          strokeWidth={2}
+          filled={star <= difficulty}
+          color={star <= difficulty ? '#FFD700' : 'rgba(255,255,255,0.5)'}
+        />
+      ))}
+    </View>
+  );
+});
+
+export const RecipeCard = memo(function RecipeCard({ recipe }: RecipeCardProps) {
   const totalTime = recipe.totalTimeMinutes ??
     (recipe.prepTimeMinutes ?? 0) + (recipe.cookTimeMinutes ?? 0);
 
-  const creatorName = recipe.creatorName ?? 'Unknown';
-  const tags = recipe.dietaryTags ?? recipe.keywords ?? [];
+  const difficultyValue = parseDifficulty(recipe.difficulty);
 
   return (
     <View style={styles.card}>
@@ -98,108 +131,87 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
         cachePolicy="memory-disk"
       />
 
+      {/* Bottom gradient for text readability */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.75)']}
+        locations={[0, 0.35, 1]}
         style={styles.gradient}
       />
 
-      {/* Top badges */}
-      <View style={styles.topBadges}>
+      {/* Top-left cuisine badge */}
+      {recipe.cuisine ? (
         <View style={styles.cuisineBadge}>
-          <Text style={styles.cuisineText}>{recipe.cuisine ?? 'International'}</Text>
+          <Text style={styles.cuisineText}>{recipe.cuisine}</Text>
         </View>
-        {recipe.calories !== undefined && (
-          <View style={styles.ratingBadge}>
-            <Icon name="flame" size={12} color="#FFD700" />
-            <Text style={styles.ratingText}>{recipe.calories} cal</Text>
-          </View>
-        )}
-      </View>
+      ) : null}
 
-      {/* Content overlay */}
+      {/* Content overlay — bottom aligned */}
       <View style={styles.content}>
-        <View style={styles.authorRow}>
-          <View style={styles.authorInfo}>
-            <View style={styles.authorAvatar}>
-              <Text style={styles.authorInitial}>
-                {creatorName.charAt(0)}
-              </Text>
-            </View>
-            <Text style={styles.authorName}>{creatorName}</Text>
-          </View>
-        </View>
-
+        {/* Title */}
         <Text style={styles.title} numberOfLines={2}>
           {recipe.title}
         </Text>
 
-        <Text style={styles.description} numberOfLines={2}>
-          {recipe.description ?? ''}
-        </Text>
+        {/* Description */}
+        {recipe.description ? (
+          <Text style={styles.description} numberOfLines={2}>
+            {recipe.description}
+          </Text>
+        ) : null}
 
+        {/* Meta row: time, calories, servings */}
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Icon name="time-outline" size={16} color={Colors.text.inverse} />
-            <Text style={styles.metaText}>{totalTime} min</Text>
-          </View>
-          <View style={styles.metaDivider} />
-          <View style={styles.metaItem}>
-            <Icon name="flame-outline" size={16} color={Colors.text.inverse} />
-            <Text style={styles.metaText}>{recipe.difficulty ?? 'Medium'}</Text>
-          </View>
-          {recipe.servings !== undefined && (
-            <>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaItem}>
-                <Icon name="people-outline" size={16} color={Colors.text.inverse} />
-                <Text style={styles.metaText}>{recipe.servings} servings</Text>
-              </View>
-            </>
-          )}
+          {totalTime > 0 ? (
+            <View style={styles.metaItem}>
+              <Icon name="clock" size={14} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.metaText}>{totalTime} min</Text>
+            </View>
+          ) : null}
+          {recipe.calories !== undefined ? (
+            <View style={styles.metaItem}>
+              <Icon name="flame" size={14} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.metaText}>{recipe.calories} cal</Text>
+            </View>
+          ) : null}
+          {recipe.servings !== undefined ? (
+            <View style={styles.metaItem}>
+              <Icon name="users" size={14} color="rgba(255,255,255,0.85)" />
+              <Text style={styles.metaText}>{recipe.servings} servings</Text>
+            </View>
+          ) : null}
         </View>
 
-        <View style={styles.tagsRow}>
-          {tags.slice(0, 3).map((tag: string) => (
-            <View key={tag} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Difficulty stars */}
+        {difficultyValue > 0 ? (
+          <DifficultyStars difficulty={difficultyValue} />
+        ) : null}
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: Radius.xl,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.background.tertiary,
     overflow: 'hidden',
-    ...Shadow.elevated,
   },
   image: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
+    ...StyleSheet.absoluteFillObject,
   },
   gradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '60%',
-  },
-  topBadges: {
-    position: 'absolute',
-    top: Spacing.md,
-    left: Spacing.md,
-    right: Spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    height: '55%',
   },
   cuisineBadge: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.lg,
     backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: Spacing.sm + 4,
     paddingVertical: Spacing.xs + 2,
@@ -207,74 +219,39 @@ const styles = StyleSheet.create({
   },
   cuisineText: {
     ...Typography.caption,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.text.primary,
-  },
-  ratingBadge: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs + 2,
-    borderRadius: Radius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    ...Typography.caption,
-    fontWeight: '600',
-    color: Colors.text.inverse,
   },
   content: {
     position: 'absolute',
-    bottom: Spacing.lg,
+    bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: Spacing.lg,
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    flex: 1,
-  },
-  authorAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  authorInitial: {
-    color: Colors.text.inverse,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  authorName: {
-    ...Typography.bodySmall,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '500',
-    flexShrink: 1,
+    padding: Spacing.lg,
+    gap: Spacing.xs,
   },
   title: {
-    ...Typography.h2,
+    fontSize: 28,
+    lineHeight: 32,
+    fontFamily: FontFamily.bold,
+    fontWeight: '800',
     color: Colors.text.inverse,
-    marginBottom: Spacing.xs,
+    letterSpacing: -0.3,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   description: {
-    ...Typography.bodySmall,
+    ...Typography.body,
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: Spacing.md,
+    lineHeight: 20,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.sm,
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
   },
   metaItem: {
     flexDirection: 'row',
@@ -282,29 +259,15 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   metaText: {
-    ...Typography.bodySmall,
-    color: Colors.text.inverse,
+    fontSize: 14,
+    fontFamily: FontFamily.semibold,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
   },
-  metaDivider: {
-    width: 1,
-    height: 14,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: Spacing.md,
-  },
-  tagsRow: {
+  starsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.xs,
-  },
-  tag: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-  },
-  tagText: {
-    ...Typography.caption,
-    color: Colors.text.inverse,
+    gap: 3,
+    marginTop: 2,
   },
 });
 

@@ -20,6 +20,7 @@ import { ProfileStats } from '@/components/ui/ProfileStats';
 import { CookbookCard } from '@/components/cookbook/CookbookCard';
 import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
 import { PostRow } from '@/components/ui/PostRow';
+import { UserListItem } from '@/components/ui/UserListItem';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 
@@ -214,6 +215,7 @@ export default function ProfileScreen(): React.ReactElement {
     user ? { userId: user._id } : 'skip'
   );
   const posts = useQuery(api.posts.listMine);
+  const suggestedUsers = useQuery(api.users.suggested, { limit: 5 });
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -344,6 +346,16 @@ export default function ProfileScreen(): React.ReactElement {
           ) : null}
         </View>
 
+        {/* Suggested Users */}
+        {suggestedUsers && suggestedUsers.length > 0 ? (
+          <View style={styles.suggestedSection}>
+            <Text style={styles.suggestedTitle}>{COPY.socialFeed.suggestedUsers}</Text>
+            {suggestedUsers.map((suggestedUser) => (
+              <UserListItem key={suggestedUser._id} user={suggestedUser} showFollowButton />
+            ))}
+          </View>
+        ) : null}
+
         {/* Sticky Tab Bar */}
         <ProfileTabBar activeTab={activeTab} onTabPress={setActiveTab} />
 
@@ -449,6 +461,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+    backgroundColor: Colors.background.primary,
   },
   headerName: {
     ...Typography.h2,
@@ -627,5 +640,17 @@ const styles = StyleSheet.create({
   postsContainer: {
     flex: 1,
     marginHorizontal: -Spacing.md,
+  },
+  suggestedSection: {
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  suggestedTitle: {
+    ...Typography.label,
+    color: Colors.text.secondary,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
   },
 });
