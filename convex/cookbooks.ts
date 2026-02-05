@@ -331,6 +331,48 @@ export const getRecentlyCooked = query({
 });
 
 /**
+ * Get or create the "Meal Prep" cookbook for the authenticated user.
+ * Used when saving recipes from the "Plan from Pantry" feature.
+ */
+export const getOrCreateMealPrepCookbook = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    // Check if Meal Prep cookbook already exists
+    const existingCookbook = await ctx.db
+      .query('cookbooks')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .filter((q) => q.eq(q.field('name'), 'Meal Prep'))
+      .unique();
+
+    if (existingCookbook) {
+      return existingCookbook._id;
+    }
+
+    // Create the Meal Prep cookbook
+    const now = Date.now();
+    const cookbookId = await ctx.db.insert('cookbooks', {
+      userId: user._id,
+      name: 'Meal Prep',
+      description: 'Recipes generated from your pantry ingredients',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return cookbookId;
+  },
+});
+
+/**
  * Add a recipe to a cookbook.
  */
 export const addRecipe = mutation({

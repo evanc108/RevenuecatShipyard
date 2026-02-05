@@ -315,4 +315,17 @@ export default defineSchema({
   })
     .index('by_user_date', ['userId', 'date'])
     .index('by_user_date_meal', ['userId', 'date', 'mealType']),
+
+  /**
+   * Pantry items — ingredients the user has on hand.
+   */
+  pantryItems: defineTable({
+    userId: v.id('users'),
+    name: v.string(),
+    normalizedName: v.string(), // lowercase, trimmed for matching
+    category: v.optional(v.string()), // produce, dairy, meat, pantry, spice, frozen, other
+    quantity: v.optional(v.number()),
+    unit: v.optional(v.string()),
+    addedAt: v.number(),
+  }).index('by_user', ['userId']),
 });

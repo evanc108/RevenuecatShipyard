@@ -472,3 +472,100 @@ export const deleteRating = mutation({
     }
   },
 });
+
+/**
+ * Save a generated recipe (from AI meal plan generation).
+ * Creates a new recipe and saves it to the user's collection.
+ */
+export const saveGenerated = mutation({
+  args: {
+    title: v.string(),
+    description: v.optional(v.string()),
+    cuisine: v.optional(v.string()),
+    difficulty: v.optional(v.string()),
+    servings: v.optional(v.number()),
+    prepTimeMinutes: v.optional(v.number()),
+    cookTimeMinutes: v.optional(v.number()),
+    totalTimeMinutes: v.optional(v.number()),
+    calories: v.optional(v.number()),
+    proteinGrams: v.optional(v.number()),
+    carbsGrams: v.optional(v.number()),
+    fatGrams: v.optional(v.number()),
+    dietaryTags: v.optional(v.array(v.string())),
+    ingredients: v.array(
+      v.object({
+        rawText: v.string(),
+        name: v.string(),
+        normalizedName: v.string(),
+        quantity: v.number(),
+        unit: v.string(),
+        preparation: v.optional(v.string()),
+        sortOrder: v.optional(v.number()),
+      })
+    ),
+    instructions: v.array(
+      v.object({
+        stepNumber: v.number(),
+        text: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    // Generate a unique URL for AI-generated recipes
+    const generatedUrl = `ai-generated://${Date.now()}-${Math.random().toString(36).substring(2)}`;
+
+    // Create the recipe
+    const recipeId = await ctx.db.insert('recipes', {
+      url: generatedUrl,
+      createdAt: Date.now(),
+      title: args.title,
+      description: args.description,
+      cuisine: args.cuisine,
+      difficulty: args.difficulty,
+      servings: args.servings,
+      prepTimeMinutes: args.prepTimeMinutes,
+      cookTimeMinutes: args.cookTimeMinutes,
+      totalTimeMinutes: args.totalTimeMinutes,
+      calories: args.calories,
+      proteinGrams: args.proteinGrams,
+      carbsGrams: args.carbsGrams,
+      fatGrams: args.fatGrams,
+      dietaryTags: args.dietaryTags,
+      ingredients: args.ingredients.map((ing, idx) => ({
+        rawText: ing.rawText,
+        name: ing.name,
+        normalizedName: ing.normalizedName,
+        quantity: ing.quantity,
+        unit: ing.unit,
+        preparation: ing.preparation,
+        sortOrder: ing.sortOrder ?? idx,
+      })),
+      instructions: args.instructions.map((inst) => ({
+        stepNumber: inst.stepNumber,
+        text: inst.text,
+      })),
+      methodUsed: 'metadata', // Using 'metadata' for AI-generated
+      ratingCount: 0,
+      ratingSum: 0,
+    });
+
+    // Save to user's collection
+    await ctx.db.insert('userSavedRecipes', {
+      userId: user._id,
+      recipeId,
+      savedAt: Date.now(),
+    });
+
+    return recipeId;
+  },
+});

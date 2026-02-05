@@ -17,6 +17,8 @@ import { AddModal } from '@/components/ui/AddModal';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { AddModalProvider } from '@/context/AddModalContext';
 import { ShareIntentProvider } from '@/context/ShareIntentContext';
+import { AddPantryItemModal } from '@/components/features/pantry/AddPantryItemModal';
+import { GenerateMealPlanModal } from '@/components/features/pantry/GenerateMealPlanModal';
 import '@/global.css';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -163,6 +165,8 @@ export default function RootLayout() {
                         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
                       </Stack>
                       <AddModal />
+                      <AddPantryItemModal />
+                      <GenerateMealPlanModal />
                     </AddModalProvider>
                   </ShareIntentProvider>
                 </AuthGuard>
