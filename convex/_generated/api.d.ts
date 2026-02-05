@@ -13,6 +13,8 @@ import type * as discover from "../discover.js";
 import type * as discoverFeed from "../discoverFeed.js";
 import type * as discoverFeedActions from "../discoverFeedActions.js";
 import type * as follows from "../follows.js";
+import type * as groceryList from "../groceryList.js";
+import type * as groceryListActions from "../groceryListActions.js";
 import type * as mealPlan from "../mealPlan.js";
 import type * as mealPlanGeneration from "../mealPlanGeneration.js";
 import type * as pantry from "../pantry.js";
@@ -36,6 +38,8 @@ declare const fullApi: ApiFromModules<{
   discoverFeed: typeof discoverFeed;
   discoverFeedActions: typeof discoverFeedActions;
   follows: typeof follows;
+  groceryList: typeof groceryList;
+  groceryListActions: typeof groceryListActions;
   mealPlan: typeof mealPlan;
   mealPlanGeneration: typeof mealPlanGeneration;
   pantry: typeof pantry;

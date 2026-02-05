@@ -55,6 +55,7 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
   const [scheduleOption, setScheduleOption] = useState<ScheduleOption>('once');
   const [selectedDays, setSelectedDays] = useState<Set<number>>(() => new Set([new Date().getDay()])); // 0-6
   const [dailyCount, setDailyCount] = useState('5');
+  const [addToGroceries, setAddToGroceries] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   const toggleDay = useCallback((dayIndex: number) => {
@@ -81,6 +82,7 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
     setScheduleOption('once');
     setSelectedDays(new Set([new Date().getDay()]));
     setDailyCount('5');
+    setAddToGroceries(true);
     setIsLoading(false);
   }, []);
 
@@ -184,6 +186,7 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
           date,
           mealType: selectedMealType,
           recipeId,
+          addToGroceryList: addToGroceries,
         });
       }
 
@@ -200,6 +203,7 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
     scheduleOption,
     selectedDays,
     dailyCount,
+    addToGroceries,
     saveRecipe,
     addMealPlanEntry,
     getOrCreateMealPrepCookbook,
@@ -342,6 +346,20 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
             <Text style={styles.optionText}>{copy.thisWeek}</Text>
           </Pressable>
         </View>
+
+        {/* Grocery List Toggle */}
+        <Pressable
+          style={styles.groceryToggle}
+          onPress={() => setAddToGroceries((prev) => !prev)}
+          disabled={isLoading}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: addToGroceries }}
+        >
+          <View style={[styles.checkbox, addToGroceries && styles.checkboxSelected]}>
+            {addToGroceries && <Icon name="check" size={14} color={Colors.text.inverse} />}
+          </View>
+          <Text style={styles.groceryToggleText}>{copy.addToGroceries}</Text>
+        </Pressable>
 
         {/* Confirm Button */}
         <Pressable
@@ -510,5 +528,33 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: Colors.accent,
+  },
+  groceryToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.md,
+  },
+  groceryToggleText: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
 });
