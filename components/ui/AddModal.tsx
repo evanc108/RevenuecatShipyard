@@ -25,7 +25,7 @@ import { useAddModal } from '@/context/AddModalContext';
 import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 import { useModalAnimation, MODAL_ANIMATION } from '@/hooks/useModalAnimation';
-import { CookbookDropdown } from './CookbookDropdown';
+import { CookbookDropdown } from '@/components/cookbook/CookbookDropdown';
 import { StarRatingInput } from './StarRatingInput';
 import type { Id } from '@/convex/_generated/dataModel';
 

@@ -19,7 +19,7 @@ import {
 import { useShareHandler } from '@/hooks/useShareHandler';
 import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
-import { ShareCookbookSheet } from '@/components/ui/ShareCookbookSheet';
+import { ShareCookbookSheet } from '@/components/cookbook/ShareCookbookSheet';
 import type { Id } from '@/convex/_generated/dataModel';
 
 type ShareIntentContextType = {

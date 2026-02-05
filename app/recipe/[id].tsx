@@ -1,12 +1,12 @@
 import { Icon } from '@/components/ui/Icon';
+import type { IconName } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -23,26 +23,281 @@ import { useMutation, useQuery } from 'convex/react';
 // --- Constants ---
 
 const copy = COPY.recipeDetail;
-const HERO_HEIGHT = 340;
-const OVERLAY_BUTTON_SIZE = 40;
+const HERO_HEIGHT = 360;
+const CONTENT_OVERLAP = 28;
 const STEP_CIRCLE_SIZE = 28;
 const SERVINGS_BUTTON_SIZE = 36;
-const INGREDIENT_DOT_SIZE = 6;
 const STAR_SIZE = 28;
 const STAR_COLOR_ACTIVE = '#FFB800';
-const STAR_COLOR = '#FFB800';
+const INGREDIENT_IMAGE_SIZE = 44;
+const NAV_BUTTON_SIZE = 40;
+const HEADER_BUTTON_SIZE = 38;
+const NAV_ICON_STROKE = 2.5;
 
 const PASTEL_COLORS: readonly string[] = [
   '#E0D6FF', '#FFD6E0', '#D6E8FF', '#D6FFE8',
   '#FFE8D6', '#FFF5D6', '#D6F0E0', '#FFE0D6',
 ] as const;
 
+const CATEGORY_COLORS = {
+  protein: '#FFE0E0',
+  vegetable: '#E0F5E0',
+  fruit: '#FFF5D6',
+  dairy: '#DEE8FF',
+  other: '#F5F5F7',
+} as const;
+
+type IngredientCategory = keyof typeof CATEGORY_COLORS;
+
+const JUMP_SECTIONS: { key: string; icon: IconName }[] = [
+  { key: 'top', icon: 'home' },
+  { key: 'nutrition', icon: 'flame' },
+  { key: 'ingredients', icon: 'layers' },
+  { key: 'instructions', icon: 'book-open' },
+];
+
+const DIFFICULTY_MAP: Record<string, number> = {
+  easy: 1,
+  medium: 2,
+  moderate: 2,
+  intermediate: 3,
+  hard: 4,
+  difficult: 4,
+  expert: 5,
+};
+
+// --- Helper Functions ---
+
 function getPastelForTitle(title: string): string {
   const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return PASTEL_COLORS[hash % PASTEL_COLORS.length] ?? PASTEL_COLORS[0];
 }
 
-// --- Component ---
+function parseDifficulty(difficulty?: string | number): number {
+  if (difficulty === undefined || difficulty === null) return 0;
+  if (typeof difficulty === 'number') return Math.min(5, Math.max(1, Math.round(difficulty)));
+  const mapped = DIFFICULTY_MAP[difficulty.toLowerCase()];
+  if (mapped !== undefined) return mapped;
+  const num = parseInt(difficulty, 10);
+  if (!isNaN(num) && num >= 1 && num <= 5) return num;
+  return 3;
+}
+
+function getIngredientCategory(category?: string, name?: string): IngredientCategory {
+  const has = (text: string, keys: string[]): boolean =>
+    keys.some((k) => text.includes(k));
+
+  if (category) {
+    const cat = category.toLowerCase();
+    if (has(cat, ['protein', 'meat', 'poultry', 'seafood', 'fish', 'egg'])) return 'protein';
+    if (has(cat, ['vegetable', 'produce', 'veg'])) return 'vegetable';
+    if (has(cat, ['fruit'])) return 'fruit';
+    if (has(cat, ['dairy', 'milk', 'cheese'])) return 'dairy';
+    return 'other';
+  }
+
+  if (name) {
+    const lower = name.toLowerCase();
+    if (
+      has(lower, [
+        'chicken', 'beef', 'pork', 'lamb', 'turkey', 'fish', 'salmon',
+        'tuna', 'shrimp', 'prawn', 'egg', 'bacon', 'sausage', 'steak',
+        'tofu', 'tempeh', 'duck', 'veal', 'crab', 'lobster', 'scallop',
+      ])
+    )
+      return 'protein';
+    if (
+      has(lower, [
+        'onion', 'garlic', 'tomato', 'pepper', 'carrot', 'celery',
+        'broccoli', 'spinach', 'kale', 'lettuce', 'potato', 'mushroom',
+        'zucchini', 'cucumber', 'corn', 'peas', 'cabbage', 'cauliflower',
+        'asparagus', 'eggplant', 'squash', 'artichoke', 'leek',
+        'scallion', 'shallot', 'beet', 'radish', 'turnip',
+      ])
+    )
+      return 'vegetable';
+    if (
+      has(lower, [
+        'lemon', 'lime', 'orange', 'apple', 'banana', 'berry',
+        'strawberry', 'blueberry', 'raspberry', 'mango', 'pineapple',
+        'avocado', 'coconut', 'grape', 'peach', 'pear', 'cherry',
+        'plum', 'fig', 'date', 'melon', 'kiwi', 'pomegranate', 'cranberry',
+      ])
+    )
+      return 'fruit';
+    if (
+      has(lower, [
+        'milk', 'cream', 'cheese', 'yogurt', 'butter', 'sour cream',
+        'whey', 'ricotta', 'mozzarella', 'parmesan', 'cheddar',
+      ])
+    )
+      return 'dairy';
+  }
+
+  return 'other';
+}
+
+function getIngredientImageUrl(name: string): string {
+  const mainName = name.split(/[,(]/)[0].trim();
+  const formatted = mainName
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+  return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formatted)}-Small.png`;
+}
+
+// --- Sub-components ---
+
+type IngredientCardProps = {
+  name: string;
+  rawText: string;
+  quantity: number;
+  unit: string;
+  preparation?: string;
+  category?: string;
+  isOptional?: boolean;
+  servingsMultiplier: number;
+  formatQuantity: (qty: number) => string;
+};
+
+const IngredientCard = memo(function IngredientCard({
+  name,
+  rawText,
+  quantity,
+  unit,
+  preparation,
+  category,
+  isOptional,
+  servingsMultiplier,
+  formatQuantity,
+}: IngredientCardProps) {
+  const ingredientCategory = getIngredientCategory(category, name);
+  const bgColor = CATEGORY_COLORS[ingredientCategory];
+  const imageUrl = getIngredientImageUrl(name);
+
+  const displayText =
+    servingsMultiplier !== 1 && quantity > 0
+      ? `${formatQuantity(quantity)} ${unit}${preparation ? `, ${preparation}` : ''}`
+      : rawText;
+
+  return (
+    <View
+      style={[ingStyles.card, { backgroundColor: bgColor }]}
+      accessibilityLabel={`${name}${isOptional ? ', optional' : ''}`}
+    >
+      <View style={ingStyles.imageCircle}>
+        <Text style={ingStyles.imageFallback}>{name.charAt(0).toUpperCase()}</Text>
+        <Image
+          source={{ uri: imageUrl }}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      </View>
+      <View style={ingStyles.info}>
+        <Text style={ingStyles.name} numberOfLines={1}>
+          {name}
+          {isOptional ? <Text style={ingStyles.optional}> (optional)</Text> : null}
+        </Text>
+        <Text style={ingStyles.detail} numberOfLines={1}>
+          {displayText}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+const ingStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm + 2,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+  },
+  imageCircle: {
+    width: INGREDIENT_IMAGE_SIZE,
+    height: INGREDIENT_IMAGE_SIZE,
+    borderRadius: INGREDIENT_IMAGE_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginRight: Spacing.md,
+  },
+  imageFallback: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text.tertiary,
+  },
+  info: {
+    flex: 1,
+  },
+  name: {
+    ...Typography.body,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  detail: {
+    ...Typography.bodySmall,
+    color: Colors.text.secondary,
+    marginTop: 2,
+  },
+  optional: {
+    fontWeight: '400',
+    fontStyle: 'italic',
+    color: Colors.text.tertiary,
+  },
+});
+
+function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactElement {
+  return (
+    <View style={{ flexDirection: 'row', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Icon
+          key={star}
+          name="star"
+          size={14}
+          color={star <= difficulty ? STAR_COLOR_ACTIVE : Colors.text.disabled}
+          filled={star <= difficulty}
+        />
+      ))}
+    </View>
+  );
+}
+
+function SectionDivider({ title }: { title: string }): React.ReactElement {
+  return (
+    <View style={divStyles.container}>
+      <View style={divStyles.line} />
+      <Text style={divStyles.title}>{title}</Text>
+      <View style={divStyles.line} />
+    </View>
+  );
+}
+
+const divStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  line: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+  },
+  title: {
+    ...Typography.label,
+    color: Colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+});
+
+// --- Main Component ---
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,20 +306,15 @@ export default function RecipeDetailScreen() {
   const recipeId = id as Id<'recipes'>;
 
   const recipe = useQuery(api.recipes.get, recipeId ? { id: recipeId } : 'skip');
-  const userRating = useQuery(
-    api.recipes.getUserRating,
-    recipeId ? { recipeId } : 'skip',
-  );
+  const userRating = useQuery(api.recipes.getUserRating, recipeId ? { recipeId } : 'skip');
   const rateMutation = useMutation(api.recipes.rate);
-  const myPost = useQuery(
-    api.posts.getMyPostForRecipe,
-    recipeId ? { recipeId } : 'skip',
-  );
+  const myPost = useQuery(api.posts.getMyPostForRecipe, recipeId ? { recipeId } : 'skip');
   const updatePostMutation = useMutation(api.posts.update);
 
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [jumpMenuOpen, setJumpMenuOpen] = useState(false);
 
-  // Edit mode state for user's review
+  // Review edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editEase, setEditEase] = useState(0);
   const [editTaste, setEditTaste] = useState(0);
@@ -72,7 +322,11 @@ export default function RecipeDetailScreen() {
   const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync edit state when post loads or changes
+  // Section scroll refs
+  const scrollViewRef = useRef<ScrollView>(null);
+  const contentBoxY = useRef(0);
+  const sectionYMap = useRef<Record<string, number>>({});
+
   useEffect(() => {
     if (myPost) {
       setEditEase(myPost.easeRating);
@@ -86,18 +340,16 @@ export default function RecipeDetailScreen() {
   const adjustedServings = Math.round(originalServings * servingsMultiplier);
 
   const adjustServings = (delta: number) => {
-    const newMultiplier = servingsMultiplier + delta;
-    if (newMultiplier >= 0.25 && newMultiplier <= 10) {
-      setServingsMultiplier(newMultiplier);
+    const next = servingsMultiplier + delta;
+    if (next >= 0.25 && next <= 10) {
+      setServingsMultiplier(next);
     }
   };
 
   const formatQuantity = useCallback(
     (qty: number): string => {
       const adjusted = qty * servingsMultiplier;
-      if (adjusted === Math.floor(adjusted)) {
-        return adjusted.toString();
-      }
+      if (adjusted === Math.floor(adjusted)) return adjusted.toString();
       const rounded = Math.round(adjusted * 100) / 100;
       if (Math.abs(rounded - 0.25) < 0.01) return '\u00BC';
       if (Math.abs(rounded - 0.33) < 0.01) return '\u2153';
@@ -141,6 +393,30 @@ export default function RecipeDetailScreen() {
     setIsEditing(false);
   };
 
+  const handleSectionLayout = useCallback((section: string, y: number) => {
+    sectionYMap.current[section] = y;
+  }, []);
+
+  const scrollToSection = useCallback(
+    (section: string) => {
+      setJumpMenuOpen(false);
+      if (section === 'top') {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        return;
+      }
+      const sectionY = sectionYMap.current[section];
+      if (sectionY !== undefined) {
+        const targetY = contentBoxY.current + sectionY - Spacing.md;
+        scrollViewRef.current?.scrollTo({ y: Math.max(0, targetY), animated: true });
+      }
+    },
+    [],
+  );
+
+  const toggleJumpMenu = useCallback(() => {
+    setJumpMenuOpen((prev) => !prev);
+  }, []);
+
   // --- Early Returns ---
 
   if (!recipeId) {
@@ -166,15 +442,18 @@ export default function RecipeDetailScreen() {
   if (recipe === null) {
     return (
       <View style={styles.container}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          style={[styles.overlayButton, { top: insets.top + Spacing.sm, left: Spacing.md }]}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
-          <Icon name="arrow-back" size={22} color={Colors.text.primary} />
-        </Pressable>
+        {/* Floating header for null state */}
+        <View style={[styles.floatingHeader, { paddingTop: insets.top + Spacing.sm }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={styles.headerBackButton}
+          >
+            <Icon name="arrow-back" size={22} color={Colors.text.primary} strokeWidth={2} />
+          </Pressable>
+        </View>
         <View style={styles.centeredContainer}>
           <Text style={styles.errorText}>{copy.notFound}</Text>
         </View>
@@ -190,18 +469,64 @@ export default function RecipeDetailScreen() {
   );
   const hasDietaryTags = Boolean(recipe.dietaryTags && recipe.dietaryTags.length > 0);
   const hasEquipment = Boolean(recipe.equipment && recipe.equipment.length > 0);
+  const difficultyLevel = parseDifficulty(recipe.difficulty);
+  const heroHeight = HERO_HEIGHT + insets.top;
+
+  // Build quick info items — key info in black
+  const quickInfoItems: React.ReactNode[] = [];
+  if (recipe.creatorName) {
+    quickInfoItems.push(
+      <Text key="creator" style={styles.quickInfoTextBlack}>
+        {recipe.creatorName}
+      </Text>,
+    );
+  }
+  if (recipe.totalTimeMinutes) {
+    quickInfoItems.push(
+      <View key="time" style={styles.quickInfoItem}>
+        <Icon name="clock" size={14} color={Colors.text.primary} />
+        <Text style={styles.quickInfoTextBlack}>{copy.minutes(recipe.totalTimeMinutes)}</Text>
+      </View>,
+    );
+  }
+  if (recipe.servings) {
+    quickInfoItems.push(
+      <View key="servings" style={styles.quickInfoItem}>
+        <Icon name="users" size={14} color={Colors.text.primary} />
+        <Text style={styles.quickInfoTextBlack}>
+          {adjustedServings} {copy.servings.label.toLowerCase()}
+        </Text>
+      </View>,
+    );
+  }
+  if (difficultyLevel > 0) {
+    quickInfoItems.push(
+      <View key="difficulty">
+        <DifficultyStars difficulty={difficultyLevel} />
+      </View>,
+    );
+  }
+  if (recipe.cuisine) {
+    quickInfoItems.push(
+      <Text key="cuisine" style={styles.quickInfoCuisine}>
+        {recipe.cuisine}
+      </Text>,
+    );
+  }
 
   // --- Render ---
 
   return (
     <View style={styles.container}>
+      {/* Scrollable Content — image extends to very top */}
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Image Section */}
-        <View style={styles.heroContainer}>
+        {/* Hero Image — full bleed to top edge of screen */}
+        <View style={[styles.heroContainer, { height: heroHeight }]}>
           {hasImage ? (
             <Image
               source={{ uri: recipe.imageUrl ?? undefined }}
@@ -211,289 +536,279 @@ export default function RecipeDetailScreen() {
               cachePolicy="memory-disk"
             />
           ) : (
-            <View style={[styles.heroFallback, { backgroundColor: getPastelForTitle(recipe.title) }]}>
+            <View
+              style={[styles.heroFallback, { backgroundColor: getPastelForTitle(recipe.title) }]}
+            >
               <Icon name="utensils" size={48} color={Colors.text.tertiary} />
             </View>
           )}
+        </View>
 
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)']}
-            locations={[0, 0.4, 1]}
-            style={styles.heroGradient}
-          />
+        {/* Content Box — rounded top, overlaps image bottom */}
+        <View
+          style={styles.contentBox}
+          onLayout={(e) => {
+            contentBoxY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          {/* Title */}
+          <Text style={styles.title} numberOfLines={3} ellipsizeMode="tail">
+            {recipe.title}
+          </Text>
 
-          <View style={styles.heroOverlay}>
-            <Text style={styles.heroTitle} numberOfLines={3} ellipsizeMode="tail">
-              {recipe.title}
-            </Text>
-            {recipe.creatorName ? (
-              <Text style={styles.heroCreator}>
-                {copy.by} {recipe.creatorName}
+          {/* Quick Info Row — key info in black */}
+          {quickInfoItems.length > 0 ? (
+            <View style={styles.quickInfoRow}>
+              {quickInfoItems.map((item, idx) => (
+                <View key={idx} style={styles.quickInfoItemWrapper}>
+                  {idx > 0 ? <Text style={styles.quickInfoDot}>{'\u2022'}</Text> : null}
+                  {item}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Dietary tags — inline in header area */}
+          {hasDietaryTags ? (
+            <View style={styles.dietaryRow}>
+              {recipe.dietaryTags?.map((tag) => (
+                <View key={tag} style={styles.dietaryTag}>
+                  <Text style={styles.dietaryTagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Description */}
+          {recipe.description ? (
+            <Text style={styles.descriptionText}>{recipe.description}</Text>
+          ) : null}
+
+          {/* Your Review */}
+          {myPost ? (
+            <>
+              <SectionDivider title={copy.yourReview.title} />
+              <View style={styles.reviewSection}>
+                <View style={styles.reviewHeader}>
+                  {isEditing ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel editing"
+                      onPress={handleCancelEdit}
+                      hitSlop={8}
+                    >
+                      <Icon name="close" size={20} color={Colors.text.tertiary} />
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit review"
+                      onPress={() => setIsEditing(true)}
+                      hitSlop={8}
+                    >
+                      <Icon name="pencil" size={18} color={Colors.accent} />
+                    </Pressable>
+                  )}
+                </View>
+
+                {/* Ease Rating */}
+                <View style={styles.reviewRatingRow}>
+                  <Text style={styles.reviewRatingLabel}>{copy.yourReview.ease}</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const value = isEditing ? editEase : myPost.easeRating;
+                      return (
+                        <Pressable
+                          key={star}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Rate ease ${star} stars`}
+                          onPress={() => isEditing && setEditEase(star)}
+                          disabled={!isEditing}
+                          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                        >
+                          <Icon
+                            name={star <= value ? 'star' : 'star-outline'}
+                            size={20}
+                            color={star <= value ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Taste Rating */}
+                <View style={styles.reviewRatingRow}>
+                  <Text style={styles.reviewRatingLabel}>{copy.yourReview.taste}</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const value = isEditing ? editTaste : myPost.tasteRating;
+                      return (
+                        <Pressable
+                          key={star}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Rate taste ${star} stars`}
+                          onPress={() => isEditing && setEditTaste(star)}
+                          disabled={!isEditing}
+                          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                        >
+                          <Icon
+                            name={star <= value ? 'star' : 'star-outline'}
+                            size={20}
+                            color={star <= value ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Presentation Rating */}
+                <View style={styles.reviewRatingRow}>
+                  <Text style={styles.reviewRatingLabel}>{copy.yourReview.presentation}</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const value = isEditing ? editPresentation : myPost.presentationRating;
+                      return (
+                        <Pressable
+                          key={star}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Rate presentation ${star} stars`}
+                          onPress={() => isEditing && setEditPresentation(star)}
+                          disabled={!isEditing}
+                          hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                        >
+                          <Icon
+                            name={star <= value ? 'star' : 'star-outline'}
+                            size={20}
+                            color={star <= value ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
+                          />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Notes */}
+                <View style={styles.reviewNotesContainer}>
+                  <Text style={styles.reviewNotesLabel}>{copy.yourReview.notes}</Text>
+                  {isEditing ? (
+                    <TextInput
+                      style={styles.reviewNotesInput}
+                      value={editNotes}
+                      onChangeText={setEditNotes}
+                      multiline
+                      placeholder={copy.yourReview.noNotes}
+                      placeholderTextColor={Colors.text.tertiary}
+                    />
+                  ) : (
+                    <Text style={styles.reviewNotesText}>
+                      {myPost.notes || copy.yourReview.noNotes}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Save Button */}
+                {isEditing ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Save review"
+                    style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                    onPress={handleSaveReview}
+                    disabled={isSaving}
+                  >
+                    <Text style={styles.saveButtonText}>
+                      {isSaving ? copy.yourReview.saving : copy.yourReview.save}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+
+          {/* Rating */}
+          <SectionDivider title={copy.rateThisRecipe} />
+          <View style={styles.ratingSection}>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => {
+                const filled = userRating != null && star <= userRating;
+                return (
+                  <Pressable
+                    key={star}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                    onPress={() => handleRate(star)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Icon
+                      name="star"
+                      size={STAR_SIZE}
+                      color={filled ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
+                      filled={filled}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+            {recipe.averageRating !== undefined && recipe.averageRating !== null ? (
+              <Text style={styles.avgRatingText}>
+                {copy.communityAverage(recipe.averageRating)}
               </Text>
             ) : null}
           </View>
-        </View>
 
-        {/* Your Review Section - only show if user has a post for this recipe */}
-        {myPost ? (
-          <View style={styles.reviewSection}>
-            <View style={styles.reviewHeader}>
-              <Text style={styles.reviewTitle}>{copy.yourReview.title}</Text>
-              {isEditing ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel editing"
-                  onPress={handleCancelEdit}
-                  hitSlop={8}
-                >
-                  <Icon name="close" size={20} color={Colors.text.tertiary} />
-                </Pressable>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit review"
-                  onPress={() => setIsEditing(true)}
-                  hitSlop={8}
-                >
-                  <Icon name="pencil" size={18} color={Colors.accent} />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Ease Rating */}
-            <View style={styles.reviewRatingRow}>
-              <Text style={styles.reviewRatingLabel}>{copy.yourReview.ease}</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const value = isEditing ? editEase : myPost.easeRating;
-                  return (
-                    <Pressable
-                      key={star}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rate ease ${star} stars`}
-                      onPress={() => isEditing && setEditEase(star)}
-                      disabled={!isEditing}
-                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                    >
-                      <Icon
-                        name={star <= value ? 'star' : 'star-outline'}
-                        size={20}
-                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
-                      />
-                    </Pressable>
-                  );
-                })}
+          {/* Nutrition */}
+          {hasNutrition ? (
+            <View
+              onLayout={(e) => handleSectionLayout('nutrition', e.nativeEvent.layout.y)}
+            >
+              <SectionDivider title={copy.nutrition.title} />
+              <View style={styles.nutritionGrid}>
+                {recipe.calories ? (
+                  <View style={styles.nutritionStat}>
+                    <Text style={styles.nutritionValue}>
+                      {Math.round(recipe.calories * servingsMultiplier)}
+                    </Text>
+                    <Text style={styles.nutritionStatLabel}>{copy.nutrition.calories}</Text>
+                  </View>
+                ) : null}
+                {recipe.proteinGrams ? (
+                  <View style={styles.nutritionStat}>
+                    <Text style={styles.nutritionValue}>
+                      {Math.round(recipe.proteinGrams * servingsMultiplier)}g
+                    </Text>
+                    <Text style={styles.nutritionStatLabel}>{copy.nutrition.protein}</Text>
+                  </View>
+                ) : null}
+                {recipe.carbsGrams ? (
+                  <View style={styles.nutritionStat}>
+                    <Text style={styles.nutritionValue}>
+                      {Math.round(recipe.carbsGrams * servingsMultiplier)}g
+                    </Text>
+                    <Text style={styles.nutritionStatLabel}>{copy.nutrition.carbs}</Text>
+                  </View>
+                ) : null}
+                {recipe.fatGrams ? (
+                  <View style={styles.nutritionStat}>
+                    <Text style={styles.nutritionValue}>
+                      {Math.round(recipe.fatGrams * servingsMultiplier)}g
+                    </Text>
+                    <Text style={styles.nutritionStatLabel}>{copy.nutrition.fat}</Text>
+                  </View>
+                ) : null}
               </View>
-            </View>
-
-            {/* Taste Rating */}
-            <View style={styles.reviewRatingRow}>
-              <Text style={styles.reviewRatingLabel}>{copy.yourReview.taste}</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const value = isEditing ? editTaste : myPost.tasteRating;
-                  return (
-                    <Pressable
-                      key={star}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rate taste ${star} stars`}
-                      onPress={() => isEditing && setEditTaste(star)}
-                      disabled={!isEditing}
-                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                    >
-                      <Icon
-                        name={star <= value ? 'star' : 'star-outline'}
-                        size={20}
-                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Presentation Rating */}
-            <View style={styles.reviewRatingRow}>
-              <Text style={styles.reviewRatingLabel}>{copy.yourReview.presentation}</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const value = isEditing ? editPresentation : myPost.presentationRating;
-                  return (
-                    <Pressable
-                      key={star}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rate presentation ${star} stars`}
-                      onPress={() => isEditing && setEditPresentation(star)}
-                      disabled={!isEditing}
-                      hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                    >
-                      <Icon
-                        name={star <= value ? 'star' : 'star-outline'}
-                        size={20}
-                        color={star <= value ? STAR_COLOR : Colors.text.tertiary}
-                      />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Notes */}
-            <View style={styles.reviewNotesContainer}>
-              <Text style={styles.reviewNotesLabel}>{copy.yourReview.notes}</Text>
-              {isEditing ? (
-                <TextInput
-                  style={styles.reviewNotesInput}
-                  value={editNotes}
-                  onChangeText={setEditNotes}
-                  multiline
-                  placeholder={copy.yourReview.noNotes}
-                  placeholderTextColor={Colors.text.tertiary}
-                />
-              ) : (
-                <Text style={styles.reviewNotesText}>
-                  {myPost.notes || copy.yourReview.noNotes}
-                </Text>
-              )}
-            </View>
-
-            {/* Save Button */}
-            {isEditing ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Save review"
-                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-                onPress={handleSaveReview}
-                disabled={isSaving}
-              >
-                <Text style={styles.saveButtonText}>
-                  {isSaving ? copy.yourReview.saving : copy.yourReview.save}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {/* Quick Info Bar */}
-        <View style={styles.infoBar}>
-          {recipe.totalTimeMinutes ? (
-            <View style={styles.infoChip}>
-              <Icon name="clock" size={16} color={Colors.text.secondary} />
-              <Text style={styles.infoChipText}>
-                {copy.minutes(recipe.totalTimeMinutes)}
-              </Text>
+              <Text style={styles.nutritionNote}>{copy.nutrition.perServing}</Text>
             </View>
           ) : null}
 
-          {recipe.servings ? (
-            <View style={styles.infoChip}>
-              <Icon name="users" size={16} color={Colors.text.secondary} />
-              <Text style={styles.infoChipText}>
-                {adjustedServings} {copy.servings.label.toLowerCase()}
-              </Text>
-            </View>
-          ) : null}
-
-          {recipe.difficulty ? (
-            <View style={styles.infoChip}>
-              <Text style={styles.infoChipText}>{recipe.difficulty}</Text>
-            </View>
-          ) : null}
-
-          {recipe.cuisine ? (
-            <View style={styles.infoChip}>
-              <Text style={styles.infoChipTextAccent}>{recipe.cuisine}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Description */}
-        {recipe.description ? (
-          <Text style={styles.descriptionText}>{recipe.description}</Text>
-        ) : null}
-
-        {/* Rating Card */}
-        <View style={styles.ratingCard}>
-          <Text style={styles.ratingLabel}>{copy.rateThisRecipe}</Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => {
-              const filled = userRating != null && star <= userRating;
-              return (
-                <Pressable
-                  key={star}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                  onPress={() => handleRate(star)}
-                  hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                >
-                  <Icon
-                    name="star"
-                    size={STAR_SIZE}
-                    color={filled ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
-                    filled={filled}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-          {recipe.averageRating !== undefined && recipe.averageRating !== null ? (
-            <Text style={styles.avgRatingText}>
-              {copy.communityAverage(recipe.averageRating)}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Nutrition Card */}
-        {hasNutrition ? (
-          <View style={styles.nutritionCard}>
-            <Text style={styles.nutritionTitle}>{copy.nutrition.title}</Text>
-            <View style={styles.nutritionGrid}>
-              {recipe.calories ? (
-                <View style={styles.nutritionStat}>
-                  <Text style={styles.nutritionValue}>
-                    {Math.round(recipe.calories * servingsMultiplier)}
-                  </Text>
-                  <Text style={styles.nutritionStatLabel}>{copy.nutrition.calories}</Text>
-                </View>
-              ) : null}
-              {recipe.proteinGrams ? (
-                <View style={styles.nutritionStat}>
-                  <Text style={styles.nutritionValue}>
-                    {Math.round(recipe.proteinGrams * servingsMultiplier)}g
-                  </Text>
-                  <Text style={styles.nutritionStatLabel}>{copy.nutrition.protein}</Text>
-                </View>
-              ) : null}
-              {recipe.carbsGrams ? (
-                <View style={styles.nutritionStat}>
-                  <Text style={styles.nutritionValue}>
-                    {Math.round(recipe.carbsGrams * servingsMultiplier)}g
-                  </Text>
-                  <Text style={styles.nutritionStatLabel}>{copy.nutrition.carbs}</Text>
-                </View>
-              ) : null}
-              {recipe.fatGrams ? (
-                <View style={styles.nutritionStat}>
-                  <Text style={styles.nutritionValue}>
-                    {Math.round(recipe.fatGrams * servingsMultiplier)}g
-                  </Text>
-                  <Text style={styles.nutritionStatLabel}>{copy.nutrition.fat}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.nutritionNote}>{copy.nutrition.perServing}</Text>
-          </View>
-        ) : null}
-
-        {/* Ingredients Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.ingredientHeaderRow}>
-            <Text style={styles.sectionTitle}>
-              {copy.ingredients} ({recipe.ingredients.length})
-            </Text>
+          {/* Ingredients */}
+          <View
+            onLayout={(e) => handleSectionLayout('ingredients', e.nativeEvent.layout.y)}
+          >
+            <SectionDivider title={`${copy.ingredients} (${recipe.ingredients.length})`} />
 
             {recipe.servings ? (
-              <View style={styles.servingsAdjuster}>
+              <View style={styles.servingsRow}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Decrease servings"
@@ -504,7 +819,9 @@ export default function RecipeDetailScreen() {
                   <Icon
                     name="minus"
                     size={18}
-                    color={servingsMultiplier <= 0.25 ? Colors.text.tertiary : Colors.accent}
+                    color={
+                      servingsMultiplier <= 0.25 ? Colors.text.tertiary : Colors.accent
+                    }
                   />
                 </Pressable>
                 <View style={styles.servingsDisplay}>
@@ -528,175 +845,175 @@ export default function RecipeDetailScreen() {
                     color={servingsMultiplier >= 10 ? Colors.text.tertiary : Colors.accent}
                   />
                 </Pressable>
+                {servingsMultiplier !== 1 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset to original servings"
+                    onPress={() => setServingsMultiplier(1)}
+                    hitSlop={8}
+                    style={styles.resetButton}
+                  >
+                    <Text style={styles.resetLink}>{copy.servings.reset}</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
+
+            {recipe.ingredients.map((ing, idx) => (
+              <IngredientCard
+                key={`${ing.name}-${idx}`}
+                name={ing.name}
+                rawText={ing.rawText}
+                quantity={ing.quantity}
+                unit={ing.unit}
+                preparation={ing.preparation}
+                category={ing.category}
+                isOptional={ing.optional}
+                servingsMultiplier={servingsMultiplier}
+                formatQuantity={formatQuantity}
+              />
+            ))}
           </View>
 
-          {servingsMultiplier !== 1 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Reset to original servings"
-              onPress={() => setServingsMultiplier(1)}
-              style={styles.resetLinkContainer}
-            >
-              <Text style={styles.resetLink}>{copy.servings.reset}</Text>
-            </Pressable>
-          ) : null}
+          {/* Instructions */}
+          <View
+            onLayout={(e) => handleSectionLayout('instructions', e.nativeEvent.layout.y)}
+          >
+            <SectionDivider title={`${copy.instructions} (${recipe.instructions.length})`} />
 
-          {recipe.ingredients.map((ing, idx) => (
-            <View key={`${ing.name}-${idx}`} style={styles.ingredientRow}>
-              <View style={styles.ingredientDot} />
-              <Text style={styles.ingredientText}>
-                {servingsMultiplier !== 1 && ing.quantity > 0 ? (
-                  <>
-                    <Text style={styles.ingredientQuantity}>
-                      {formatQuantity(ing.quantity)} {ing.unit}{' '}
-                    </Text>
-                    {ing.name}
-                    {ing.preparation ? `, ${ing.preparation}` : ''}
-                  </>
-                ) : (
-                  ing.rawText
-                )}
-                {ing.optional ? (
-                  <Text style={styles.ingredientOptional}> (optional)</Text>
-                ) : null}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Instructions Section */}
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.sectionTitle}>
-            {copy.instructions} ({recipe.instructions.length})
-          </Text>
-
-          {recipe.instructions.map((inst) => (
-            <View key={inst.stepNumber} style={styles.instructionRow}>
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepCircleText}>{inst.stepNumber}</Text>
-              </View>
-              <View style={styles.instructionContent}>
-                <Text style={styles.instructionText}>{inst.text}</Text>
-
-                {inst.tip ? (
-                  <View style={styles.tipContainer}>
-                    <Icon name="info" size={16} color={Colors.text.secondary} />
-                    <Text style={styles.tipText}>{inst.tip}</Text>
-                  </View>
-                ) : null}
-
-                {inst.temperature || inst.timeSeconds ? (
-                  <View style={styles.instructionChips}>
-                    {inst.temperature ? (
-                      <View style={styles.temperatureChip}>
-                        <Icon name="flame" size={14} color={Colors.accent} />
-                        <Text style={styles.chipText}>{inst.temperature}</Text>
-                      </View>
-                    ) : null}
-
-                    {inst.timeSeconds ? (
-                      <View style={styles.timeChip}>
-                        <Icon name="clock" size={14} color={Colors.text.secondary} />
-                        <Text style={styles.chipTextMuted}>
-                          {Math.ceil(inst.timeSeconds / 60)} min
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Tags Section */}
-        {hasDietaryTags || hasEquipment ? (
-          <View style={styles.tagsSection}>
-            {hasDietaryTags ? (
-              <>
-                <Text style={styles.sectionTitle}>{copy.dietary}</Text>
-                <View style={styles.tagRow}>
-                  {recipe.dietaryTags?.map((tag, idx) => (
-                    <View key={`dietary-${tag}-${idx}`} style={styles.tagPill}>
-                      <Text style={styles.tagPillText}>{tag}</Text>
-                    </View>
-                  ))}
+            {recipe.instructions.map((inst) => (
+              <View key={inst.stepNumber} style={styles.instructionRow}>
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepCircleText}>{inst.stepNumber}</Text>
                 </View>
-              </>
-            ) : null}
+                <View style={styles.instructionContent}>
+                  <Text style={styles.instructionText}>{inst.text}</Text>
 
-            {hasEquipment ? (
-              <View style={hasDietaryTags ? styles.equipmentSubsection : undefined}>
-                <Text style={styles.sectionTitle}>{copy.equipment}</Text>
-                <View style={styles.tagRow}>
-                  {recipe.equipment?.map((equip, idx) => (
-                    <View key={`equip-${equip}-${idx}`} style={styles.tagPill}>
-                      <Text style={styles.tagPillText}>{equip}</Text>
+                  {inst.tip ? (
+                    <View style={styles.tipContainer}>
+                      <Icon name="info" size={16} color={Colors.text.secondary} />
+                      <Text style={styles.tipText}>{inst.tip}</Text>
                     </View>
-                  ))}
+                  ) : null}
+
+                  {inst.temperature || inst.timeSeconds ? (
+                    <View style={styles.instructionMeta}>
+                      {inst.temperature ? (
+                        <View style={styles.instructionMetaItem}>
+                          <Icon name="flame" size={14} color={Colors.accent} />
+                          <Text style={styles.instructionMetaText}>{inst.temperature}</Text>
+                        </View>
+                      ) : null}
+                      {inst.timeSeconds ? (
+                        <View style={styles.instructionMetaItem}>
+                          <Icon name="clock" size={14} color={Colors.text.secondary} />
+                          <Text style={styles.instructionMetaTextMuted}>
+                            {Math.ceil(inst.timeSeconds / 60)} min
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
               </View>
-            ) : null}
+            ))}
           </View>
-        ) : null}
 
-        {/* Source Footer */}
-        <View style={styles.sourceFooter}>
-          <Text style={styles.sourceText}>
-            {copy.extractedVia} {recipe.methodUsed} {copy.tier}
-          </Text>
-          {recipe.url ? (
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Open source URL"
-              onPress={() => Linking.openURL(recipe.url)}
-              hitSlop={8}
-            >
-              <View style={styles.sourceLinkRow}>
-                <Text style={styles.sourceLink} numberOfLines={1} ellipsizeMode="middle">
-                  {recipe.url}
+          {/* Equipment — only if present, no dietary section here anymore */}
+          {hasEquipment ? (
+            <>
+              <SectionDivider title={copy.equipment} />
+              <View style={styles.tagsTextSection}>
+                <Text style={styles.tagsText}>
+                  {recipe.equipment?.join('  \u2022  ')}
                 </Text>
-                <Icon name="external-link" size={14} color={Colors.accent} />
               </View>
-            </Pressable>
+            </>
           ) : null}
+
+          {/* Source Footer */}
+          <View style={styles.sourceFooter}>
+            <View style={styles.sourceDivider} />
+            <Text style={styles.sourceText}>
+              {copy.extractedVia} {recipe.methodUsed} {copy.tier}
+            </Text>
+            {recipe.url ? (
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Open source URL"
+                onPress={() => Linking.openURL(recipe.url)}
+                hitSlop={8}
+              >
+                <View style={styles.sourceLinkRow}>
+                  <Text style={styles.sourceLink} numberOfLines={1} ellipsizeMode="middle">
+                    {recipe.url}
+                  </Text>
+                  <Icon name="external-link" size={14} color={Colors.accent} />
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </ScrollView>
 
-      {/* Overlay Buttons — fixed above ScrollView */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        style={[
-          styles.overlayButton,
-          { top: insets.top + Spacing.sm, left: Spacing.md },
-        ]}
-        onPress={() => router.back()}
-        hitSlop={8}
-      >
-        <Icon name="arrow-back" size={22} color="#FFFFFF" />
-      </Pressable>
+      {/* Floating Header — overlays on top of hero image */}
+      <View style={[styles.floatingHeader, { paddingTop: insets.top + Spacing.sm }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={styles.headerBackButton}
+        >
+          <Icon name="arrow-back" size={22} color={Colors.text.inverse} strokeWidth={2} />
+        </Pressable>
 
-      <View style={[styles.actionButtons, { top: insets.top + Spacing.sm }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Bookmark recipe"
-          style={styles.overlayButton}
-          hitSlop={8}
-        >
-          <Icon name="bookmark" size={20} color="#FFFFFF" />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Share recipe"
-          style={styles.overlayButton}
-          hitSlop={8}
-        >
-          <Icon name="share" size={20} color="#FFFFFF" />
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Jump to section"
+            onPress={toggleJumpMenu}
+            style={styles.navButton}
+          >
+            <Icon name="menu" size={20} color={Colors.text.inverse} strokeWidth={NAV_ICON_STROKE} />
+          </Pressable>
+        </View>
       </View>
+
+      {/* Jump Menu — extends directly below nav button, same width, icons only */}
+      {jumpMenuOpen ? (
+        <>
+          <Pressable
+            style={styles.jumpBackdrop}
+            onPress={() => setJumpMenuOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          />
+          <View
+            style={[
+              styles.jumpMenu,
+              { top: insets.top + Spacing.sm + HEADER_BUTTON_SIZE + Spacing.xs },
+            ]}
+          >
+            {JUMP_SECTIONS.map((section) => (
+              <Pressable
+                key={section.key}
+                style={styles.jumpMenuItem}
+                onPress={() => scrollToSection(section.key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to ${section.key}`}
+              >
+                <Icon
+                  name={section.icon}
+                  size={20}
+                  color={Colors.text.inverse}
+                  strokeWidth={NAV_ICON_STROKE}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -726,9 +1043,42 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Hero
+  // Floating header — absolutely positioned over hero image
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    zIndex: 10,
+  },
+  headerBackButton: {
+    width: HEADER_BUTTON_SIZE,
+    height: HEADER_BUTTON_SIZE,
+    borderRadius: HEADER_BUTTON_SIZE / 2,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navButton: {
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Hero — full bleed
   heroContainer: {
-    height: HERO_HEIGHT,
     overflow: 'hidden',
   },
   heroImage: {
@@ -739,76 +1089,92 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '60%',
-  },
-  heroOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+
+  // Content Box — rounded top corners, overlaps image
+  contentBox: {
+    backgroundColor: Colors.background.primary,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    marginTop: -CONTENT_OVERLAP,
     paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.lg,
   },
-  heroTitle: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  heroCreator: {
-    ...Typography.bodySmall,
-    color: 'rgba(255,255,255,0.85)',
-    marginTop: Spacing.xs,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+
+  // Title
+  title: {
+    ...Typography.h1,
+    color: Colors.text.primary,
   },
 
-  // Overlay Buttons
-  overlayButton: {
-    position: 'absolute',
-    width: OVERLAY_BUTTON_SIZE,
-    height: OVERLAY_BUTTON_SIZE,
-    borderRadius: OVERLAY_BUTTON_SIZE / 2,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtons: {
-    position: 'absolute',
-    right: Spacing.md,
+  // Quick Info Row — key information in black
+  quickInfoRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    gap: Spacing.xs,
+  },
+  quickInfoItemWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  quickInfoTextBlack: {
+    ...Typography.bodySmall,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  quickInfoDot: {
+    ...Typography.bodySmall,
+    color: Colors.text.tertiary,
+    marginHorizontal: Spacing.xs,
+  },
+  quickInfoCuisine: {
+    ...Typography.bodySmall,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+
+  // Dietary tags — inline in header area
+  dietaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+  },
+  dietaryTag: {
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: Spacing.xs,
+  },
+  dietaryTagText: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+  },
+
+  // Description
+  descriptionText: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    marginTop: Spacing.md,
   },
 
   // Review Section
   reviewSection: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
-    ...Shadow.surface,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
   },
   reviewHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  reviewTitle: {
-    ...Typography.label,
-    color: Colors.text.primary,
+    justifyContent: 'flex-end',
+    marginBottom: Spacing.sm,
   },
   reviewRatingRow: {
     flexDirection: 'row',
@@ -820,6 +1186,10 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.text.secondary,
     width: 100,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
   },
   reviewNotesContainer: {
     marginTop: Spacing.sm,
@@ -837,7 +1207,7 @@ const styles = StyleSheet.create({
   reviewNotesInput: {
     ...Typography.body,
     color: Colors.text.primary,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.background.primary,
     borderRadius: Radius.sm,
     padding: Spacing.sm,
     minHeight: 80,
@@ -858,61 +1228,10 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
   },
 
-  // Info Bar
-  infoBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  infoChip: {
-    flexDirection: 'row',
+  // Rating
+  ratingSection: {
     alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.background.primary,
-    paddingHorizontal: Spacing.sm + 4,
     paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-    ...Shadow.surface,
-  },
-  infoChipText: {
-    ...Typography.caption,
-    color: Colors.text.primary,
-  },
-  infoChipTextAccent: {
-    ...Typography.caption,
-    color: Colors.accent,
-    fontWeight: '600',
-  },
-
-  // Description
-  descriptionText: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-
-  // Rating Card
-  ratingCard: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    alignItems: 'center',
-    ...Shadow.surface,
-  },
-  ratingLabel: {
-    ...Typography.label,
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
   },
   avgRatingText: {
     ...Typography.caption,
@@ -920,20 +1239,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 
-  // Nutrition Card
-  nutritionCard: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
-    ...Shadow.surface,
-  },
-  nutritionTitle: {
-    ...Typography.label,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
+  // Nutrition
   nutritionGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -958,28 +1264,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 
-  // Sections
-  sectionContainer: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text.primary,
-    marginBottom: Spacing.md,
-  },
-
-  // Ingredients
-  ingredientHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  servingsAdjuster: {
+  // Servings Adjuster
+  servingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   servingsButton: {
     width: SERVINGS_BUTTON_SIZE,
@@ -1003,47 +1293,15 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
     fontSize: 10,
   },
-  resetLinkContainer: {
-    marginBottom: Spacing.md,
-    alignSelf: 'flex-end',
+  resetButton: {
+    marginLeft: 'auto',
   },
   resetLink: {
     ...Typography.caption,
     color: Colors.accent,
   },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.sm,
-  },
-  ingredientDot: {
-    width: INGREDIENT_DOT_SIZE,
-    height: INGREDIENT_DOT_SIZE,
-    borderRadius: INGREDIENT_DOT_SIZE / 2,
-    backgroundColor: Colors.accent,
-    marginTop: 8,
-    marginRight: Spacing.sm,
-  },
-  ingredientText: {
-    ...Typography.body,
-    color: Colors.text.primary,
-    flex: 1,
-  },
-  ingredientQuantity: {
-    fontWeight: '600',
-    color: Colors.accent,
-  },
-  ingredientOptional: {
-    ...Typography.bodySmall,
-    color: Colors.text.tertiary,
-    fontStyle: 'italic',
-  },
 
   // Instructions
-  instructionsContainer: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
-  },
   instructionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1085,67 +1343,44 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     flex: 1,
   },
-  instructionChips: {
+  instructionMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.md,
     marginTop: Spacing.sm,
   },
-  temperatureChip: {
+  instructionMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
     gap: Spacing.xs,
   },
-  timeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background.secondary,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-    gap: Spacing.xs,
-  },
-  chipText: {
+  instructionMetaText: {
     ...Typography.caption,
     color: Colors.accent,
   },
-  chipTextMuted: {
+  instructionMetaTextMuted: {
     ...Typography.caption,
     color: Colors.text.secondary,
   },
 
-  // Tags
-  tagsSection: {
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.xl,
+  // Tags — plain text, no pills
+  tagsTextSection: {
+    marginBottom: Spacing.sm,
   },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  tagPill: {
-    backgroundColor: Colors.background.secondary,
-    paddingHorizontal: Spacing.sm + 4,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-  },
-  tagPillText: {
-    ...Typography.caption,
+  tagsText: {
+    ...Typography.body,
     color: Colors.text.secondary,
-  },
-  equipmentSubsection: {
-    marginTop: Spacing.md,
+    lineHeight: 24,
   },
 
   // Source Footer
   sourceFooter: {
-    paddingHorizontal: Spacing.lg,
     marginTop: Spacing.xl,
+  },
+  sourceDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginBottom: Spacing.md,
   },
   sourceText: {
     ...Typography.bodySmall,
@@ -1161,5 +1396,28 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.accent,
     flex: 1,
+  },
+
+  // Jump Menu — same width as nav button, icons only, extends below
+  jumpBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+  },
+  jumpMenu: {
+    position: 'absolute',
+    right: Spacing.lg,
+    width: NAV_BUTTON_SIZE,
+    backgroundColor: Colors.text.primary,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    paddingVertical: Spacing.xs,
+    alignItems: 'center',
+    ...Shadow.elevated,
+    zIndex: 51,
+  },
+  jumpMenuItem: {
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

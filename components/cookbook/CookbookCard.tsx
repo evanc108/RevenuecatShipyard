@@ -92,24 +92,24 @@ export const CookbookCard = memo(function CookbookCard({
         <Text
           style={[
             styles.cardTitle,
-            isCarousel && styles.cardTitleCarousel,
+            isCarousel ? styles.cardTitleCarousel : styles.cardTitleGrid,
             hasImage && styles.titleOnImage,
           ]}
-          numberOfLines={2}
+          numberOfLines={isCarousel ? 2 : 3}
           ellipsizeMode="tail"
         >
           {name}
         </Text>
 
-        {/* Description */}
-        {description ? (
+        {/* Description — carousel only */}
+        {isCarousel && description ? (
           <Text
             style={[
               styles.cardDescription,
-              isCarousel && styles.cardDescriptionCarousel,
+              styles.cardDescriptionCarousel,
               hasImage && styles.descriptionOnImage,
             ]}
-            numberOfLines={isCarousel ? 2 : 1}
+            numberOfLines={2}
             ellipsizeMode="tail"
           >
             {description}
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   cardGrid: {
     width: '100%',
-    aspectRatio: 0.7,
+    aspectRatio: 0.85,
   },
   cardCarousel: {
     flex: 1,
@@ -185,11 +185,15 @@ const styles = StyleSheet.create({
 
   // Title — big and bold
   cardTitle: {
-    ...Typography.h2,
+    ...Typography.h1,
     fontWeight: '700',
     letterSpacing: -0.3,
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
+  },
+  cardTitleGrid: {
+    fontSize: 20,
+    lineHeight: 24,
   },
   cardTitleCarousel: {
     fontSize: 32,
@@ -199,8 +203,8 @@ const styles = StyleSheet.create({
 
   // Description
   cardDescription: {
-    ...Typography.bodySmall,
-    color: Colors.text.secondary,
+    ...Typography.h1,
+    color: Colors.text.primary,
   },
   cardDescriptionCarousel: {
     fontSize: 16,

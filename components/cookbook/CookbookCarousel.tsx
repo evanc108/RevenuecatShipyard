@@ -1,4 +1,4 @@
-import { CookbookCard } from '@/components/ui/CookbookCard';
+import { CookbookCard } from '@/components/cookbook/CookbookCard';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -447,14 +447,14 @@ function ViewModeToggle({
         <View style={styles.toggleIconContainer}>
           <Icon
             name="layers"
-            size={16}
+            size={18}
             color={viewMode === 'slider' ? Colors.text.inverse : Colors.text.tertiary}
           />
         </View>
         <View style={styles.toggleIconContainer}>
           <Icon
             name="apps"
-            size={16}
+            size={18}
             color={viewMode === 'grid' ? Colors.text.inverse : Colors.text.tertiary}
           />
         </View>
@@ -615,7 +615,7 @@ export function CookbookCarousel({
                 key={cookbook._id}
                 style={[
                   { width: gridItemWidth, marginBottom: GRID_GAP, borderRadius: Radius.xl },
-                  Shadow.elevated,
+                  styles.gridCardShadow,
                 ]}
               >
                 <CookbookCard
@@ -632,7 +632,7 @@ export function CookbookCarousel({
             <View
               style={[
                 { width: gridItemWidth, marginBottom: GRID_GAP, borderRadius: Radius.xl },
-                Shadow.elevated,
+                styles.gridCardShadow,
               ]}
             >
               <GridAddCard onPress={onAddPress} />
@@ -687,24 +687,24 @@ const styles = StyleSheet.create({
   },
   toggleTrack: {
     flexDirection: 'row',
-    width: 72,
-    height: 34,
-    borderRadius: 17,
+    width: 88,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.background.tertiary,
     alignItems: 'center',
     position: 'relative',
   },
   toggleIndicator: {
     position: 'absolute',
-    width: 36,
-    height: 30,
-    borderRadius: 15,
+    width: 42,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.text.primary,
     left: 2,
     top: 2,
   },
   toggleIndicatorRight: {
-    left: 34,
+    left: 44,
   },
   toggleIconContainer: {
     flex: 1,
@@ -766,6 +766,13 @@ const styles = StyleSheet.create({
   gridAddTitle: {
     ...Typography.h3,
     color: Colors.text.primary,
+  },
+  gridCardShadow: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 6,
   },
   gridRow: {
     flexDirection: 'row',
