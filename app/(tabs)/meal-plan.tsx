@@ -73,6 +73,13 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
+    backgroundColor: Colors.background.primary,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 1,
   },
   tabSliderWrapper: {
     flex: 1,
