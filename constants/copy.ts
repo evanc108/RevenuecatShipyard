@@ -288,6 +288,8 @@ export const COPY = {
       save: 'Save',
       saving: 'Saving...',
     },
+    cook: 'Cook',
+    mealPlan: 'Meal Plan',
   },
   socialFeed: {
     title: 'Feed',

@@ -9,7 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   ArrowLeft,
+  ArrowUp,
   X,
   Menu,
 
@@ -84,8 +86,10 @@ const ICON_MAP = {
   'chevron-forward': ChevronRight,
   'chevron-right': ChevronRight,
   'chevron-down': ChevronDown,
+  'chevron-up': ChevronUp,
   'arrow-back': ArrowLeft,
   'arrow-left': ArrowLeft,
+  'arrow-up': ArrowUp,
   close: X,
   menu: Menu,
 
