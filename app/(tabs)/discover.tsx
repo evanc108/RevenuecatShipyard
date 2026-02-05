@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -12,6 +13,8 @@ import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/convex/_generated/api';
+import { UserListItem } from '@/components/ui/UserListItem';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { TabSlider } from '@/components/ui/TabSlider';
 import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
@@ -375,6 +378,70 @@ function DiscoverContent() {
   );
 }
 
+// --- Friend Search Component ---
+function FriendSearch(): React.ReactElement {
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebounce(searchQuery, 300);
+
+  const suggestedUsers = useQuery(api.users.suggested, { limit: 10 });
+  const searchResults = useQuery(
+    api.users.search,
+    debouncedQuery.length >= 2 ? { query: debouncedQuery, limit: 10 } : 'skip'
+  );
+
+  const isSearching = debouncedQuery.length >= 2;
+  const users = isSearching ? searchResults : suggestedUsers;
+  const isLoading = users === undefined;
+
+  return (
+    <View style={styles.searchSection}>
+      <View style={styles.searchHeader}>
+        <Text style={styles.searchTitle}>{COPY.socialFeed.searchTitle}</Text>
+      </View>
+      <View style={styles.searchInputContainer}>
+        <Ionicons name="search" size={18} color={Colors.text.tertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={COPY.socialFeed.searchPlaceholder}
+          placeholderTextColor={Colors.text.tertiary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={Colors.text.tertiary} />
+          </Pressable>
+        )}
+      </View>
+
+      <Text style={styles.searchSectionLabel}>
+        {isSearching ? COPY.socialFeed.searchResults : COPY.socialFeed.suggestedUsers}
+      </Text>
+
+      {isLoading ? (
+        <ActivityIndicator size="small" color={Colors.accent} style={styles.searchLoading} />
+      ) : users && users.length > 0 ? (
+        <View style={styles.usersList}>
+          {users.map((user) => (
+            <UserListItem key={user._id} user={user} showFollowButton />
+          ))}
+        </View>
+      ) : (
+        <View style={styles.noResults}>
+          <Text style={styles.noResultsText}>
+            {isSearching ? COPY.socialFeed.noResults : COPY.socialFeed.noSuggestions}
+          </Text>
+          {isSearching && (
+            <Text style={styles.noResultsSubtext}>{COPY.socialFeed.tryDifferentSearch}</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // --- Feed Content Component ---
 function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
   const currentUser = useQuery(api.users.current);
@@ -480,6 +547,8 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
       }
     : null;
 
+  const ListHeader = useMemo(() => <FriendSearch />, []);
+
   return (
     <>
       <View style={styles.feedContainer}>
@@ -487,8 +556,10 @@ function FeedContent({ onFindPeople }: { onFindPeople: () => void }) {
           data={validPosts}
           renderItem={renderFeedItem}
           keyExtractor={keyExtractor}
+          ListHeaderComponent={ListHeader}
           ListEmptyComponent={EmptyFeedComponent}
           showsVerticalScrollIndicator={false}
+          estimatedItemSize={300}
         />
       </View>
       <CookbookSelectionModal
@@ -642,5 +713,64 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.text.inverse,
     fontWeight: '600',
+  },
+  // Friend search styles
+  searchSection: {
+    backgroundColor: Colors.background.primary,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  searchHeader: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  searchTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: 12,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    color: Colors.text.primary,
+    paddingVertical: 0,
+  },
+  searchSectionLabel: {
+    ...Typography.label,
+    color: Colors.text.secondary,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  usersList: {
+    marginTop: Spacing.xs,
+  },
+  searchLoading: {
+    paddingVertical: Spacing.lg,
+  },
+  noResults: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+  },
+  noResultsSubtext: {
+    ...Typography.bodySmall,
+    color: Colors.text.tertiary,
+    marginTop: Spacing.xs,
   },
 });

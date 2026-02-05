@@ -1,12 +1,15 @@
+import { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { Icon } from '@/components/ui/Icon';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileStats } from '@/components/ui/ProfileStats';
 import { FollowButton } from '@/components/ui/FollowButton';
+import { FeedPost } from '@/components/ui/FeedPost';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -28,9 +31,58 @@ export default function UserProfileScreen(): React.ReactElement {
     api.follows.isFollowing,
     userId ? { userId: userId as Id<'users'> } : 'skip'
   );
+  const posts = useQuery(
+    api.posts.listByUserEnriched,
+    userId ? { userId: userId as Id<'users'> } : 'skip'
+  );
+
+  const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
+
+  // Cookbook modal state
+  const [showCookbookModal, setShowCookbookModal] = useState(false);
+  const [pendingRecipe, setPendingRecipe] = useState<{
+    _id: Id<'recipes'>;
+    title: string;
+    imageUrl?: string;
+    url: string;
+  } | null>(null);
+  const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
 
   const isLoading = user === undefined || stats === undefined || isFollowing === undefined;
   const isCurrentUser = currentUser?._id === userId;
+
+  const handleBookmarkPress = useCallback((recipe: {
+    _id: Id<'recipes'>;
+    title: string;
+    imageUrl?: string;
+    url: string;
+  }) => {
+    setPendingRecipe(recipe);
+    setShowCookbookModal(true);
+  }, []);
+
+  const handleCookbookSelect = useCallback(async (cookbookId: Id<'cookbooks'>) => {
+    if (!pendingRecipe) return;
+
+    setIsSavingToCookbook(true);
+    try {
+      await addRecipeToCookbook({
+        cookbookId,
+        recipeId: pendingRecipe._id,
+      });
+      setShowCookbookModal(false);
+      setPendingRecipe(null);
+    } catch (err) {
+      console.error('Failed to add recipe to cookbook:', err);
+    } finally {
+      setIsSavingToCookbook(false);
+    }
+  }, [pendingRecipe, addRecipeToCookbook]);
+
+  const handleCookbookModalClose = useCallback(() => {
+    setShowCookbookModal(false);
+    setPendingRecipe(null);
+  }, []);
 
   if (isLoading) {
     return (
@@ -125,7 +177,52 @@ export default function UserProfileScreen(): React.ReactElement {
             </View>
           ) : null}
         </View>
+
+        {/* Posts Section */}
+        <View style={styles.postsSection}>
+          <Text style={styles.postsSectionTitle}>Posts</Text>
+          <View style={styles.postsContainer}>
+            {posts === undefined ? (
+              <ActivityIndicator size="small" color={Colors.accent} style={styles.postsLoading} />
+            ) : posts.length > 0 ? (
+              posts.map((post) => (
+                <FeedPost
+                  key={post._id}
+                  postId={post._id}
+                  user={post.user}
+                  recipe={post.recipe}
+                  easeRating={post.easeRating}
+                  tasteRating={post.tasteRating}
+                  presentationRating={post.presentationRating}
+                  notes={post.notes}
+                  createdAt={post.createdAt}
+                  likeCount={post.likeCount}
+                  commentCount={post.commentCount}
+                  isLiked={post.isLiked}
+                  isSaved={post.isSaved}
+                  currentUserId={currentUser?._id}
+                  onBookmarkPress={handleBookmarkPress}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Icon name="grid" size={48} color={Colors.text.tertiary} />
+                <Text style={styles.emptyStateTitle}>{COPY.posts.emptyTitle}</Text>
+                <Text style={styles.emptyStateText}>{COPY.posts.emptySubtitle}</Text>
+              </View>
+            )}
+          </View>
+        </View>
       </ScrollView>
+
+      {/* Cookbook Selection Modal */}
+      <CookbookSelectionModal
+        visible={showCookbookModal}
+        recipe={pendingRecipe}
+        onClose={handleCookbookModalClose}
+        onSelect={handleCookbookSelect}
+        isLoading={isSavingToCookbook}
+      />
     </SafeAreaView>
   );
 }
@@ -185,5 +282,41 @@ const styles = StyleSheet.create({
   },
   followButtonContainer: {
     marginTop: Spacing.lg,
+  },
+  postsSection: {
+    marginTop: Spacing.lg,
+    marginHorizontal: -Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  postsSectionTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  postsContainer: {
+    flex: 1,
+  },
+  postsLoading: {
+    paddingVertical: Spacing.xl,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xxl,
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyStateTitle: {
+    ...Typography.h3,
+    color: Colors.text.primary,
+    marginTop: Spacing.md,
+  },
+  emptyStateText: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
 });
