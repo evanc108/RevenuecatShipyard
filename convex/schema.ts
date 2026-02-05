@@ -47,6 +47,19 @@ export const instructionSchema = v.object({
   tip: v.optional(v.string()),
 });
 
+/**
+ * Grocery item source schema - tracks where an ingredient came from.
+ */
+export const grocerySourceSchema = v.object({
+  recipeId: v.id('recipes'),
+  recipeName: v.string(),
+  quantity: v.number(),
+  unit: v.string(),
+  servingsMultiplier: v.number(),
+  mealPlanEntryId: v.optional(v.id('mealPlanEntries')),
+  scheduledDate: v.optional(v.string()),
+});
+
 export default defineSchema({
   users: defineTable({
     // Identity (linked to Clerk)
@@ -328,4 +341,25 @@ export default defineSchema({
     unit: v.optional(v.string()),
     addedAt: v.number(),
   }).index('by_user', ['userId']),
+
+  /**
+   * Grocery list items — ingredients the user needs to buy.
+   * Aggregates quantities from multiple recipe sources.
+   */
+  groceryItems: defineTable({
+    userId: v.id('users'),
+    name: v.string(),
+    normalizedName: v.string(),
+    category: v.optional(v.string()),
+    totalQuantity: v.number(),
+    unit: v.string(),
+    sources: v.array(grocerySourceSchema),
+    isChecked: v.boolean(),
+    userQuantityOverride: v.optional(v.number()),
+    amazonFreshUrl: v.optional(v.string()),
+    addedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_user', ['userId'])
+    .index('by_user_normalized', ['userId', 'normalizedName']),
 });

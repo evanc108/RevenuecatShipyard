@@ -1,6 +1,7 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { mealType } from './schema';
+import { internal } from './_generated/api';
 
 /**
  * Get all meal plan entries for a given date, joined with recipe data.
@@ -53,12 +54,14 @@ export const getEntriesForDate = query({
 
 /**
  * Add a recipe to a meal slot on a given date.
+ * Optionally adds recipe ingredients to the grocery list.
  */
 export const addEntry = mutation({
   args: {
     date: v.string(),
     mealType: mealType,
     recipeId: v.id('recipes'),
+    addToGroceryList: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -87,7 +90,7 @@ export const addEntry = mutation({
       -1
     );
 
-    return ctx.db.insert('mealPlanEntries', {
+    const entryId = await ctx.db.insert('mealPlanEntries', {
       userId: user._id,
       date: args.date,
       mealType: args.mealType,
@@ -95,6 +98,66 @@ export const addEntry = mutation({
       sortOrder: maxOrder + 1,
       addedAt: Date.now(),
     });
+
+    // Add to grocery list if requested (default: true)
+    if (args.addToGroceryList !== false) {
+      const recipe = await ctx.db.get(args.recipeId);
+      if (recipe) {
+        const now = Date.now();
+        for (const ingredient of recipe.ingredients) {
+          if (ingredient.optional) continue;
+
+          const source = {
+            recipeId: args.recipeId,
+            recipeName: recipe.title,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+            servingsMultiplier: 1,
+            mealPlanEntryId: entryId,
+            scheduledDate: args.date,
+          };
+
+          const existingItem = await ctx.db
+            .query('groceryItems')
+            .withIndex('by_user_normalized', (q) =>
+              q.eq('userId', user._id).eq('normalizedName', ingredient.normalizedName)
+            )
+            .unique();
+
+          if (existingItem) {
+            const sourceExists = existingItem.sources.some(
+              (s) => s.recipeId === args.recipeId && s.mealPlanEntryId === entryId
+            );
+
+            if (!sourceExists) {
+              const newSources = [...existingItem.sources, source];
+              const newTotal = newSources.reduce((sum, s) => sum + s.quantity, 0);
+
+              await ctx.db.patch(existingItem._id, {
+                sources: newSources,
+                totalQuantity: newTotal,
+                updatedAt: now,
+              });
+            }
+          } else {
+            await ctx.db.insert('groceryItems', {
+              userId: user._id,
+              name: ingredient.name,
+              normalizedName: ingredient.normalizedName,
+              category: ingredient.category,
+              totalQuantity: ingredient.quantity,
+              unit: ingredient.unit,
+              sources: [source],
+              isChecked: false,
+              addedAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      }
+    }
+
+    return entryId;
   },
 });
 

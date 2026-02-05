@@ -1,4 +1,5 @@
 import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
+import { AddToGroceryButton } from '@/components/features/pantry';
 import type { IconName } from '@/components/ui/Icon';
 import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
@@ -994,7 +995,7 @@ export default function RecipeDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Floating Action Bar — Cook + Meal Plan */}
+      {/* Floating Action Bar — Cook + Save/Meal Plan */}
       <View style={[styles.floatingBar, { paddingBottom: insets.bottom + Spacing.sm }]}>
         <Pressable
           accessibilityRole="button"
@@ -1045,6 +1046,12 @@ export default function RecipeDetailScreen() {
         </Pressable>
 
         <View style={styles.headerRight}>
+          {/* Cart button */}
+          <AddToGroceryButton
+            recipeId={recipeId}
+            servingsMultiplier={servingsMultiplier}
+            variant="icon"
+          />
           <Animated.View style={[styles.navPill, navPillStyle]}>
             {/* Menu toggle — always visible at top */}
             <Pressable
@@ -1154,6 +1161,7 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: Spacing.sm,
   },
   navPill: {
     width: NAV_BUTTON_SIZE,
