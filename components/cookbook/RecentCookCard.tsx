@@ -1,6 +1,6 @@
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -43,7 +43,7 @@ function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactEle
           size={12}
           strokeWidth={2}
           filled={star <= difficulty}
-          color={star <= difficulty ? '#FFD700' : Colors.text.disabled}
+          color={star <= difficulty ? Colors.text.primary : Colors.text.secondary}
         />
       ))}
     </View>
@@ -156,6 +156,7 @@ const styles = StyleSheet.create({
   title: {
     ...Typography.h3,
     color: Colors.text.primary,
+    paddingLeft: Spacing.xs,
   },
   tagsColumn: {
     gap: Spacing.xs,
@@ -176,6 +177,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   starsRow: {
+    paddingVertical: Spacing.xs,
+    paddingLeft: Spacing.xs,
     flexDirection: 'row',
     gap: 2,
   },
