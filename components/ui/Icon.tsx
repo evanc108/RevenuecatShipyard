@@ -36,6 +36,10 @@ import {
   Image,
   UtensilsCrossed,
   Flame,
+  Sun,
+  Moon,
+  Cookie,
+  ShoppingCart,
 
   // UI Elements
   AlertCircle,
@@ -130,6 +134,11 @@ const ICON_MAP = {
   'restaurant-outline': UtensilsCrossed,
   utensils: UtensilsCrossed,
   flame: Flame,
+  sun: Sun,
+  moon: Moon,
+  cookie: Cookie,
+  'shopping-cart': ShoppingCart,
+  cart: ShoppingCart,
   'flame-outline': Flame,
 
   // UI Elements

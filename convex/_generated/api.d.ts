@@ -13,6 +13,7 @@ import type * as discover from "../discover.js";
 import type * as discoverFeed from "../discoverFeed.js";
 import type * as discoverFeedActions from "../discoverFeedActions.js";
 import type * as follows from "../follows.js";
+import type * as mealPlan from "../mealPlan.js";
 import type * as postComments from "../postComments.js";
 import type * as postLikes from "../postLikes.js";
 import type * as posts from "../posts.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   discoverFeed: typeof discoverFeed;
   discoverFeedActions: typeof discoverFeedActions;
   follows: typeof follows;
+  mealPlan: typeof mealPlan;
   postComments: typeof postComments;
   postLikes: typeof postLikes;
   posts: typeof posts;

@@ -528,11 +528,13 @@ export default function DiscoverScreen() {
           <Text style={styles.title}>{COPY.discover.title}</Text>
         </View>
         <View style={styles.tabContainer}>
-          <TabSlider
-            tabs={TABS}
-            activeTab={activeTab}
-            onTabChange={(key) => setActiveTab(key as TabKey)}
-          />
+          <View style={styles.tabSliderWrapper}>
+            <TabSlider
+              tabs={TABS}
+              activeTab={activeTab}
+              onTabChange={(key) => setActiveTab(key as TabKey)}
+            />
+          </View>
         </View>
         <View style={styles.content}>{content}</View>
       </SafeAreaView>
@@ -558,8 +560,11 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   tabContainer: {
-    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
     paddingBottom: Spacing.md,
+  },
+  tabSliderWrapper: {
+    width: '55%',
   },
   content: {
     flex: 1,
