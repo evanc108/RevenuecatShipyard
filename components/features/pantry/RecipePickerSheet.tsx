@@ -17,8 +17,8 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Icon } from '@/components/ui/Icon';
-import { CookbookCard } from '@/components/ui/CookbookCard';
-import { RecipeCard } from '@/components/ui/RecipeCard';
+import { CookbookCard } from '@/components/cookbook/CookbookCard';
+import { RecipeCard } from '@/components/cookbook/RecipeCard';
 import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
@@ -360,7 +360,7 @@ type RecipeGridItem = {
   imageUrl?: string;
   cuisine?: string;
   totalTimeMinutes?: number;
-  difficulty?: string;
+  difficulty?: string | number;
 };
 
 type RecipeGridProps = {

@@ -268,6 +268,62 @@ export const getRecipes = query({
 });
 
 /**
+ * Get the most recently cooked recipe in a cookbook.
+ * Checks if the user has any posts for recipes in this cookbook.
+ * Returns the recipe data for the most recent post, or null.
+ */
+export const getRecentlyCooked = query({
+  args: { cookbookId: v.id('cookbooks') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return null;
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook || cookbook.userId !== user._id) return null;
+
+    // Get all recipe IDs in this cookbook
+    const cookbookRecipes = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook', (q) => q.eq('cookbookId', args.cookbookId))
+      .collect();
+
+    const recipeIds = new Set(cookbookRecipes.map((cr) => cr.recipeId));
+
+    if (recipeIds.size === 0) return null;
+
+    // Get all user posts, newest first
+    const posts = await ctx.db
+      .query('posts')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .order('desc')
+      .collect();
+
+    // Find the most recent post for a recipe in this cookbook
+    const recentPost = posts.find((post) => recipeIds.has(post.recipeId));
+    if (!recentPost) return null;
+
+    const recipe = await ctx.db.get(recentPost.recipeId);
+    if (!recipe) return null;
+
+    return {
+      _id: recipe._id,
+      title: recipe.title,
+      imageUrl: recipe.imageUrl,
+      totalTimeMinutes: recipe.totalTimeMinutes,
+      cuisine: recipe.cuisine,
+      cookedAt: recentPost.createdAt,
+    };
+  },
+});
+
+/**
  * Add a recipe to a cookbook.
  */
 export const addRecipe = mutation({

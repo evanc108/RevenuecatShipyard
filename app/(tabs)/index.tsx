@@ -1,14 +1,12 @@
-import { CookbookCarousel } from '@/components/ui/CookbookCarousel';
 import { ClipboardPrompt } from '@/components/ui/ClipboardPrompt';
-import { CreateCookbookModal } from '@/components/ui/CreateCookbookModal';
-import { UploadsHistoryModal } from '@/components/ui/UploadsHistoryModal';
+import { CookbookCarousel } from '@/components/cookbook/CookbookCarousel';
+import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Shadow, Spacing, Typography } from '@/constants/theme';
+import { useShareIntent } from '@/context/ShareIntentContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { Icon } from '@/components/ui/Icon';
 import { useClipboardDetection } from '@/hooks/useClipboardDetection';
-import { useShareIntent } from '@/context/ShareIntentContext';
-import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 import { useMutation, useQuery } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -62,13 +60,6 @@ export default function CookbookScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Uploads modal state
-  const [isUploadsModalVisible, setIsUploadsModalVisible] = useState(false);
-
-  // Get upload count for badge
-  const uploads = usePendingUploadsStore((s) => s.uploads);
-  const uploadCount = Object.keys(uploads).length;
-
   // Clipboard detection for recipe URLs
   const { detectedUrl, detectedDomain, dismissDetection, clearDetection } = useClipboardDetection();
   const { triggerImport } = useShareIntent();
@@ -101,7 +92,7 @@ export default function CookbookScreen() {
     width: interpolate(
       searchProgress.value,
       [0, 1],
-      [SEARCH_ICON_SIZE, 200],
+      [SEARCH_ICON_SIZE, 260],
     ),
   }));
 
@@ -264,25 +255,9 @@ export default function CookbookScreen() {
           <Text style={styles.titleBottom}>{COPY.titleBottom}</Text>
         </View>
 
+        {/* Top-right actions */}
         <View style={styles.headerActions}>
-          {/* Uploads History Button */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View uploads"
-            onPress={() => setIsUploadsModalVisible(true)}
-            style={styles.uploadsButton}
-          >
-            <Icon name="download" size={20} color={Colors.text.secondary} />
-            {uploadCount > 0 && (
-              <View style={styles.uploadsBadge}>
-                <Text style={styles.uploadsBadgeText}>
-                  {uploadCount > 9 ? '9+' : uploadCount}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-
-          {/* Search */}
+          {/* Search — black button, expands left */}
           <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
             <Pressable
               accessibilityRole="button"
@@ -292,32 +267,34 @@ export default function CookbookScreen() {
             >
               <Icon
                 name="search"
-                size={20}
-                color={isSearchActive ? Colors.text.tertiary : Colors.text.secondary}
+                size={22}
+                strokeWidth={2.5}
+                color={isSearchActive ? Colors.text.inverse : Colors.text.inverse}
               />
             </Pressable>
 
             {isSearchActive ? (
               <Animated.View style={[styles.searchInputContainer, searchInputOpacity]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close search"
+                  onPress={handleCloseSearch}
+                  style={styles.searchCloseButton}
+                  hitSlop={8}
+                >
+                  <Icon name="close" size={18} strokeWidth={2.5} color="rgba(255,255,255,0.7)" />
+                </Pressable>
                 <TextInput
                   ref={inputRef}
                   style={styles.searchInput}
                   placeholder={COPY.searchPlaceholder}
-                  placeholderTextColor={Colors.text.tertiary}
+                  placeholderTextColor="rgba(255,255,255,0.5)"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   autoCapitalize="none"
                   autoCorrect={false}
                   accessibilityLabel={COPY.searchPlaceholder}
                 />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close search"
-                  onPress={handleCloseSearch}
-                  hitSlop={8}
-                >
-                  <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
-                </Pressable>
               </Animated.View>
             ) : null}
           </Animated.View>
@@ -370,11 +347,6 @@ export default function CookbookScreen() {
         editData={editCookbookData}
       />
 
-      {/* Uploads History Modal */}
-      <UploadsHistoryModal
-        visible={isUploadsModalVisible}
-        onClose={() => setIsUploadsModalVisible(false)}
-      />
     </SafeAreaView>
   );
 }
@@ -398,15 +370,15 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   titleTop: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: '400',
     color: Colors.text.primary,
     letterSpacing: -0.2,
   },
   titleBottom: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 38,
+    lineHeight: 40,
     fontWeight: '700',
     color: Colors.text.primary,
     letterSpacing: -0.3,
@@ -414,44 +386,19 @@ const styles = StyleSheet.create({
 
   // Header Actions
   headerActions: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  uploadsButton: {
-    width: SEARCH_ICON_SIZE,
-    height: SEARCH_ICON_SIZE,
-    borderRadius: SEARCH_ICON_SIZE / 2,
-    backgroundColor: Colors.background.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadow.surface,
-  },
-  uploadsBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  uploadsBadgeText: {
-    ...Typography.caption,
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.text.inverse,
-  },
-
   // Search
   searchBar: {
     height: SEARCH_ICON_SIZE,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.text.primary,
     borderRadius: SEARCH_ICON_SIZE / 2,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     overflow: 'hidden',
     ...Shadow.surface,
@@ -462,17 +409,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  searchCloseButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: Spacing.sm,
     gap: Spacing.xs,
   },
   searchInput: {
     flex: 1,
     ...Typography.body,
-    color: Colors.text.primary,
+    color: Colors.text.inverse,
     paddingVertical: 0,
   },
 

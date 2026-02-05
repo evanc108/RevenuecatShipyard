@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
-import { RecipeCard } from '@/components/ui/RecipeCard';
+import { RecipeCard } from '@/components/cookbook/RecipeCard';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { parseDifficulty } from '@/utils/parseDifficulty';
@@ -20,7 +20,7 @@ type MealEntry = {
     imageUrl?: string;
     cuisine?: string;
     totalTimeMinutes?: number;
-    difficulty?: string;
+    difficulty?: string | number;
   };
 };
 

@@ -71,7 +71,7 @@ export type Recipe = {
   title: string;
   description?: string;
   cuisine?: string;
-  difficulty?: string;
+  difficulty?: string | number;
   thumbnailUrl?: string;
 
   // Servings and timing

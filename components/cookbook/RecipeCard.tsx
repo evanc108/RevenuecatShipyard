@@ -42,6 +42,7 @@ function DifficultyStars({ difficulty, onImage }: { difficulty: number; onImage?
         key={i}
         name="star"
         size={14}
+        filled={isFilled}
         color={
           isFilled
             ? (onImage ? '#FFD700' : Colors.accent)

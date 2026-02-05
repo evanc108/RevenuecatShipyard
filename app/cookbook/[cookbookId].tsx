@@ -1,13 +1,15 @@
-import { RecentCookCard } from '@/components/ui/RecentCookCard';
-import { RecipeCard } from '@/components/ui/RecipeCard';
+import { RecentCookCard } from '@/components/cookbook/RecentCookCard';
+import { RecipeCard } from '@/components/cookbook/RecipeCard';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Icon } from '@/components/ui/Icon';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from 'convex/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -28,6 +30,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 // --- Helpers ---
 
@@ -41,8 +44,9 @@ const DIFFICULTY_MAP: Record<string, number> = {
   expert: 5,
 };
 
-function parseDifficulty(difficulty?: string): number {
-  if (!difficulty) return 0;
+function parseDifficulty(difficulty?: string | number): number {
+  if (difficulty === undefined || difficulty === null) return 0;
+  if (typeof difficulty === 'number') return Math.min(5, Math.max(1, Math.round(difficulty)));
   const mapped = DIFFICULTY_MAP[difficulty.toLowerCase()];
   if (mapped !== undefined) return mapped;
   const num = parseInt(difficulty, 10);
@@ -57,7 +61,7 @@ type CookbookRecipe = {
   title: string;
   description?: string;
   cuisine?: string;
-  difficulty?: string;
+  difficulty?: string | number;
   imageUrl?: string;
   totalTimeMinutes?: number;
   prepTimeMinutes?: number;
@@ -68,24 +72,15 @@ type CookbookRecipe = {
   addedAt: number;
 };
 
-// --- Types ---
-
-type SortMode = 'recent' | 'oldest' | 'a-z' | 'z-a';
-
 // --- Constants ---
 
-const SORT_OPTIONS: readonly { mode: SortMode; label: string }[] = [
-  { mode: 'recent', label: 'Recent' },
-  { mode: 'oldest', label: 'Oldest' },
-  { mode: 'a-z', label: 'A \u2192 Z' },
-  { mode: 'z-a', label: 'Z \u2192 A' },
-];
-
-const SEARCH_ICON_SIZE = 40;
+const SEARCH_ICON_SIZE = 48;
+const STROKE_FILL_PRIMARY = '#EEEEF3';
+const STROKE_FILL_SECONDARY = '#F2F2F6';
 const SWIPE_VELOCITY_THRESHOLD = 500;
 
 // Main card hugs left wall — wider so info text is visible
-const CARD_WIDTH_RATIO = 0.62;
+const CARD_WIDTH_RATIO = 0.68;
 const SCALE_STEP = 0.1;
 // Ghost card offset (peeks right + drops down behind main)
 const GHOST_OFFSET_X = 160;
@@ -208,6 +203,204 @@ const stackStyles = StyleSheet.create({
   },
 });
 
+// --- Add Recipe Card (last in stack) ---
+
+type AddRecipeCardProps = {
+  index: number;
+  translateX: SharedValue<number>;
+  cardWidth: number;
+  cardStep: number;
+  screenWidth: number;
+  onPress: () => void;
+};
+
+const AddRecipeStackedCard = memo(function AddRecipeStackedCard({
+  index,
+  translateX,
+  cardWidth,
+  cardStep,
+  screenWidth,
+  onPress,
+}: AddRecipeCardProps): React.ReactElement {
+  // Add-recipe card is slightly wider than recipe cards
+  const addCardWidth = cardWidth * 1.12;
+  const centerX = (screenWidth - addCardWidth) / 2;
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const activeIndex = -translateX.value / cardStep;
+    const distance = index - activeIndex;
+    const absDistance = Math.abs(distance);
+
+    // When active (distance=0), center in screen instead of flush left
+    const cardTranslateX = interpolate(
+      distance,
+      [-1, 0, 1, 2],
+      [-screenWidth * 0.6, centerX, GHOST_OFFSET_X, GHOST_OFFSET_X * 2],
+      Extrapolation.CLAMP,
+    );
+
+    // No vertical offset when centered/active
+    const translateY = interpolate(
+      distance,
+      [-1, 0, 1, 2],
+      [0, 0, GHOST_OFFSET_Y, GHOST_OFFSET_Y * 1.5],
+      Extrapolation.CLAMP,
+    );
+
+    const scale = interpolate(
+      absDistance,
+      [0, 1, 2],
+      [1, 1 - SCALE_STEP, 1 - SCALE_STEP * 2],
+      Extrapolation.CLAMP,
+    );
+
+    const opacity = interpolate(
+      absDistance,
+      [0, 1, 2, 3],
+      [1, 0.6, 0, 0],
+      Extrapolation.CLAMP,
+    );
+
+    const zIndex = 100 - Math.round(absDistance);
+
+    return {
+      transform: [
+        { translateX: cardTranslateX },
+        { translateY },
+        { scale },
+      ],
+      opacity,
+      zIndex,
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          width: addCardWidth,
+          top: 0,
+          bottom: 0,
+          left: 0,
+          borderRadius: Radius.xl,
+        },
+        Shadow.elevated,
+        animatedStyle,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add new recipe"
+        style={addCardStyles.inner}
+        onPress={onPress}
+      >
+        {/* Top-right plus icon */}
+        <Icon
+          name="plus"
+          size={30}
+          color={Colors.accent}
+          style={addCardStyles.plusIcon}
+        />
+
+        {/* Decorative brush stroke */}
+        <Svg
+          style={addCardStyles.stroke}
+          viewBox="0 0 200 160"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <Path
+            d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
+            fill={STROKE_FILL_PRIMARY}
+          />
+          <Path
+            d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
+            fill={STROKE_FILL_SECONDARY}
+          />
+          <Path
+            d="M25,105 C30,98 45,100 40,112 C35,120 22,115 25,105Z"
+            fill={STROKE_FILL_SECONDARY}
+          />
+        </Svg>
+
+        {/* Centered illustration */}
+        <Image
+          source={require('@/assets/images/create-recipe-icon.png')}
+          style={addCardStyles.image}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+
+        {/* Bottom fade */}
+        <LinearGradient
+          colors={[
+            'rgba(255,255,255,0)',
+            'rgba(255,255,255,0.15)',
+            'rgba(255,255,255,0.4)',
+            'rgba(255,255,255,0.7)',
+            'rgba(255,255,255,1)',
+          ]}
+          locations={[0, 0.25, 0.5, 0.75, 1]}
+          style={addCardStyles.gradient}
+        />
+
+        {/* Top-left label */}
+        <View style={addCardStyles.topLabel}>
+          <Text style={addCardStyles.title}>{'Add\nRecipe'}</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+});
+
+const addCardStyles = StyleSheet.create({
+  inner: {
+    flex: 1,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.background.primary,
+    overflow: 'hidden',
+  },
+  plusIcon: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    zIndex: 1,
+  },
+  stroke: {
+    position: 'absolute',
+    width: '92%',
+    height: '65%',
+    top: '8%',
+    left: '4%',
+  },
+  image: {
+    position: 'absolute',
+    width: '88%',
+    height: '80%',
+    top: '8%',
+    left: '6%',
+  },
+  gradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: -1,
+    right: -1,
+    height: '75%',
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+  },
+  topLabel: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.md,
+    zIndex: 1,
+  },
+  title: {
+    ...Typography.h1,
+    color: Colors.text.primary,
+  },
+});
+
 // --- Pagination Dot ---
 
 type PaginationDotProps = {
@@ -261,14 +454,20 @@ export default function CookbookDetailScreen(): React.ReactElement {
     cookbookId ? { cookbookId: cookbookId as Id<'cookbooks'> } : 'skip',
   );
 
+  const recentlyCooked = useQuery(
+    api.cookbooks.getRecentlyCooked,
+    cookbookId ? { cookbookId: cookbookId as Id<'cookbooks'> } : 'skip',
+  );
+
+  const suggestedRecipes = useQuery(api.discoverFeed.getUnviewedRecipes, { limit: 1 });
+
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('recent');
   const searchProgress = useSharedValue(0);
   const inputRef = useRef<TextInput>(null);
 
-  const searchMaxWidth = (screenWidth - Spacing.lg * 2) * 0.45;
+  const searchMaxWidth = 260;
 
   // Swipable card state
   const translateX = useSharedValue(0);
@@ -278,6 +477,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const cardStep = screenWidth * 0.35;
 
   const recipes: CookbookRecipe[] = cookbookRecipes ?? [];
+  const isRecipesLoading = cookbookRecipes === undefined;
+
+  // Reset local state when navigating between cookbooks
+  useEffect(() => {
+    translateX.value = 0;
+    contextX.value = 0;
+    setSearchQuery('');
+    setIsSearchActive(false);
+  }, [cookbookId]);
 
   // --- Search Animation ---
 
@@ -305,7 +513,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
     opacity: interpolate(searchProgress.value, [0.3, 0.7], [0, 1]),
   }));
 
-  // --- Sort & Filter ---
+  // --- Filter ---
 
   const sortedRecipes = useMemo(() => {
     let result = [...recipes];
@@ -319,25 +527,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
       );
     }
 
-    switch (sortMode) {
-      case 'recent':
-        result.sort((a, b) => b.addedAt - a.addedAt);
-        break;
-      case 'oldest':
-        result.sort((a, b) => a.addedAt - b.addedAt);
-        break;
-      case 'a-z':
-        result.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case 'z-a':
-        result.sort((a, b) => b.title.localeCompare(a.title));
-        break;
-    }
+    // Default sort: most recent first
+    result.sort((a, b) => b.addedAt - a.addedAt);
 
     return result;
-  }, [recipes, searchQuery, sortMode]);
+  }, [recipes, searchQuery]);
 
-  const maxIndex = Math.max(sortedRecipes.length - 1, 0);
+  // +1 for the add recipe card at the end
+  const totalCards = sortedRecipes.length + 1;
+  const maxIndex = Math.max(totalCards - 1, 0);
 
   // --- Pan Gesture ---
 
@@ -389,7 +587,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 
   // --- Loading / Error States ---
 
-  if (cookbook === undefined) {
+  if (cookbook === undefined || (cookbook && `${cookbook._id}` !== cookbookId)) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
@@ -425,7 +623,8 @@ export default function CookbookDetailScreen(): React.ReactElement {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
+        {/* Top row: back button + actions */}
+        <View style={styles.headerTopRow}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -434,164 +633,245 @@ export default function CookbookDetailScreen(): React.ReactElement {
           >
             <Icon name="arrow-back" size={24} color={Colors.text.primary} />
           </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
-            {cookbook.name}
-          </Text>
-        </View>
 
-        <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Search"
-            onPress={!isSearchActive ? handleOpenSearch : undefined}
-            style={styles.searchIconButton}
-          >
-            <Icon
-              name="search"
-              size={20}
-              color={isSearchActive ? Colors.text.tertiary : Colors.text.secondary}
-            />
-          </Pressable>
-
-          {isSearchActive ? (
-            <Animated.View style={[styles.searchInputContainer, searchInputOpacity]}>
-              <TextInput
-                ref={inputRef}
-                style={styles.searchInput}
-                placeholder={COPY.cookbookDetail.searchPlaceholder}
-                placeholderTextColor={Colors.text.tertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                autoCorrect={false}
-                accessibilityLabel={COPY.cookbookDetail.searchPlaceholder}
-              />
+          <View style={styles.headerActions}>
+            <Animated.View style={[styles.searchBar, searchBarAnimatedStyle]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close search"
-                onPress={handleCloseSearch}
-                hitSlop={8}
+                accessibilityLabel="Search"
+                onPress={!isSearchActive ? handleOpenSearch : undefined}
+                style={styles.searchIconButton}
               >
-                <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
+                <Icon
+                  name="search"
+                  size={22}
+                  strokeWidth={2.5}
+                  color={isSearchActive ? Colors.text.inverse : Colors.text.inverse}
+                />
               </Pressable>
-            </Animated.View>
-          ) : null}
-        </Animated.View>
-      </View>
 
-      {/* Sort Bar */}
-      <View style={styles.sortBar}>
-        {SORT_OPTIONS.map((option) => {
-          const isActive = sortMode === option.mode;
-          return (
+              {isSearchActive ? (
+                <Animated.View style={[styles.searchInputContainer, searchInputOpacity]}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close search"
+                    onPress={handleCloseSearch}
+                    hitSlop={8}
+                    style={styles.searchCloseButton}
+                  >
+                    <Icon name="close" size={18} strokeWidth={2.5} color="rgba(255,255,255,0.7)" />
+                  </Pressable>
+                  <TextInput
+                    ref={inputRef}
+                    style={styles.searchInput}
+                    placeholder="Search..."
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel="Search"
+                  />
+                </Animated.View>
+              ) : null}
+            </Animated.View>
+
             <Pressable
-              key={option.mode}
               accessibilityRole="button"
-              accessibilityLabel={`Sort by ${option.label}`}
-              accessibilityState={{ selected: isActive }}
-              style={[
-                styles.sortPill,
-                isActive && styles.sortPillActive,
-              ]}
-              onPress={() => setSortMode(option.mode)}
+              accessibilityLabel="Add recipe"
+              style={styles.plusButton}
+              onPress={() => {
+                // TODO: Add recipe flow
+              }}
+              hitSlop={8}
             >
-              <Text
-                style={[
-                  styles.sortPillText,
-                  isActive && styles.sortPillTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
+              <Icon name="add" size={24} color={Colors.text.inverse} />
             </Pressable>
-          );
-        })}
+          </View>
+        </View>
+
+        {/* Cookbook name below back button */}
+        <Text style={styles.headerTitle} numberOfLines={2} ellipsizeMode="tail">
+          {cookbook.name}
+        </Text>
       </View>
 
       {/* Content */}
-      <View style={styles.contentContainer}>
-        {/* Recently Cooked — single card */}
-        {sortedRecipes.length > 0 ? (
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>{COPY.cookbookDetail.recentlyCooked}</Text>
-            <View style={styles.recentCardWrapper}>
-              <RecentCookCard
-                title={sortedRecipes[0].title}
-                imageUrl={sortedRecipes[0].imageUrl}
-                totalTimeMinutes={sortedRecipes[0].totalTimeMinutes ?? 0}
-                cuisine={sortedRecipes[0].cuisine}
-                onPress={() => handleRecipePress(sortedRecipes[0]._id)}
-                onCook={() => handleCookPress(sortedRecipes[0]._id)}
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {/* Your Recipes header + pagination dots inline */}
-        <View style={styles.recipesHeaderRow}>
-          <View style={styles.recipesHeaderTextRow}>
-            <Text style={styles.recipesHeaderLight}>
-              {COPY.cookbookDetail.yourRecipesPrefix}{' '}
-            </Text>
-            <Text style={styles.recipesHeaderBold}>
-              {COPY.cookbookDetail.yourRecipesBold}
-            </Text>
-          </View>
-
-          {/* Pagination dots — inline right */}
-          {sortedRecipes.length > 1 ? (
-            <View style={styles.dotsContainer}>
-              {sortedRecipes.map((recipe, idx) => (
-                <PaginationDot
-                  key={recipe._id}
-                  index={idx}
-                  translateX={translateX}
-                  cardStep={cardStep}
+      {isRecipesLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.accent} />
+        </View>
+      ) : (
+        <View style={styles.contentContainer}>
+          {/* Suggested Recipe / Recently Cooked */}
+          {recentlyCooked ? (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{COPY.cookbookDetail.recentlyCooked}</Text>
+              <View style={styles.recentCardWrapper}>
+                <RecentCookCard
+                  title={recentlyCooked.title}
+                  imageUrl={recentlyCooked.imageUrl}
+                  totalTimeMinutes={recentlyCooked.totalTimeMinutes ?? 0}
+                  cuisine={recentlyCooked.cuisine}
+                  onPress={() => handleRecipePress(recentlyCooked._id)}
+                  onCook={() => handleCookPress(recentlyCooked._id)}
                 />
-              ))}
+              </View>
+            </View>
+          ) : suggestedRecipes && suggestedRecipes.length > 0 ? (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{COPY.cookbookDetail.suggestedRecipe}</Text>
+              <View style={styles.recentCardWrapper}>
+                <RecentCookCard
+                  title={suggestedRecipes[0].title}
+                  imageUrl={suggestedRecipes[0].imageUrl}
+                  totalTimeMinutes={suggestedRecipes[0].totalTimeMinutes ?? 0}
+                  cuisine={suggestedRecipes[0].cuisine}
+                  onPress={() => {
+                    // TODO: Navigate to discover recipe detail
+                  }}
+                  onCook={() => {
+                    // TODO: Add suggested recipe to this cookbook
+                  }}
+                  actionLabel={COPY.cookbookDetail.add}
+                />
+              </View>
             </View>
           ) : null}
-        </View>
 
-        {/* Stacked Swipable Cards — positioned from top, clipped at edges */}
-        {sortedRecipes.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>{COPY.cookbookDetail.emptyTitle}</Text>
-            <Text style={styles.emptySubtitle}>{COPY.cookbookDetail.emptySubtitle}</Text>
-          </View>
-        ) : (
-          <View style={styles.carouselSection}>
-            <GestureDetector gesture={panGesture}>
-              <Animated.View style={styles.carouselTrack}>
+          {/* Your Recipes header + pagination dots inline */}
+          <View style={styles.recipesHeaderRow}>
+            <View style={styles.recipesHeaderTextRow}>
+              <Text style={styles.recipesHeaderLight}>
+                {COPY.cookbookDetail.yourRecipesPrefix}{' '}
+              </Text>
+              <Text style={styles.recipesHeaderBold}>
+                {COPY.cookbookDetail.yourRecipesBold}
+              </Text>
+            </View>
+
+            {/* Pagination dots — inline right */}
+            {sortedRecipes.length > 1 ? (
+              <View style={styles.dotsContainer}>
                 {sortedRecipes.map((recipe, idx) => (
-                  <StackedRecipeCard
+                  <PaginationDot
                     key={recipe._id}
-                    recipe={recipe}
                     index={idx}
+                    translateX={translateX}
+                    cardStep={cardStep}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          {/* Cards section */}
+          {sortedRecipes.length > 0 ? (
+            <View style={styles.carouselSection}>
+              <GestureDetector gesture={panGesture}>
+                <Animated.View style={styles.carouselTrack}>
+                  {sortedRecipes.map((recipe, idx) => (
+                    <StackedRecipeCard
+                      key={recipe._id}
+                      recipe={recipe}
+                      index={idx}
+                      translateX={translateX}
+                      cardWidth={cardWidth}
+                      cardStep={cardStep}
+                      screenWidth={screenWidth}
+                      onPress={() => handleRecipePress(recipe._id)}
+                    />
+                  ))}
+
+                  {/* Add Recipe card — always last */}
+                  <AddRecipeStackedCard
+                    index={sortedRecipes.length}
                     translateX={translateX}
                     cardWidth={cardWidth}
                     cardStep={cardStep}
                     screenWidth={screenWidth}
-                    onPress={() => handleRecipePress(recipe._id)}
+                    onPress={() => {
+                      // TODO: Add recipe flow
+                    }}
                   />
-                ))}
-              </Animated.View>
-            </GestureDetector>
-          </View>
-        )}
-      </View>
+                </Animated.View>
+              </GestureDetector>
+            </View>
+          ) : (
+            /* Empty: static add card fills to bottom */
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add new recipe"
+              style={styles.emptyAddCard}
+              onPress={() => {
+                // TODO: Add recipe flow
+              }}
+            >
+              <View style={styles.emptyAddCardInner}>
+                {/* Red plus icon — top right */}
+                <View style={styles.emptyPlusButton}>
+                  <Icon name="add" size={28} color={Colors.accent} />
+                </View>
 
-      {/* FAB */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={COPY.cookbookDetail.addRecipe}
-        style={styles.fab}
-        onPress={() => {
-          // TODO: Add recipe flow
-        }}
-      >
-        <Icon name="add" size={28} color={Colors.text.inverse} />
-      </Pressable>
+                {/* Decorative brush stroke */}
+                <Svg
+                  style={styles.emptyStroke}
+                  viewBox="0 0 200 160"
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                  <Path
+                    d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
+                    fill={STROKE_FILL_PRIMARY}
+                  />
+                  <Path
+                    d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
+                    fill={STROKE_FILL_SECONDARY}
+                  />
+                  <Path
+                    d="M25,105 C30,98 45,100 40,112 C35,120 22,115 25,105Z"
+                    fill={STROKE_FILL_SECONDARY}
+                  />
+                </Svg>
+
+                {/* Centered illustration */}
+                <Image
+                  source={require('@/assets/images/create-recipe-icon.png')}
+                  style={styles.emptyImage}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                />
+
+                {/* Bottom fade */}
+                <LinearGradient
+                  colors={[
+                    'rgba(255,255,255,0)',
+                    'rgba(255,255,255,0.15)',
+                    'rgba(255,255,255,0.4)',
+                    'rgba(255,255,255,0.7)',
+                    'rgba(255,255,255,1)',
+                  ]}
+                  locations={[0, 0.25, 0.5, 0.75, 1]}
+                  style={styles.emptyCardGradient}
+                />
+
+                {/* Top-left label */}
+                <View style={styles.emptyCardTopLabel}>
+                  <Text style={styles.emptyCardTitle}>{'Add\nRecipe'}</Text>
+                </View>
+              </View>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* Bottom screen gradient fade */}
+      <View style={styles.bottomFadeContainer} pointerEvents="none">
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.02)', 'rgba(0,0,0,0.06)']}
+          locations={[0, 0.5, 1]}
+          style={styles.bottomFadeGradient}
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -606,33 +886,44 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
-    minHeight: 52,
+    gap: Spacing.sm,
   },
-  headerLeft: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    flex: 1,
-    marginRight: Spacing.sm,
+    justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   headerTitle: {
-    ...Typography.h1,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: '700',
     color: Colors.text.primary,
-    flex: 1,
+    letterSpacing: -0.3,
+  },
+  plusButton: {
+    width: SEARCH_ICON_SIZE,
+    height: SEARCH_ICON_SIZE,
+    borderRadius: SEARCH_ICON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadow.surface,
   },
 
   // Search
   searchBar: {
     height: SEARCH_ICON_SIZE,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: Colors.text.primary,
     borderRadius: SEARCH_ICON_SIZE / 2,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     overflow: 'hidden',
     ...Shadow.surface,
@@ -647,42 +938,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: Spacing.sm,
     gap: Spacing.xs,
+  },
+  searchCloseButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   searchInput: {
     flex: 1,
     ...Typography.body,
-    color: Colors.text.primary,
+    color: Colors.text.inverse,
     paddingVertical: 0,
-  },
-
-  // Sort
-  sortBar: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  sortPill: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 32,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.background.primary,
-    ...Shadow.surface,
-  },
-  sortPillActive: {
-    backgroundColor: Colors.accentLight,
-  },
-  sortPillText: {
-    ...Typography.caption,
-    color: Colors.text.primary,
-  },
-  sortPillTextActive: {
-    color: Colors.accent,
-    fontWeight: '600',
   },
 
   // Content
@@ -751,7 +1017,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Empty
+  // Empty state — add card fills remaining space to screen bottom
+  emptyAddCard: {
+    flex: 1,
+    marginHorizontal: Spacing.lg,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    backgroundColor: Colors.background.primary,
+    ...Shadow.elevated,
+  },
+  emptyAddCardInner: {
+    flex: 1,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    overflow: 'hidden',
+  },
+  emptyPlusButton: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    zIndex: 1,
+  },
+  emptyStroke: {
+    position: 'absolute',
+    width: '110%',
+    height: '80%',
+    top: '0%',
+    left: '-5%',
+  },
+  emptyImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '90%',
+    top: '0%',
+    left: '0%',
+  },
+  emptyCardGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: -1,
+    right: -1,
+    height: '75%',
+  },
+  emptyCardTopLabel: {
+    position: 'absolute',
+    top: Spacing.lg,
+    left: Spacing.lg,
+    zIndex: 1,
+  },
+  emptyCardTitle: {
+    ...Typography.h1,
+    color: Colors.text.primary,
+  },
+
+  // Not found
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -762,9 +1081,17 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.text.primary,
   },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.text.secondary,
+
+  // Bottom screen gradient fade
+  bottomFadeContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+  },
+  bottomFadeGradient: {
+    flex: 1,
   },
 
   // Loading
@@ -774,18 +1101,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // FAB
-  fab: {
-    position: 'absolute',
-    bottom: Spacing.lg,
-    right: Spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadow.elevated,
-    zIndex: 10,
-  },
 });

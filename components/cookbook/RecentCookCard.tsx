@@ -12,6 +12,7 @@ type RecentCookCardProps = {
   cuisine?: string;
   onPress: () => void;
   onCook: () => void;
+  actionLabel?: string;
 };
 
 const CARD_HEIGHT = 130;
@@ -37,7 +38,9 @@ export const RecentCookCard = memo(function RecentCookCard({
   cuisine,
   onPress,
   onCook,
+  actionLabel,
 }: RecentCookCardProps): React.ReactElement {
+  const buttonLabel = actionLabel ?? COPY.cookbookDetail.cook;
   const fallbackBg = getPastelForTitle(title);
 
   return (
@@ -85,12 +88,12 @@ export const RecentCookCard = memo(function RecentCookCard({
       {/* Floating Cook button */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${COPY.cookbookDetail.cook} ${title}`}
+        accessibilityLabel={`${buttonLabel} ${title}`}
         style={styles.cookButton}
         onPress={onCook}
       >
         <View style={styles.cookTextWrapper}>
-          <Text style={styles.cookText}>{COPY.cookbookDetail.cook}</Text>
+          <Text style={styles.cookText}>{buttonLabel}</Text>
         </View>
       </Pressable>
     </Pressable>

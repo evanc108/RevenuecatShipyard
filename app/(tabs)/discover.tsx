@@ -15,7 +15,7 @@ import { api } from '@/convex/_generated/api';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { TabSlider } from '@/components/ui/TabSlider';
 import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
-import { CookbookSelectionModal } from '@/components/ui/CookbookSelectionModal';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
 import { FeedPost } from '@/components/ui/FeedPost';
 import { COPY } from '@/constants/copy';
 import type { Recipe } from '@/components/discover/RecipeCard';

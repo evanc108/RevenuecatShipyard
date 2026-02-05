@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 
 import { Icon } from '@/components/ui/Icon';
-import { CookbookDropdown } from '@/components/ui/CookbookDropdown';
+import { CookbookDropdown } from '@/components/cookbook/CookbookDropdown';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { getDomainFromUrl } from '@/hooks/useShareHandler';

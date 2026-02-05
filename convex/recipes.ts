@@ -112,7 +112,7 @@ export const saveExtracted = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     cuisine: v.optional(v.string()),
-    difficulty: v.optional(v.string()),
+    difficulty: v.optional(v.union(v.string(), v.number())),
     imageUrl: v.optional(v.string()),
     servings: v.optional(v.number()),
     prepTimeMinutes: v.optional(v.number()),

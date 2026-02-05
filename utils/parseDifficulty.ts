@@ -8,8 +8,9 @@ const DIFFICULTY_MAP: Record<string, number> = {
   expert: 5,
 };
 
-export function parseDifficulty(difficulty?: string): number {
-  if (!difficulty) return 0;
+export function parseDifficulty(difficulty?: string | number): number {
+  if (difficulty === undefined || difficulty === null) return 0;
+  if (typeof difficulty === 'number') return Math.min(5, Math.max(1, Math.round(difficulty)));
   const mapped = DIFFICULTY_MAP[difficulty.toLowerCase()];
   if (mapped !== undefined) return mapped;
   const num = parseInt(difficulty, 10);

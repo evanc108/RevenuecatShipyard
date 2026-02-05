@@ -33,6 +33,8 @@ export const COPY = {
   },
   cookbookDetail: {
     recentlyCooked: 'Recently Cooked',
+    suggestedRecipe: 'Suggested Recipe',
+    add: 'Add',
     yourRecipesPrefix: 'Your',
     yourRecipesBold: 'Recipes',
     cook: 'Cook',
