@@ -1,32 +1,38 @@
-import { useState, useMemo, useCallback } from 'react';
-import {
-  Animated,
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import type { Id } from '@/convex/_generated/dataModel';
-import { Icon } from '@/components/ui/Icon';
 import { CookbookCard } from '@/components/cookbook/CookbookCard';
 import { RecipeCard } from '@/components/cookbook/RecipeCard';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/constants/theme';
+import { Icon } from '@/components/ui/Icon';
+import { TabSlider } from '@/components/ui/TabSlider';
 import { COPY } from '@/constants/copy';
-import { useModalAnimation } from '@/hooks/useModalAnimation';
-import { useDebounce } from '@/hooks/useDebounce';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useRecipePicker } from '@/context/RecipePickerContext';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useModalAnimation } from '@/hooks/useModalAnimation';
 import { parseDifficulty } from '@/utils/parseDifficulty';
+import { useQuery } from 'convex/react';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ViewMode = 'cookbooks' | 'allRecipes' | 'cookbookRecipes';
+
+const PICKER_TABS = [
+  { key: 'cookbooks', label: 'Cookbooks' },
+  { key: 'allRecipes', label: 'All Recipes' },
+];
 
 export function RecipePickerSheet(): React.ReactElement | null {
   const insets = useSafeAreaInsets();
@@ -98,29 +104,9 @@ export function RecipePickerSheet(): React.ReactElement | null {
     setSearchQuery('');
   }, []);
 
-  const handleToggleView = useCallback(() => {
-    setSearchQuery('');
-    setSelectedCookbookId(null);
-    setViewMode((prev) => (prev === 'allRecipes' ? 'cookbooks' : 'allRecipes'));
-  }, []);
-
   if (!isRendered) return null;
 
   const showSearch = viewMode === 'allRecipes' || viewMode === 'cookbookRecipes';
-  const showBackButton = viewMode === 'cookbookRecipes';
-
-  // Find cookbook name for header
-  const selectedCookbookName =
-    viewMode === 'cookbookRecipes' && cookbooks
-      ? cookbooks.find((c) => c._id === selectedCookbookId)?.name ?? ''
-      : '';
-
-  const headerTitle =
-    viewMode === 'cookbooks'
-      ? COPY.pantry.mealPlan.addRecipe
-      : viewMode === 'allRecipes'
-        ? 'All Recipes'
-        : selectedCookbookName;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -146,76 +132,31 @@ export function RecipePickerSheet(): React.ReactElement | null {
             <View style={styles.handle} />
           </View>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              {showBackButton && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Back"
-                  onPress={handleBack}
-                  hitSlop={8}
-                >
-                  <Icon
-                    name="chevron-left"
-                    size={24}
-                    color={Colors.text.primary}
-                  />
-                </Pressable>
-              )}
-              <Text style={styles.title} numberOfLines={1}>
-                {headerTitle}
-              </Text>
+          {/* View toggle (cookbooks vs all) — only in cookbooks or allRecipes mode */}
+          {viewMode !== 'cookbookRecipes' ? (
+            <View style={styles.toggleRow}>
+              <TabSlider
+                tabs={PICKER_TABS}
+                activeTab={viewMode}
+                onTabChange={(tabKey) => {
+                  setSearchQuery('');
+                  setSelectedCookbookId(null);
+                  setViewMode(tabKey as 'cookbooks' | 'allRecipes');
+                }}
+              />
             </View>
+          ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close"
-              onPress={handleClose}
-              hitSlop={12}
+              accessibilityLabel="Back to cookbooks"
+              onPress={handleBack}
+              style={styles.backRow}
             >
-              <Icon name="close" size={24} color={Colors.text.secondary} />
+              <Icon name="chevron-left" size={20} color={Colors.text.primary} />
+              <Text style={styles.backLabel} numberOfLines={1}>
+                {cookbooks?.find((c) => c._id === selectedCookbookId)?.name ?? 'Cookbook'}
+              </Text>
             </Pressable>
-          </View>
-
-          {/* View toggle (cookbooks vs all) — only in cookbooks or allRecipes mode */}
-          {viewMode !== 'cookbookRecipes' && (
-            <View style={styles.toggleRow}>
-              <Pressable
-                style={[
-                  styles.toggleButton,
-                  viewMode === 'cookbooks' && styles.toggleButtonActive,
-                ]}
-                onPress={() => {
-                  setViewMode('cookbooks');
-                  setSearchQuery('');
-                }}
-              >
-                <Text
-                  style={[
-                    styles.toggleText,
-                    viewMode === 'cookbooks' && styles.toggleTextActive,
-                  ]}
-                >
-                  Cookbooks
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.toggleButton,
-                  viewMode === 'allRecipes' && styles.toggleButtonActive,
-                ]}
-                onPress={handleToggleView}
-              >
-                <Text
-                  style={[
-                    styles.toggleText,
-                    viewMode === 'allRecipes' && styles.toggleTextActive,
-                  ]}
-                >
-                  All Recipes
-                </Text>
-              </Pressable>
-            </View>
           )}
 
           {/* Search (only in recipe views) */}
@@ -459,49 +400,21 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.border,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.sm,
-  },
-  headerLeft: {
+  backRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    flex: 1,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
-  title: {
-    ...Typography.h2,
+  backLabel: {
+    ...Typography.h3,
     color: Colors.text.primary,
     flex: 1,
   },
   toggleRow: {
-    flexDirection: 'row',
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Radius.full,
-    padding: 3,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderRadius: Radius.full,
-  },
-  toggleButtonActive: {
-    backgroundColor: Colors.background.primary,
-    ...Shadow.surface,
-  },
-  toggleText: {
-    ...Typography.label,
-    color: Colors.text.tertiary,
-  },
-  toggleTextActive: {
-    color: Colors.text.primary,
   },
   searchContainer: {
     flexDirection: 'row',

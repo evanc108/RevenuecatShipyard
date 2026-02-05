@@ -1,14 +1,13 @@
-import { memo, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Icon } from '@/components/ui/Icon';
+import { MealRecipeCard } from '@/components/features/pantry/MealRecipeCard';
 import type { IconName } from '@/components/ui/Icon';
-import { RecipeCard } from '@/components/cookbook/RecipeCard';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
-import { parseDifficulty } from '@/utils/parseDifficulty';
-import type { MealType } from '@/stores/useMealPlanStore';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import type { Id } from '@/convex/_generated/dataModel';
+import type { MealType } from '@/stores/useMealPlanStore';
+import { useRouter } from 'expo-router';
+import { memo, useCallback, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type MealEntry = {
   _id: Id<'mealPlanEntries'>;
@@ -20,7 +19,8 @@ type MealEntry = {
     imageUrl?: string;
     cuisine?: string;
     totalTimeMinutes?: number;
-    difficulty?: string | number;
+    difficulty?: string;
+    calories?: number;
   };
 };
 
@@ -38,10 +38,6 @@ const MEAL_ICON_MAP: Record<MealType, IconName> = {
   snack: 'cookie',
 };
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const GRID_GAP = Spacing.md;
-const CARD_WIDTH = (SCREEN_WIDTH - Spacing.md * 2 - GRID_GAP) / 2;
-
 function MealSectionComponent({
   mealType,
   entries,
@@ -51,6 +47,11 @@ function MealSectionComponent({
   const router = useRouter();
   const iconName = MEAL_ICON_MAP[mealType];
   const label = COPY.pantry.mealPlan.mealTypes[mealType];
+
+  const totalCalories = useMemo(
+    () => entries.reduce((sum, entry) => sum + (entry.recipe.calories ?? 0), 0),
+    [entries]
+  );
 
   const handleRecipePress = useCallback(
     (recipeId: Id<'recipes'>) => {
@@ -73,6 +74,12 @@ function MealSectionComponent({
         <View style={styles.headerLeft}>
           <Icon name={iconName} size={18} color={Colors.accent} />
           <Text style={styles.label}>{label}</Text>
+          {totalCalories > 0 ? (
+            <View style={styles.calorieBadge}>
+              <Icon name="flame" size={12} color={Colors.accent} />
+              <Text style={styles.calorieText}>{totalCalories} cal</Text>
+            </View>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -85,30 +92,17 @@ function MealSectionComponent({
         </Pressable>
       </View>
 
-      {/* Recipe Cards Grid */}
+      {/* Recipe Cards List */}
       {entries.length > 0 ? (
-        <View style={styles.grid}>
+        <View style={styles.list}>
           {entries.map((entry) => (
-            <View key={entry._id} style={styles.cardWrapper}>
-              <RecipeCard
-                title={entry.recipe.title}
-                imageUrl={entry.recipe.imageUrl}
-                totalTimeMinutes={entry.recipe.totalTimeMinutes ?? 0}
-                difficulty={parseDifficulty(entry.recipe.difficulty)}
-                cuisine={entry.recipe.cuisine}
-                onPress={() => handleRecipePress(entry.recipe._id)}
-              />
-              {/* Remove button overlay */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Remove recipe"
-                onPress={() => handleRemove(entry._id)}
-                hitSlop={8}
-                style={styles.removeButton}
-              >
-                <Icon name="close" size={14} color="#FFFFFF" />
-              </Pressable>
-            </View>
+            <MealRecipeCard
+              key={entry._id}
+              entryId={entry._id}
+              recipe={entry.recipe}
+              onPress={() => handleRecipePress(entry.recipe._id)}
+              onRemove={handleRemove}
+            />
           ))}
         </View>
       ) : null}
@@ -137,6 +131,20 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.text.primary,
   },
+  calorieBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    backgroundColor: Colors.accentLight,
+    borderRadius: Radius.full,
+  },
+  calorieText: {
+    ...Typography.caption,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
   addButton: {
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
@@ -149,26 +157,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GRID_GAP,
+  list: {
+    gap: Spacing.sm,
     marginTop: Spacing.xs,
-  },
-  cardWrapper: {
-    width: CARD_WIDTH,
-    aspectRatio: 0.75,
-  },
-  removeButton: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   bottomDivider: {
     height: 1,
