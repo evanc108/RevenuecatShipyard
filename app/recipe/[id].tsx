@@ -1,3 +1,4 @@
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
 import type { IconName } from '@/components/ui/Icon';
 import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
@@ -309,8 +310,15 @@ export default function RecipeDetailScreen() {
   const rateMutation = useMutation(api.recipes.rate);
   const myPost = useQuery(api.posts.getMyPostForRecipe, recipeId ? { recipeId } : 'skip');
   const updatePostMutation = useMutation(api.posts.update);
+  const isInCookbook = useQuery(
+    api.cookbooks.isRecipeInAnyCookbook,
+    recipeId ? { recipeId } : 'skip',
+  );
+  const addToCookbookMutation = useMutation(api.cookbooks.addRecipe);
 
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+  const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
   const [jumpMenuOpen, setJumpMenuOpen] = useState(false);
   const menuProgress = useSharedValue(0);
 
@@ -396,6 +404,20 @@ export default function RecipeDetailScreen() {
     }
     setIsEditing(false);
   };
+
+  const handleSaveToCookbook = useCallback(
+    async (cookbookId: Id<'cookbooks'>) => {
+      if (!recipeId || isSavingToCookbook) return;
+      setIsSavingToCookbook(true);
+      try {
+        await addToCookbookMutation({ cookbookId, recipeId });
+        setIsSaveModalVisible(false);
+      } finally {
+        setIsSavingToCookbook(false);
+      }
+    },
+    [recipeId, addToCookbookMutation, isSavingToCookbook],
+  );
 
   const handleSectionLayout = useCallback((section: string, y: number) => {
     sectionYMap.current[section] = y;
@@ -985,17 +1007,29 @@ export default function RecipeDetailScreen() {
           <Icon name="flame" size={18} color={Colors.text.inverse} />
           <Text style={styles.floatingButtonText}>{copy.cook}</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={copy.mealPlan}
-          style={styles.floatingButtonMealPlan}
-          onPress={() => {
-            // TODO: meal plan action
-          }}
-        >
-          <Icon name="calendar" size={18} color={Colors.text.primary} />
-          <Text style={styles.floatingButtonMealPlanText}>{copy.mealPlan}</Text>
-        </Pressable>
+        {isInCookbook === false ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.saveToCookbook}
+            style={styles.floatingButtonMealPlan}
+            onPress={() => setIsSaveModalVisible(true)}
+          >
+            <Icon name="bookmark" size={18} color={Colors.text.primary} />
+            <Text style={styles.floatingButtonMealPlanText}>{copy.saveToCookbook}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.mealPlan}
+            style={styles.floatingButtonMealPlan}
+            onPress={() => {
+              // TODO: meal plan action
+            }}
+          >
+            <Icon name="calendar" size={18} color={Colors.text.primary} />
+            <Text style={styles.floatingButtonMealPlanText}>{copy.mealPlan}</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Floating Header — overlays on top of hero image */}
@@ -1060,6 +1094,15 @@ export default function RecipeDetailScreen() {
           accessibilityLabel="Close menu"
         />
       ) : null}
+
+      {/* Save to Cookbook modal */}
+      <CookbookSelectionModal
+        visible={isSaveModalVisible}
+        recipe={recipe ? { title: recipe.title, imageUrl: recipe.imageUrl, url: recipe.url } : null}
+        onClose={() => setIsSaveModalVisible(false)}
+        onSelect={handleSaveToCookbook}
+        isLoading={isSavingToCookbook}
+      />
     </View>
   );
 }

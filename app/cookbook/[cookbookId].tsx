@@ -476,6 +476,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 
   const { openModal } = useAddModal();
   const saveToCookbookMutation = useMutation(api.discoverFeed.saveToCookbook);
+  const getOrCreateRecipeMutation = useMutation(api.discoverFeed.getOrCreateRecipe);
 
   // View mode state (card = stacked carousel, grid = 2-column grid)
   const [viewMode, setViewMode] = useState<'card' | 'grid'>('card');
@@ -691,6 +692,18 @@ export default function CookbookDetailScreen(): React.ReactElement {
     [cookbookId, saveToCookbookMutation, isAddingSuggested, playSuccessAnimation],
   );
 
+  const handleSuggestedRecipePress = useCallback(
+    async (discoverRecipeId: Id<'discoverRecipes'>) => {
+      try {
+        const recipeId = await getOrCreateRecipeMutation({ discoverRecipeId });
+        router.push(`/recipe/${recipeId}`);
+      } catch {
+        // Silently fail — user can still use the Add button
+      }
+    },
+    [getOrCreateRecipeMutation, router],
+  );
+
   // --- Recipe Options ---
 
   const handleRecipeMorePress = useCallback((recipeId: Id<'recipes'>, title: string) => {
@@ -834,6 +847,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
                   title={recentlyCooked.title}
                   imageUrl={recentlyCooked.imageUrl}
                   totalTimeMinutes={recentlyCooked.totalTimeMinutes ?? 0}
+                  difficulty={parseDifficulty(recentlyCooked.difficulty)}
                   cuisine={recentlyCooked.cuisine}
                   onPress={() => handleRecipePress(recentlyCooked._id)}
                   onCook={() => handleCookPress(recentlyCooked._id)}
@@ -848,10 +862,9 @@ export default function CookbookDetailScreen(): React.ReactElement {
                   title={suggestedRecipes[0].title}
                   imageUrl={suggestedRecipes[0].imageUrl}
                   totalTimeMinutes={suggestedRecipes[0].totalTimeMinutes ?? 0}
+                  difficulty={parseDifficulty(suggestedRecipes[0].difficulty)}
                   cuisine={suggestedRecipes[0].cuisine}
-                  onPress={() => {
-                    // Discover recipes don't have a detail page yet
-                  }}
+                  onPress={() => handleSuggestedRecipePress(suggestedRecipes[0]._id)}
                   onCook={() => handleAddSuggestedRecipe(suggestedRecipes[0]._id)}
                   actionLabel={COPY.cookbookDetail.add}
                   actionLoading={isAddingSuggested}
