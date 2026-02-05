@@ -17,6 +17,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from 'convex/react';
 
@@ -25,11 +31,11 @@ import { useMutation, useQuery } from 'convex/react';
 const copy = COPY.recipeDetail;
 const HERO_HEIGHT = 360;
 const CONTENT_OVERLAP = 28;
-const STEP_CIRCLE_SIZE = 28;
+const STEP_CIRCLE_SIZE = 32;
 const SERVINGS_BUTTON_SIZE = 36;
 const STAR_SIZE = 28;
 const STAR_COLOR_ACTIVE = '#FFB800';
-const INGREDIENT_IMAGE_SIZE = 44;
+const INGREDIENT_IMAGE_SIZE = 52;
 const NAV_BUTTON_SIZE = 40;
 const HEADER_BUTTON_SIZE = 38;
 const NAV_ICON_STROKE = 2.5;
