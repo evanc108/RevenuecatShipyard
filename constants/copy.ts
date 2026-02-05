@@ -177,6 +177,18 @@ export const COPY = {
     mealPlan: {
       emptyTitle: 'Plan Your Meals',
       emptySubtitle: 'Organize your weekly meals and stay on track',
+      today: 'Today',
+      mealTypes: {
+        breakfast: 'Breakfast',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        snack: 'Snacks',
+      },
+      addRecipe: 'Add Recipe',
+      searchPlaceholder: 'Search saved recipes...',
+      noSavedRecipes: 'No saved recipes yet',
+      noResults: 'No recipes found',
+      remove: 'Remove',
     },
     yourFood: {
       emptyTitle: 'Track Your Pantry',

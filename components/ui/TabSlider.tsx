@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: Colors.background.secondary,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
     padding: Spacing.xs,
     position: 'relative',
   },
@@ -106,9 +106,7 @@ const styles = StyleSheet.create({
     top: Spacing.xs,
     bottom: Spacing.xs,
     backgroundColor: Colors.background.primary,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.accent,
+    borderRadius: Radius.full,
     ...Shadow.surface,
   },
   tab: {
@@ -121,7 +119,7 @@ const styles = StyleSheet.create({
     ...Typography.label,
   },
   tabTextActive: {
-    color: Colors.accent,
+    color: Colors.text.primary,
   },
   tabTextInactive: {
     color: Colors.text.tertiary,

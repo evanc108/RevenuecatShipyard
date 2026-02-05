@@ -1,21 +1,20 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { TabSlider } from '@/components/ui/TabSlider';
+import { Icon } from '@/components/ui/Icon';
 import {
   MealPlanContent,
   YourFoodContent,
-  GroceriesContent,
 } from '@/components/features/pantry';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 
-type TabKey = 'mealPlan' | 'yourFood' | 'groceries';
+type TabKey = 'mealPlan' | 'yourFood';
 
 const TABS = [
   { key: 'mealPlan' as const, label: COPY.pantry.tabs.mealPlan },
   { key: 'yourFood' as const, label: COPY.pantry.tabs.yourFood },
-  { key: 'groceries' as const, label: COPY.pantry.tabs.groceries },
 ];
 
 export default function MealPlanScreen() {
@@ -27,8 +26,6 @@ export default function MealPlanScreen() {
         return <MealPlanContent />;
       case 'yourFood':
         return <YourFoodContent />;
-      case 'groceries':
-        return <GroceriesContent />;
       default:
         return <MealPlanContent />;
     }
@@ -36,15 +33,22 @@ export default function MealPlanScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Pantry</Text>
-      </View>
-      <View style={styles.tabContainer}>
-        <TabSlider
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={(key) => setActiveTab(key as TabKey)}
-        />
+      <View style={styles.topRow}>
+        <View style={styles.tabSliderWrapper}>
+          <TabSlider
+            tabs={TABS}
+            activeTab={activeTab}
+            onTabChange={(key) => setActiveTab(key as TabKey)}
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Groceries"
+          style={styles.cartButton}
+          hitSlop={8}
+        >
+          <Icon name="shopping-cart" size={20} color={Colors.text.primary} />
+        </Pressable>
       </View>
       <View style={styles.content}>{content}</View>
     </SafeAreaView>
@@ -56,18 +60,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
   },
-  title: {
-    ...Typography.h1,
-    color: Colors.text.primary,
+  tabSliderWrapper: {
+    flex: 1,
   },
-  tabContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+  cartButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
