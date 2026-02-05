@@ -7,8 +7,9 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAddModal } from '@/context/AddModalContext';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,6 +26,8 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
   type SharedValue,
@@ -459,7 +462,14 @@ export default function CookbookDetailScreen(): React.ReactElement {
     cookbookId ? { cookbookId: cookbookId as Id<'cookbooks'> } : 'skip',
   );
 
-  const suggestedRecipes = useQuery(api.discoverFeed.getUnviewedRecipes, { limit: 1 });
+  // Fetch suggested recipes eagerly (avoids waterfall with recentlyCooked)
+  const suggestedRecipes = useQuery(
+    api.discoverFeed.getUnviewedRecipes,
+    { limit: 1 },
+  );
+
+  const { openModal } = useAddModal();
+  const saveToCookbookMutation = useMutation(api.discoverFeed.saveToCookbook);
 
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -477,7 +487,19 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const cardStep = screenWidth * 0.35;
 
   const recipes: CookbookRecipe[] = cookbookRecipes ?? [];
-  const isRecipesLoading = cookbookRecipes === undefined;
+  // Wait for all visible data before rendering content
+  const isPageLoading =
+    cookbookRecipes === undefined ||
+    recentlyCooked === undefined ||
+    (recentlyCooked === null && suggestedRecipes === undefined);
+
+  // --- Success animation state ---
+  const [isAddingSuggested, setIsAddingSuggested] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const successOverlayOpacity = useSharedValue(0);
+  const successIconScale = useSharedValue(0);
+  const successIconTranslateY = useSharedValue(20);
+  const plusButtonScale = useSharedValue(1);
 
   // Reset local state when navigating between cookbooks
   useEffect(() => {
@@ -512,6 +534,50 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const searchInputOpacity = useAnimatedStyle(() => ({
     opacity: interpolate(searchProgress.value, [0.3, 0.7], [0, 1]),
   }));
+
+  // --- Success Animation ---
+
+  const successOverlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: successOverlayOpacity.value,
+  }));
+
+  const successIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: successIconScale.value },
+      { translateY: successIconTranslateY.value },
+    ],
+  }));
+
+  const plusButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: plusButtonScale.value }],
+  }));
+
+  const playSuccessAnimation = useCallback(() => {
+    setShowSuccessOverlay(true);
+
+    // Fade in, hold, fade out
+    successOverlayOpacity.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withDelay(900, withTiming(0, { duration: 250 })),
+    );
+
+    // Icon: scale up, overshoot, settle, then shrink
+    successIconScale.value = withSequence(
+      withTiming(0, { duration: 0 }),
+      withTiming(1.2, { duration: 250 }),
+      withSpring(1, { damping: 10, stiffness: 200 }),
+      withDelay(500, withTiming(0, { duration: 200 })),
+    );
+
+    // Icon: start below, bounce up, settle
+    successIconTranslateY.value = withSequence(
+      withTiming(20, { duration: 0 }),
+      withSpring(0, { damping: 8, stiffness: 150 }),
+    );
+
+    // Clean up after animation completes
+    setTimeout(() => setShowSuccessOverlay(false), 1400);
+  }, [successOverlayOpacity, successIconScale, successIconTranslateY]);
 
   // --- Filter ---
 
@@ -584,6 +650,32 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const handleCookPress = useCallback((_recipeId: Id<'recipes'>) => {
     // TODO: Start cooking flow
   }, []);
+
+  const handleAddRecipe = useCallback(() => {
+    if (!cookbookId) return;
+    plusButtonScale.value = withSequence(
+      withTiming(0.85, { duration: 80 }),
+      withSpring(1, { damping: 15, stiffness: 400 }),
+    );
+    openModal({ initialCookbookId: cookbookId as Id<'cookbooks'> });
+  }, [cookbookId, openModal, plusButtonScale]);
+
+  const handleAddSuggestedRecipe = useCallback(
+    async (discoverRecipeId: Id<'discoverRecipes'>) => {
+      if (!cookbookId || isAddingSuggested) return;
+      setIsAddingSuggested(true);
+      try {
+        await saveToCookbookMutation({
+          discoverRecipeId,
+          cookbookId: cookbookId as Id<'cookbooks'>,
+        });
+        playSuccessAnimation();
+      } finally {
+        setIsAddingSuggested(false);
+      }
+    },
+    [cookbookId, saveToCookbookMutation, isAddingSuggested, playSuccessAnimation],
+  );
 
   // --- Loading / Error States ---
 
@@ -676,17 +768,17 @@ export default function CookbookDetailScreen(): React.ReactElement {
               ) : null}
             </Animated.View>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Add recipe"
-              style={styles.plusButton}
-              onPress={() => {
-                // TODO: Add recipe flow
-              }}
-              hitSlop={8}
-            >
-              <Icon name="add" size={24} color={Colors.text.inverse} />
-            </Pressable>
+            <Animated.View style={plusButtonAnimatedStyle}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Add recipe"
+                style={styles.plusButton}
+                onPress={handleAddRecipe}
+                hitSlop={8}
+              >
+                <Icon name="add" size={24} color={Colors.text.inverse} />
+              </Pressable>
+            </Animated.View>
           </View>
         </View>
 
@@ -697,7 +789,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
       </View>
 
       {/* Content */}
-      {isRecipesLoading ? (
+      {isPageLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
@@ -728,12 +820,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
                   totalTimeMinutes={suggestedRecipes[0].totalTimeMinutes ?? 0}
                   cuisine={suggestedRecipes[0].cuisine}
                   onPress={() => {
-                    // TODO: Navigate to discover recipe detail
+                    // Discover recipes don't have a detail page yet
                   }}
-                  onCook={() => {
-                    // TODO: Add suggested recipe to this cookbook
-                  }}
+                  onCook={() => handleAddSuggestedRecipe(suggestedRecipes[0]._id)}
                   actionLabel={COPY.cookbookDetail.add}
+                  actionLoading={isAddingSuggested}
                 />
               </View>
             </View>
@@ -790,9 +881,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
                     cardWidth={cardWidth}
                     cardStep={cardStep}
                     screenWidth={screenWidth}
-                    onPress={() => {
-                      // TODO: Add recipe flow
-                    }}
+                    onPress={handleAddRecipe}
                   />
                 </Animated.View>
               </GestureDetector>
@@ -803,9 +892,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
               accessibilityRole="button"
               accessibilityLabel="Add new recipe"
               style={styles.emptyAddCard}
-              onPress={() => {
-                // TODO: Add recipe flow
-              }}
+              onPress={handleAddRecipe}
             >
               <View style={styles.emptyAddCardInner}>
                 {/* Red plus icon — top right */}
@@ -872,6 +959,20 @@ export default function CookbookDetailScreen(): React.ReactElement {
           style={styles.bottomFadeGradient}
         />
       </View>
+
+      {/* Success overlay */}
+      {showSuccessOverlay ? (
+        <Animated.View
+          style={[styles.successOverlay, successOverlayAnimatedStyle]}
+          pointerEvents="none"
+        >
+          <Animated.View style={successIconAnimatedStyle}>
+            <View style={styles.successIconCircle}>
+              <Icon name="check" size={40} color={Colors.background.primary} strokeWidth={3} />
+            </View>
+          </Animated.View>
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -1101,4 +1202,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  // Success overlay
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.97)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.semantic.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

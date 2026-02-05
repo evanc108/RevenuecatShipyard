@@ -13,6 +13,7 @@ type RecentCookCardProps = {
   onPress: () => void;
   onCook: () => void;
   actionLabel?: string;
+  actionLoading?: boolean;
 };
 
 const CARD_HEIGHT = 130;
@@ -39,6 +40,7 @@ export const RecentCookCard = memo(function RecentCookCard({
   onPress,
   onCook,
   actionLabel,
+  actionLoading,
 }: RecentCookCardProps): React.ReactElement {
   const buttonLabel = actionLabel ?? COPY.cookbookDetail.cook;
   const fallbackBg = getPastelForTitle(title);
@@ -89,8 +91,9 @@ export const RecentCookCard = memo(function RecentCookCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${buttonLabel} ${title}`}
-        style={styles.cookButton}
+        style={[styles.cookButton, actionLoading === true && styles.cookButtonLoading]}
         onPress={onCook}
+        disabled={actionLoading}
       >
         <View style={styles.cookTextWrapper}>
           <Text style={styles.cookText}>{buttonLabel}</Text>
@@ -157,6 +160,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cookButtonLoading: {
+    backgroundColor: '#4A4A4A',
+    transform: [{ scale: 0.92 }],
   },
   cookTextWrapper: {
     transform: [{ rotate: '90deg' }],

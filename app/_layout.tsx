@@ -15,6 +15,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { ShareIntentProvider } from '@/context/ShareIntentContext';
+import { AddModalProvider } from '@/context/AddModalContext';
+import { AddModal } from '@/components/ui/AddModal';
 import { UploadProgressIndicator } from '@/components/ui/UploadProgressIndicator';
 import '@/global.css';
 
@@ -151,16 +153,19 @@ export default function RootLayout() {
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <AuthGuard>
                   <ShareIntentProvider>
-                    <Stack screenOptions={{ headerShown: false }}>
-                      <Stack.Screen name="index" />
-                      <Stack.Screen name="(onboarding)" />
-                      <Stack.Screen name="(auth)" />
-                      <Stack.Screen name="(tabs)" />
-                      <Stack.Screen name="cookbook/[cookbookId]" />
-                      <Stack.Screen name="recipe/[id]" />
-                      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
-                    </Stack>
-                    <UploadProgressIndicator />
+                    <AddModalProvider>
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="index" />
+                        <Stack.Screen name="(onboarding)" />
+                        <Stack.Screen name="(auth)" />
+                        <Stack.Screen name="(tabs)" />
+                        <Stack.Screen name="cookbook/[cookbookId]" />
+                        <Stack.Screen name="recipe/[id]" />
+                        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+                      </Stack>
+                      <AddModal />
+                      <UploadProgressIndicator />
+                    </AddModalProvider>
                   </ShareIntentProvider>
                 </AuthGuard>
                 <StatusBar style="auto" />

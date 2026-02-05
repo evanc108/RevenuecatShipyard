@@ -69,7 +69,7 @@ function getRecipeCardColor(title: string): string {
 
 export function AddModal(): React.ReactElement {
   const insets = useSafeAreaInsets();
-  const { isVisible, closeModal } = useAddModal();
+  const { isVisible, initialCookbookId, closeModal } = useAddModal();
 
   // View state
   const [currentView, setCurrentView] = useState<ModalView>('main');
@@ -113,6 +113,15 @@ export function AddModal(): React.ReactElement {
   }, [userRecipes, shareSearchQuery]);
 
   const inputRef = useRef<TextInput>(null);
+
+  // Pre-select cookbook when modal opens with initialCookbookId
+  const prevVisibleRef = useRef(false);
+  if (isVisible && !prevVisibleRef.current && initialCookbookId) {
+    setSelectedCookbookId(initialCookbookId);
+    setCurrentView('import');
+    setTimeout(() => inputRef.current?.focus(), 300);
+  }
+  prevVisibleRef.current = isVisible;
 
   // Reset state callback - defined before useModalAnimation
   const resetState = useCallback(() => {

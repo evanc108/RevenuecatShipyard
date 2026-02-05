@@ -269,7 +269,8 @@ export const getRecipes = query({
 
 /**
  * Get the most recently cooked recipe in a cookbook.
- * Checks if the user has any posts for recipes in this cookbook.
+ * Only returns data when the cookbook has more than 3 recipes
+ * AND the user has a post for at least one of them.
  * Returns the recipe data for the most recent post, or null.
  */
 export const getRecentlyCooked = query({
@@ -294,11 +295,14 @@ export const getRecentlyCooked = query({
       .withIndex('by_cookbook', (q) => q.eq('cookbookId', args.cookbookId))
       .collect();
 
-    const recipeIds = new Set(cookbookRecipes.map((cr) => cr.recipeId));
+    // Only show recently cooked when cookbook has more than 3 recipes
+    if (cookbookRecipes.length <= 3) return null;
 
-    if (recipeIds.size === 0) return null;
+    const recipeIds = new Set(
+      cookbookRecipes.map((cr) => cr.recipeId.toString())
+    );
 
-    // Get all user posts, newest first
+    // Get user posts, newest first
     const posts = await ctx.db
       .query('posts')
       .withIndex('by_user', (q) => q.eq('userId', user._id))
@@ -306,7 +310,9 @@ export const getRecentlyCooked = query({
       .collect();
 
     // Find the most recent post for a recipe in this cookbook
-    const recentPost = posts.find((post) => recipeIds.has(post.recipeId));
+    const recentPost = posts.find((post) =>
+      recipeIds.has(post.recipeId.toString())
+    );
     if (!recentPost) return null;
 
     const recipe = await ctx.db.get(recentPost.recipeId);
