@@ -7,6 +7,8 @@ import {
   MealPlanContent,
   YourFoodContent,
 } from '@/components/features/pantry';
+import { GeneratedRecipesSheet } from '@/components/features/pantry/GeneratedRecipesSheet';
+import { ScheduleOptionsSheet } from '@/components/features/pantry/ScheduleOptionsSheet';
 import { Colors, Spacing } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 
@@ -51,6 +53,10 @@ export default function MealPlanScreen() {
         </Pressable>
       </View>
       <View style={styles.content}>{content}</View>
+
+      {/* Meal Plan Generation Modals */}
+      <GeneratedRecipesSheet />
+      <ScheduleOptionsSheet />
     </SafeAreaView>
   );
 }

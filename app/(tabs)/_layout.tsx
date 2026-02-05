@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { RecipePickerSheet } from '@/components/features/pantry/RecipePickerSheet';
 import { HapticTab } from '@/components/haptic-tab';
+import { FloatingMealPlanProgress } from '@/components/ui/FloatingMealPlanProgress';
 import { FloatingUploadProgress } from '@/components/ui/FloatingUploadProgress';
 import { Icon } from '@/components/ui/Icon';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -136,6 +137,7 @@ function TabLayoutContent() {
       </Tabs>
       <RecipePickerSheet />
       <FloatingUploadProgress />
+      <FloatingMealPlanProgress />
     </>
   );
 }

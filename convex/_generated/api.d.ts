@@ -14,6 +14,8 @@ import type * as discoverFeed from "../discoverFeed.js";
 import type * as discoverFeedActions from "../discoverFeedActions.js";
 import type * as follows from "../follows.js";
 import type * as mealPlan from "../mealPlan.js";
+import type * as mealPlanGeneration from "../mealPlanGeneration.js";
+import type * as pantry from "../pantry.js";
 import type * as postComments from "../postComments.js";
 import type * as postLikes from "../postLikes.js";
 import type * as posts from "../posts.js";
@@ -35,6 +37,8 @@ declare const fullApi: ApiFromModules<{
   discoverFeedActions: typeof discoverFeedActions;
   follows: typeof follows;
   mealPlan: typeof mealPlan;
+  mealPlanGeneration: typeof mealPlanGeneration;
+  pantry: typeof pantry;
   postComments: typeof postComments;
   postLikes: typeof postLikes;
   posts: typeof posts;

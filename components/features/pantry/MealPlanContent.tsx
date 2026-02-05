@@ -84,6 +84,7 @@ function MealPlanContentComponent(): React.ReactElement {
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
       />
+
       <View style={styles.divider} />
       {entries === undefined ? (
         <View style={styles.loadingContainer}>
