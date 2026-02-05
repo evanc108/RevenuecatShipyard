@@ -888,41 +888,41 @@ export default function RecipeDetailScreen() {
             <SectionDivider title={`${copy.instructions} (${recipe.instructions.length})`} />
 
             {recipe.instructions.map((inst) => (
-                <View
-                  key={inst.stepNumber}
-                  style={styles.instructionCard}
-                >
-                  <Text style={styles.stepNumber}>
-                    {inst.stepNumber}
-                  </Text>
-                  <Text style={styles.instructionText}>{inst.text}</Text>
+              <View
+                key={inst.stepNumber}
+                style={styles.instructionCard}
+              >
+                <Text style={styles.stepNumber}>
+                  {inst.stepNumber}
+                </Text>
+                <Text style={styles.instructionText}>{inst.text}</Text>
 
-                  {inst.tip ? (
-                    <View style={styles.tipContainer}>
-                      <Icon name="info" size={16} color={Colors.text.secondary} />
-                      <Text style={styles.tipText}>{inst.tip}</Text>
-                    </View>
-                  ) : null}
+                {inst.tip ? (
+                  <View style={styles.tipContainer}>
+                    <Icon name="info" size={16} color={Colors.text.secondary} />
+                    <Text style={styles.tipText}>{inst.tip}</Text>
+                  </View>
+                ) : null}
 
-                  {inst.temperature || inst.timeSeconds ? (
-                    <View style={styles.instructionMeta}>
-                      {inst.temperature ? (
-                        <View style={styles.instructionMetaItem}>
-                          <Icon name="flame" size={14} color={Colors.accent} />
-                          <Text style={styles.instructionMetaText}>{inst.temperature}</Text>
-                        </View>
-                      ) : null}
-                      {inst.timeSeconds ? (
-                        <View style={styles.instructionMetaItem}>
-                          <Icon name="clock" size={14} color={Colors.text.tertiary} />
-                          <Text style={styles.instructionMetaText}>
-                            {Math.ceil(inst.timeSeconds / 60)} min
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </View>
+                {inst.temperature || inst.timeSeconds ? (
+                  <View style={styles.instructionMeta}>
+                    {inst.temperature ? (
+                      <View style={styles.instructionMetaItem}>
+                        <Icon name="flame" size={14} color={Colors.accent} />
+                        <Text style={styles.instructionMetaText}>{inst.temperature}</Text>
+                      </View>
+                    ) : null}
+                    {inst.timeSeconds ? (
+                      <View style={styles.instructionMetaItem}>
+                        <Icon name="clock" size={14} color={Colors.text.tertiary} />
+                        <Text style={styles.instructionMetaText}>
+                          {Math.ceil(inst.timeSeconds / 60)} min
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
             ))}
           </View>
 
@@ -1041,7 +1041,7 @@ export default function RecipeDetailScreen() {
           hitSlop={12}
           style={styles.headerBackButton}
         >
-          <Icon name="arrow-back" size={24} color={Colors.text.inverse} strokeWidth={2.5} />
+          <Icon name="arrow-back" size={24} color={Colors.text.primary} strokeWidth={2.5} />
         </Pressable>
 
         <View style={styles.headerRight}>

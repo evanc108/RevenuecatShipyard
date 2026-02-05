@@ -10,16 +10,19 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery } from 'convex/react';
-import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/ui/Avatar';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MODAL_HEIGHT = SCREEN_HEIGHT * (2 / 3);
 
 type CommentUser = {
   _id: Id<'users'>;
@@ -180,11 +183,7 @@ export const CommentSection = memo(function CommentSection({
     }
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons
-          name="chatbubble-outline"
-          size={48}
-          color={Colors.text.tertiary}
-        />
+        <Icon name="message-circle" size={48} color={Colors.text.tertiary} />
         <Text style={styles.emptyTitle}>{COPY.comments.empty}</Text>
         <Text style={styles.emptySubtitle}>{COPY.comments.beFirst}</Text>
       </View>
@@ -195,10 +194,19 @@ export const CommentSection = memo(function CommentSection({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      transparent
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Backdrop */}
+      <Pressable style={styles.backdrop} onPress={onClose} />
+
+      {/* Sheet */}
+      <View style={styles.sheet}>
+        {/* Drag handle */}
+        <View style={styles.handleRow}>
+          <View style={styles.handle} />
+        </View>
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerSpacer} />
@@ -209,7 +217,7 @@ export const CommentSection = memo(function CommentSection({
             style={styles.closeButton}
             onPress={onClose}
           >
-            <Ionicons name="close" size={24} color={Colors.text.primary} />
+            <Icon name="close" size={22} color={Colors.text.primary} strokeWidth={2} />
           </Pressable>
         </View>
 
@@ -260,15 +268,33 @@ export const CommentSection = memo(function CommentSection({
             </Pressable>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
-  container: {
+  backdrop: {
     flex: 1,
+    backgroundColor: Colors.background.overlay,
+  },
+  sheet: {
+    height: MODAL_HEIGHT,
     backgroundColor: Colors.background.primary,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+  },
+  handleRow: {
+    alignItems: 'center',
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.text.tertiary,
+    opacity: 0.4,
   },
   header: {
     flexDirection: 'row',

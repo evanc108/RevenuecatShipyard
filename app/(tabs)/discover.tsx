@@ -1,25 +1,26 @@
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  TextInput,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
+import type { Recipe } from '@/components/discover/RecipeCard';
+import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
+import { FeedPost } from '@/components/ui/FeedPost';
+import { Icon } from '@/components/ui/Icon';
+import { Loading } from '@/components/ui/Loading';
+import { COPY } from '@/constants/copy';
+import { Colors, FontFamily, Radius, Spacing, Typography } from '@/constants/theme';
+import { api } from '@/convex/_generated/api';
+import type { Doc, Id } from '@/convex/_generated/dataModel';
 import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
-import { Ionicons } from '@expo/vector-icons';
-import { api } from '@/convex/_generated/api';
-import { Loading } from '@/components/ui/Loading';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { SwipeableCardStack } from '@/components/discover/SwipeableCardStack';
-import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
-import { FeedPost } from '@/components/ui/FeedPost';
-import { COPY } from '@/constants/copy';
-import type { Recipe } from '@/components/discover/RecipeCard';
-import type { Doc, Id } from '@/convex/_generated/dataModel';
+import { Image } from 'expo-image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- Types ---
 type TabKey = 'discover' | 'feed';
@@ -444,7 +445,7 @@ function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; 
 
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="newspaper-outline" size={64} color={Colors.text.tertiary} />
+        <Icon name="book" size={64} color={Colors.text.tertiary} />
         <Text style={styles.emptyTitle}>{COPY.socialFeed.emptyFeedTitle}</Text>
         <Text style={styles.emptySubtitle}>{COPY.socialFeed.emptyFeedSubtitle}</Text>
         <Pressable
@@ -544,30 +545,55 @@ export default function DiscoverScreen() {
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.tabHeader}>
+          <Image
+            source={require('@/assets/images/header_icon.svg')}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
+          <View style={styles.tabRow}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'discover' }}
+              accessibilityLabel={COPY.discover.tabs.discover}
+              onPress={() => handleTabChange('discover')}
+            >
+              <Text style={activeTab === 'discover' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {COPY.discover.tabs.discover}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'feed' }}
+              accessibilityLabel={COPY.discover.tabs.feed}
+              onPress={() => handleTabChange('feed')}
+            >
+              <Text style={activeTab === 'feed' ? styles.tabLabelActive : styles.tabLabelInactive}>
+                {COPY.discover.tabs.feed}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.headerSpacer} />
+
+          {/* Bell notification button */}
           <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'discover' }}
-            accessibilityLabel={COPY.discover.tabs.discover}
-            onPress={() => handleTabChange('discover')}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            style={styles.bellButton}
+            hitSlop={8}
+            onPress={() => {
+              // TODO: open notifications
+            }}
           >
-            <Text style={activeTab === 'discover' ? styles.tabLabelActive : styles.tabLabelInactive}>
-              {COPY.discover.tabs.discover}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'feed' }}
-            accessibilityLabel={COPY.discover.tabs.feed}
-            onPress={() => handleTabChange('feed')}
-          >
-            <Text style={activeTab === 'feed' ? styles.tabLabelActive : styles.tabLabelInactive}>
-              {COPY.discover.tabs.feed}
-            </Text>
+            <Icon name="bell" size={28} color={Colors.text.primary} strokeWidth={2} />
+            <View style={styles.notiBadge}>
+              <Text style={styles.notiCount}>3</Text>
+            </View>
           </Pressable>
         </View>
         {activeTab === 'feed' ? (
           <View style={styles.searchBarContainer}>
-            <Ionicons name="search-outline" size={18} color={Colors.text.tertiary} />
+            <Icon name="search" size={18} color={Colors.text.tertiary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search people & recipes..."
@@ -585,7 +611,7 @@ export default function DiscoverScreen() {
                 onPress={() => setFeedSearchQuery('')}
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={18} color={Colors.text.tertiary} />
+                <Icon name="close-circle" size={18} color={Colors.text.tertiary} />
               </Pressable>
             ) : null}
           </View>
@@ -606,33 +632,68 @@ const styles = StyleSheet.create({
   },
   tabHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.lg,
+    gap: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
     backgroundColor: Colors.background.primary,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 6,
-    zIndex: 1,
+  },
+  headerLogo: {
+    width: 100,
+    height: 60,
+  },
+  headerSpacer: {
+    flex: 1,
+  },
+  bellButton: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notiBadge: {
+    position: 'absolute',
+    top: 30,
+    right: 8,
+    backgroundColor: Colors.accent,
+    minWidth: 20,
+    height: 20,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    borderWidth: 2,
+    borderColor: Colors.background.primary,
+  },
+  notiCount: {
+    fontSize: 9,
+    fontFamily: FontFamily.bold,
+    fontWeight: '700' as const,
+    color: Colors.text.inverse,
+    lineHeight: 12,
+  },
+  tabRow: {
+    paddingLeft: Spacing.sm,
+    paddingTop: Spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
   },
   tabLabelActive: {
     fontSize: 24,
     lineHeight: 30,
+    fontFamily: FontFamily.bold,
     fontWeight: '800' as const,
     color: '#000000',
     letterSpacing: -0.2,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
     textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 10,
   },
   tabLabelInactive: {
     fontSize: 24,
     lineHeight: 30,
+    fontFamily: FontFamily.bold,
     fontWeight: '800' as const,
     color: '#D1D1D6',
     letterSpacing: -0.3,
