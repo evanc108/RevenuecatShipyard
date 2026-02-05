@@ -1,6 +1,6 @@
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
@@ -13,6 +13,8 @@ type RecipeCardProps = {
   difficulty: number; // 1-5
   cuisine?: string;
   onPress: () => void;
+  onMorePress?: () => void;
+  compact?: boolean; // true for grid view (smaller text)
 };
 
 const PASTEL_FALLBACKS: readonly string[] = [
@@ -33,7 +35,17 @@ function getPastelForTitle(title: string): string {
 
 const MAX_STARS = 5;
 
-function DifficultyStars({ difficulty, onImage }: { difficulty: number; onImage?: boolean }): React.ReactElement {
+function DifficultyStars({
+  difficulty,
+  onImage,
+  starSize,
+  strokeWidth,
+}: {
+  difficulty: number;
+  onImage?: boolean;
+  starSize: number;
+  strokeWidth: number;
+}): React.ReactElement {
   const stars: React.ReactElement[] = [];
   for (let i = 1; i <= MAX_STARS; i++) {
     const isFilled = i <= difficulty;
@@ -41,12 +53,13 @@ function DifficultyStars({ difficulty, onImage }: { difficulty: number; onImage?
       <Icon
         key={i}
         name="star"
-        size={14}
+        size={starSize}
+        strokeWidth={strokeWidth}
         filled={isFilled}
         color={
           isFilled
             ? (onImage ? '#FFD700' : Colors.accent)
-            : (onImage ? 'rgba(255,255,255,0.25)' : Colors.border)
+            : (onImage ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.8)')
         }
       />,
     );
@@ -61,9 +74,15 @@ export const RecipeCard = memo(function RecipeCard({
   difficulty,
   cuisine,
   onPress,
+  onMorePress,
+  compact = false,
 }: RecipeCardProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(title);
   const hasImage = Boolean(imageUrl);
+  const starSize = compact ? 15 : 18;
+  const starStrokeWidth = compact ? 2 : 2;
+  const metaIconSize = compact ? 14 : 16;
+  const moreIconSize = compact ? 20 : 28;
 
   return (
     <Pressable
@@ -90,44 +109,77 @@ export const RecipeCard = memo(function RecipeCard({
       {/* Gradient overlay for text visibility */}
       {hasImage ? (
         <LinearGradient
-          colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.2)', 'transparent']}
+          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.2)', 'transparent']}
           locations={[0, 0.4, 0.75]}
           style={styles.gradientOverlay}
         />
       ) : null}
 
-      {/* Info overlays on image, right-aligned */}
-      <View style={styles.infoSection}>
+      {/* Settings button — top-right */}
+      {onMorePress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Recipe options"
+          style={compact ? styles.moreIconCompact : styles.moreIcon}
+          onPress={onMorePress}
+          hitSlop={12}
+        >
+          <Icon
+            name="apps"
+            size={moreIconSize}
+            color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
+          />
+        </Pressable>
+      ) : null}
+
+      {/* Info overlays on image, left-aligned */}
+      <View style={compact ? styles.infoSectionCompact : styles.infoSection}>
         <Text
-          style={[styles.title, hasImage && styles.titleOnImage]}
-          numberOfLines={2}
-          ellipsizeMode="tail"
+          style={[
+            compact ? styles.titleCompact : styles.title,
+            hasImage && styles.titleOnImage,
+          ]}
         >
           {title}
         </Text>
 
         <View style={styles.metaRow}>
-          <View style={styles.timeChip}>
+          <View style={compact ? styles.timeChipCompact : styles.timeChip}>
             <Icon
               name="time-outline"
-              size={14}
-              color={hasImage ? 'rgba(255,255,255,0.9)' : Colors.text.primary}
+              size={metaIconSize}
+              color={hasImage ? 'rgba(255,255,255,0.95)' : Colors.text.primary}
             />
-            <Text style={[styles.timeText, hasImage && styles.textOnImage]}>
+            <Text
+              style={[
+                compact ? styles.metaTextCompact : styles.metaText,
+                hasImage && styles.textOnImage,
+              ]}
+            >
               {totalTimeMinutes} {COPY.cookbookDetail.minuteShort}
             </Text>
           </View>
 
           {cuisine ? (
-            <View style={styles.cuisineChip}>
-              <Text style={[styles.cuisineText, hasImage && styles.cuisineTextOnImage]}>
+            <View style={compact ? styles.cuisineChipCompact : styles.cuisineChip}>
+              <Text
+                style={[
+                  compact ? styles.cuisineTextCompact : styles.cuisineText,
+                  hasImage && styles.cuisineTextOnImage,
+                ]}
+              >
                 {cuisine}
               </Text>
             </View>
           ) : null}
         </View>
 
-        <DifficultyStars difficulty={difficulty} onImage={hasImage} />
+        <DifficultyStars
+          difficulty={difficulty}
+          onImage={hasImage}
+          starSize={starSize}
+          strokeWidth={starStrokeWidth}
+        />
       </View>
     </Pressable>
   );
@@ -149,20 +201,40 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  // Stack view info section
   infoSection: {
     padding: Spacing.md,
+    paddingRight: Spacing.xl + Spacing.md,
     gap: Spacing.sm,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
+  },
+  // Grid view info section — tighter spacing
+  infoSectionCompact: {
+    padding: Spacing.sm,
+    paddingRight: Spacing.xl,
+    gap: Spacing.xs,
+    alignItems: 'flex-start',
   },
   title: {
     ...Typography.h1,
     color: Colors.text.primary,
-    textAlign: 'right',
+    textAlign: 'left',
+    maxWidth: '90%',
+  },
+  titleCompact: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700' as const,
+    letterSpacing: -0.2,
+    color: Colors.text.primary,
+    textAlign: 'left',
+    maxWidth: '90%',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
   timeChip: {
     flexDirection: 'row',
@@ -172,8 +244,21 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
   },
-  timeText: {
-    ...Typography.caption,
+  timeChipCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: Radius.full,
+  },
+  metaText: {
+    ...Typography.body,
+    color: Colors.text.primary,
+    fontWeight: '600',
+  },
+  metaTextCompact: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600' as const,
     color: Colors.text.primary,
   },
   cuisineChip: {
@@ -181,34 +266,55 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
   },
+  cuisineChipCompact: {
+    borderRadius: Radius.full,
+  },
   cuisineText: {
-    ...Typography.caption,
+    ...Typography.body,
     color: Colors.accent,
     fontWeight: '600',
   },
+  cuisineTextCompact: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700' as const,
+    color: Colors.accent,
+  },
   starsRow: {
     flexDirection: 'row',
-    gap: 2,
+    gap: 3,
   },
   gradientOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
+  moreIcon: {
+    position: 'absolute',
+    top: Spacing.lg,
+    right: Spacing.lg,
+    zIndex: 1,
+  },
+  moreIconCompact: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    zIndex: 1,
+  },
   titleOnImage: {
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   textOnImage: {
-    color: 'rgba(255,255,255,0.9)',
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
   cuisineTextOnImage: {
-    color: 'rgba(255,255,255,0.85)',
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    color: 'rgba(255,255,255,0.95)',
+    textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 3,
   },
 });

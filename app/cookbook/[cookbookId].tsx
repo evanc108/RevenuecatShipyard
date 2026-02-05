@@ -1,19 +1,22 @@
 import { RecentCookCard } from '@/components/cookbook/RecentCookCard';
 import { RecipeCard } from '@/components/cookbook/RecipeCard';
+import { RecipeOptionsSheet } from '@/components/cookbook/RecipeOptionsSheet';
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { useAddModal } from '@/context/AddModalContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { Icon } from '@/components/ui/Icon';
+import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMutation, useQuery } from 'convex/react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAddModal } from '@/context/AddModalContext';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -108,6 +111,7 @@ type StackedCardProps = {
   cardStep: number;
   screenWidth: number;
   onPress: () => void;
+  onMorePress?: () => void;
 };
 
 const StackedRecipeCard = memo(function StackedRecipeCard({
@@ -118,6 +122,7 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
   cardStep,
   screenWidth,
   onPress,
+  onMorePress,
 }: StackedCardProps): React.ReactElement {
   const animatedStyle = useAnimatedStyle(() => {
     const activeIndex = -translateX.value / cardStep;
@@ -192,6 +197,7 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
           difficulty={parseDifficulty(recipe.difficulty)}
           cuisine={recipe.cuisine}
           onPress={onPress}
+          onMorePress={onMorePress}
         />
       </View>
     </Animated.View>
@@ -471,6 +477,14 @@ export default function CookbookDetailScreen(): React.ReactElement {
   const { openModal } = useAddModal();
   const saveToCookbookMutation = useMutation(api.discoverFeed.saveToCookbook);
 
+  // View mode state (card = stacked carousel, grid = 2-column grid)
+  const [viewMode, setViewMode] = useState<'card' | 'grid'>('card');
+
+  // Recipe options sheet state
+  const [optionsRecipeId, setOptionsRecipeId] = useState<Id<'recipes'> | null>(null);
+  const [optionsRecipeTitle, setOptionsRecipeTitle] = useState('');
+  const [isOptionsVisible, setIsOptionsVisible] = useState(false);
+
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -677,6 +691,22 @@ export default function CookbookDetailScreen(): React.ReactElement {
     [cookbookId, saveToCookbookMutation, isAddingSuggested, playSuccessAnimation],
   );
 
+  // --- Recipe Options ---
+
+  const handleRecipeMorePress = useCallback((recipeId: Id<'recipes'>, title: string) => {
+    setOptionsRecipeId(recipeId);
+    setOptionsRecipeTitle(title);
+    setIsOptionsVisible(true);
+  }, []);
+
+  const handleCloseOptions = useCallback(() => {
+    setIsOptionsVisible(false);
+  }, []);
+
+  const handleToggleViewMode = useCallback(() => {
+    setViewMode((m) => (m === 'card' ? 'grid' : 'card'));
+  }, []);
+
   // --- Loading / Error States ---
 
   if (cookbook === undefined || (cookbook && `${cookbook._id}` !== cookbookId)) {
@@ -830,7 +860,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
             </View>
           ) : null}
 
-          {/* Your Recipes header + pagination dots inline */}
+          {/* Your Recipes header + view toggle */}
           <View style={styles.recipesHeaderRow}>
             <View style={styles.recipesHeaderTextRow}>
               <Text style={styles.recipesHeaderLight}>
@@ -841,51 +871,110 @@ export default function CookbookDetailScreen(): React.ReactElement {
               </Text>
             </View>
 
-            {/* Pagination dots — inline right */}
-            {sortedRecipes.length > 1 ? (
-              <View style={styles.dotsContainer}>
-                {sortedRecipes.map((recipe, idx) => (
-                  <PaginationDot
-                    key={recipe._id}
-                    index={idx}
-                    translateX={translateX}
-                    cardStep={cardStep}
+            {/* View mode toggle — card/grid */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Switch to ${viewMode === 'card' ? 'grid' : 'card'} view`}
+              style={styles.toggleButton}
+              onPress={handleToggleViewMode}
+              hitSlop={8}
+            >
+              <View style={styles.toggleTrack}>
+                <View
+                  style={[
+                    styles.toggleIndicator,
+                    viewMode === 'grid' ? styles.toggleIndicatorRight : null,
+                  ]}
+                />
+                <View style={styles.toggleIconContainer}>
+                  <Icon
+                    name="layers"
+                    size={18}
+                    color={viewMode === 'card' ? Colors.text.inverse : Colors.text.tertiary}
                   />
-                ))}
+                </View>
+                <View style={styles.toggleIconContainer}>
+                  <Icon
+                    name="apps"
+                    size={18}
+                    color={viewMode === 'grid' ? Colors.text.inverse : Colors.text.tertiary}
+                  />
+                </View>
               </View>
-            ) : null}
+            </Pressable>
           </View>
+
+          {/* Pagination dots — below header, only in card mode */}
+          {viewMode === 'card' && sortedRecipes.length > 1 ? (
+            <View style={styles.dotsRow}>
+              {sortedRecipes.map((recipe, idx) => (
+                <PaginationDot
+                  key={recipe._id}
+                  index={idx}
+                  translateX={translateX}
+                  cardStep={cardStep}
+                />
+              ))}
+            </View>
+          ) : null}
 
           {/* Cards section */}
           {sortedRecipes.length > 0 ? (
-            <View style={styles.carouselSection}>
-              <GestureDetector gesture={panGesture}>
-                <Animated.View style={styles.carouselTrack}>
-                  {sortedRecipes.map((recipe, idx) => (
-                    <StackedRecipeCard
-                      key={recipe._id}
-                      recipe={recipe}
-                      index={idx}
+            viewMode === 'card' ? (
+              <View style={styles.carouselSection}>
+                <GestureDetector gesture={panGesture}>
+                  <Animated.View style={styles.carouselTrack}>
+                    {sortedRecipes.map((recipe, idx) => (
+                      <StackedRecipeCard
+                        key={recipe._id}
+                        recipe={recipe}
+                        index={idx}
+                        translateX={translateX}
+                        cardWidth={cardWidth}
+                        cardStep={cardStep}
+                        screenWidth={screenWidth}
+                        onPress={() => handleRecipePress(recipe._id)}
+                        onMorePress={() => handleRecipeMorePress(recipe._id, recipe.title)}
+                      />
+                    ))}
+
+                    {/* Add Recipe card — always last */}
+                    <AddRecipeStackedCard
+                      index={sortedRecipes.length}
                       translateX={translateX}
                       cardWidth={cardWidth}
                       cardStep={cardStep}
                       screenWidth={screenWidth}
-                      onPress={() => handleRecipePress(recipe._id)}
+                      onPress={handleAddRecipe}
                     />
+                  </Animated.View>
+                </GestureDetector>
+              </View>
+            ) : (
+              /* Grid view */
+              <ScrollView
+                style={styles.gridScrollView}
+                contentContainerStyle={styles.gridContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.grid}>
+                  {sortedRecipes.map((recipe) => (
+                    <View key={recipe._id} style={styles.gridCardWrapper}>
+                      <RecipeCard
+                        title={recipe.title}
+                        imageUrl={recipe.imageUrl}
+                        totalTimeMinutes={recipe.totalTimeMinutes ?? 0}
+                        difficulty={parseDifficulty(recipe.difficulty)}
+                        cuisine={recipe.cuisine}
+                        onPress={() => handleRecipePress(recipe._id)}
+                        onMorePress={() => handleRecipeMorePress(recipe._id, recipe.title)}
+                        compact
+                      />
+                    </View>
                   ))}
-
-                  {/* Add Recipe card — always last */}
-                  <AddRecipeStackedCard
-                    index={sortedRecipes.length}
-                    translateX={translateX}
-                    cardWidth={cardWidth}
-                    cardStep={cardStep}
-                    screenWidth={screenWidth}
-                    onPress={handleAddRecipe}
-                  />
-                </Animated.View>
-              </GestureDetector>
-            </View>
+                </View>
+              </ScrollView>
+            )
           ) : (
             /* Empty: static add card fills to bottom */
             <Pressable
@@ -959,6 +1048,16 @@ export default function CookbookDetailScreen(): React.ReactElement {
           style={styles.bottomFadeGradient}
         />
       </View>
+
+      {/* Recipe options sheet */}
+      <RecipeOptionsSheet
+        visible={isOptionsVisible}
+        recipeId={optionsRecipeId}
+        recipeTitle={optionsRecipeTitle}
+        cookbookId={cookbookId as Id<'cookbooks'>}
+        onClose={handleCloseOptions}
+        onViewRecipe={handleRecipePress}
+      />
 
       {/* Success overlay */}
       {showSuccessOverlay ? (
@@ -1074,13 +1173,13 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
   },
 
-  // Your Recipes header with dots inline
+  // Your Recipes header with toggle
   recipesHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.xs,
   },
   recipesHeaderTextRow: {
     flexDirection: 'row',
@@ -1097,16 +1196,69 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
 
-  // Pagination dots — inline with header
-  dotsContainer: {
+  // View mode toggle (matches CookbookCarousel pattern)
+  toggleButton: {
+    padding: Spacing.xs,
+  },
+  toggleTrack: {
+    flexDirection: 'row',
+    width: 88,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background.tertiary,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  toggleIndicator: {
+    position: 'absolute',
+    width: 42,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.text.primary,
+    left: 2,
+    top: 2,
+  },
+  toggleIndicatorRight: {
+    left: 44,
+  },
+  toggleIconContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+
+  // Pagination dots — left-aligned below header
+  dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-start',
     gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   dot: {
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
     backgroundColor: Colors.text.primary,
+  },
+
+  // Grid view
+  gridScrollView: {
+    flex: 1,
+  },
+  gridContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  gridCardWrapper: {
+    width: (Dimensions.get('window').width - Spacing.lg * 2 - Spacing.md) / 2,
+    aspectRatio: 0.75,
   },
 
   // Stacked cards carousel — starts from top, clips at edges
