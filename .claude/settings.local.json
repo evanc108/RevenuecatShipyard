@@ -29,7 +29,13 @@
       "Bash(npx expo doctor:*)",
       "Bash(grep:*)",
       "Bash(npx expo lint:*)",
-      "Bash(npx expo install:*)"
+      "Bash(npx expo install:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git rebase:*)",
+      "Bash(GIT_EDITOR=true git rebase:*)",
+      "Bash(GIT_EDITOR=\"true\" git:*)",
+      "Bash(EDITOR=true git rebase:*)"
     ]
   }
 }
