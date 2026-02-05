@@ -302,7 +302,11 @@ export default function CookbookScreen() {
 									name="search"
 									size={18}
 									strokeWidth={2.5}
-									color={isSearchActive ? Colors.text.primary : Colors.text.inverse}
+									color={
+										isSearchActive
+											? Colors.text.primary
+											: Colors.text.inverse
+									}
 								/>
 							</Pressable>
 

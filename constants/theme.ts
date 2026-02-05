@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 export const Colors = {
-  accent: '#db6724',
+  accent: '#ED7935',
   accentDark: '#b85420',
   accentLight: '#ffa46a',
   background: {
@@ -26,10 +26,10 @@ export const Colors = {
   light: {
     text: '#1A1A1A',
     background: '#FFFFFF',
-    tint: '#db6724',
+    tint: '#ED7935',
     icon: '#6B6B6B',
     tabIconDefault: '#6B6B6B',
-    tabIconSelected: '#db6724',
+    tabIconSelected: '#ED7935',
   },
   dark: {
     text: '#ECEDEE',

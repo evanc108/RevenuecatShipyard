@@ -780,9 +780,9 @@ export default function CookbookDetailScreen(): React.ReactElement {
               >
                 <Icon
                   name="search"
-                  size={22}
+                  size={18}
                   strokeWidth={2.5}
-                  color={isSearchActive ? Colors.text.inverse : Colors.text.inverse}
+                  color={isSearchActive ? Colors.text.primary : Colors.text.inverse}
                 />
               </Pressable>
 
@@ -795,7 +795,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
                     hitSlop={8}
                     style={styles.searchCloseButton}
                   >
-                    <Icon name="close" size={18} strokeWidth={2.5} color="rgba(255,255,255,0.7)" />
+                    <Icon name="close" size={18} strokeWidth={2.5} color={Colors.text.inverse} />
                   </Pressable>
                   <TextInput
                     ref={inputRef}
@@ -1119,7 +1119,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 32,
-    lineHeight: 38,
+    lineHeight: 36,
+    fontFamily: 'Lora_700Bold',
     fontWeight: '700',
     color: Colors.text.primary,
     letterSpacing: -0.3,
@@ -1128,7 +1129,7 @@ const styles = StyleSheet.create({
     width: SEARCH_ICON_SIZE,
     height: SEARCH_ICON_SIZE,
     borderRadius: SEARCH_ICON_SIZE / 2,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.surface,
@@ -1137,7 +1138,7 @@ const styles = StyleSheet.create({
   // Search
   searchBar: {
     height: SEARCH_ICON_SIZE,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
     borderRadius: SEARCH_ICON_SIZE / 2,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1230,7 +1231,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
     left: 2,
     top: 2,
   },
@@ -1256,7 +1257,7 @@ const styles = StyleSheet.create({
   dot: {
     height: DOT_SIZE,
     borderRadius: DOT_SIZE / 2,
-    backgroundColor: Colors.text.primary,
+    backgroundColor: Colors.accent,
   },
 
   // Grid view
