@@ -1,6 +1,6 @@
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { Icon } from '@/components/ui/Icon';
 import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -9,6 +9,7 @@ type RecentCookCardProps = {
   title: string;
   imageUrl?: string;
   totalTimeMinutes: number;
+  difficulty?: number; // 1-5
   cuisine?: string;
   onPress: () => void;
   onCook: () => void;
@@ -32,10 +33,28 @@ function getPastelForTitle(title: string): string {
   return PASTEL_FALLBACKS[hash % PASTEL_FALLBACKS.length] ?? PASTEL_FALLBACKS[0];
 }
 
+function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactElement {
+  return (
+    <View style={styles.starsRow}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Icon
+          key={star}
+          name="star"
+          size={12}
+          strokeWidth={2}
+          filled={star <= difficulty}
+          color={star <= difficulty ? Colors.text.primary : Colors.text.secondary}
+        />
+      ))}
+    </View>
+  );
+}
+
 export const RecentCookCard = memo(function RecentCookCard({
   title,
   imageUrl,
   totalTimeMinutes,
+  difficulty,
   cuisine,
   onPress,
   onCook,
@@ -83,6 +102,9 @@ export const RecentCookCard = memo(function RecentCookCard({
             <View style={styles.tagChip}>
               <Text style={styles.tagText}>{cuisine}</Text>
             </View>
+          ) : null}
+          {difficulty !== undefined && difficulty > 0 ? (
+            <DifficultyStars difficulty={difficulty} />
           ) : null}
         </View>
       </View>
@@ -134,6 +156,7 @@ const styles = StyleSheet.create({
   title: {
     ...Typography.h3,
     color: Colors.text.primary,
+    paddingLeft: Spacing.xs,
   },
   tagsColumn: {
     gap: Spacing.xs,
@@ -152,6 +175,12 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.text.primary,
     fontWeight: '500',
+  },
+  starsRow: {
+    paddingVertical: Spacing.xs,
+    paddingLeft: Spacing.xs,
+    flexDirection: 'row',
+    gap: 2,
   },
   cookButton: {
     backgroundColor: Colors.text.primary,

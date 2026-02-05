@@ -44,6 +44,15 @@ export const COPY = {
     addRecipe: 'Add Recipe',
     notFound: 'Cookbook not found',
     minuteShort: 'min',
+    recipeOptions: {
+      viewRecipe: 'View Recipe',
+      moveToCookbook: 'Move to Cookbook',
+      deleteFromCookbook: 'Remove from Cookbook',
+      cancel: 'Cancel',
+      selectCookbook: 'Select Cookbook',
+      moveSuccess: 'Recipe moved',
+      deleteConfirm: 'Remove this recipe from the cookbook?',
+    },
   },
   cookbooks: {
     title: 'Cookbooks',
@@ -128,6 +137,13 @@ export const COPY = {
       submit: 'Import',
       submitActive: 'Import Recipe',
       importing: 'Importing...',
+    },
+    addRecipe: {
+      title: 'Add Recipe',
+      urlLabel: 'Recipe URL',
+      placeholder: 'Paste a recipe link...',
+      hint: 'Share from TikTok, Instagram, YouTube, or any recipe website',
+      submit: 'Add Recipe',
     },
     options: {
       importUrl: 'Import from URL',
@@ -339,6 +355,9 @@ export const COPY = {
       save: 'Save',
       saving: 'Saving...',
     },
+    cook: 'Cook',
+    mealPlan: 'Meal Plan',
+    saveToCookbook: 'Save',
   },
   socialFeed: {
     title: 'Feed',

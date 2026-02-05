@@ -171,7 +171,11 @@ export function AddModal(): React.ReactElement {
   };
 
   const handleBack = () => {
-    animateToView('main');
+    if (isCookbookContext && currentView === 'import') {
+      closeModal();
+    } else {
+      animateToView('main');
+    }
   };
 
   const handleCookbookSelect = (id: Id<'cookbooks'>) => {
@@ -265,74 +269,96 @@ export function AddModal(): React.ReactElement {
     </View>
   );
 
-  const renderImportView = () => (
-    <>
-      {/* URL Input */}
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>{copy.importUrl.urlLabel}</Text>
-        <View style={styles.urlInputContainer}>
-          <Icon name="link" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
-          <TextInput
-            ref={inputRef}
-            style={styles.urlInput}
-            placeholder={copy.importUrl.placeholder}
-            placeholderTextColor={Colors.text.tertiary}
-            value={url}
-            onChangeText={setUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            returnKeyType="done"
-          />
-          {url.length > 0 && (
-            <Pressable
-              onPress={() => setUrl('')}
-              hitSlop={8}
-              accessibilityLabel="Clear URL"
-            >
-              <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
-            </Pressable>
-          )}
-        </View>
-      </View>
+  // Whether we're in cookbook-context mode (opened from a cookbook page)
+  const isCookbookContext = initialCookbookId !== null;
 
-      {/* Cookbook Selection */}
-      <View style={styles.inputGroup}>
-        <CookbookDropdown
-          selectedId={selectedCookbookId}
-          onSelect={handleCookbookSelect}
-          error={cookbookError}
-        />
-      </View>
+  const renderImportView = () => {
+    const urlLabel = isCookbookContext ? copy.addRecipe.urlLabel : copy.importUrl.urlLabel;
+    const placeholder = isCookbookContext ? copy.addRecipe.placeholder : copy.importUrl.placeholder;
+    const canSubmit = isCookbookContext ? url.trim().length > 0 : canImport;
+    const submitLabel = isCookbookContext
+      ? copy.addRecipe.submit
+      : (selectedCookbookId ? copy.importUrl.submitActive : copy.importUrl.submit);
 
-      {/* Import Button */}
-      <Pressable
-        style={[
-          styles.importButton,
-          canImport && styles.importButtonActive,
-        ]}
-        onPress={handleImport}
-        disabled={!canImport}
-        accessibilityRole="button"
-        accessibilityLabel={copy.importUrl.submitActive}
-        accessibilityState={{ disabled: !canImport }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon
-            name="download"
-            size={20}
-            color={canImport ? Colors.text.inverse : Colors.text.disabled}
-          />
-          <Text style={[
-            styles.importButtonText,
-            !canImport && styles.importButtonTextDisabled,
-          ]}>
-            {selectedCookbookId ? copy.importUrl.submitActive : copy.importUrl.submit}
-          </Text>
+    return (
+      <>
+        {/* Social media hint — only in cookbook context */}
+        {isCookbookContext ? (
+          <View style={styles.hintContainer}>
+            <Icon name="share" size={18} color={Colors.text.tertiary} />
+            <Text style={styles.hintText}>{copy.addRecipe.hint}</Text>
+          </View>
+        ) : null}
+
+        {/* URL Input */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>{urlLabel}</Text>
+          <View style={styles.urlInputContainer}>
+            <Icon name="link" size={20} color={Colors.text.tertiary} style={styles.urlIcon} />
+            <TextInput
+              ref={inputRef}
+              style={styles.urlInput}
+              placeholder={placeholder}
+              placeholderTextColor={Colors.text.tertiary}
+              value={url}
+              onChangeText={setUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              returnKeyType="done"
+            />
+            {url.length > 0 && (
+              <Pressable
+                onPress={() => setUrl('')}
+                hitSlop={8}
+                accessibilityLabel="Clear URL"
+              >
+                <Icon name="close-circle" size={20} color={Colors.text.tertiary} />
+              </Pressable>
+            )}
+          </View>
         </View>
-      </Pressable>
-    </>
-  );
+
+        {/* Cookbook Selection — hide when opened from a cookbook page */}
+        {!isCookbookContext ? (
+          <View style={styles.inputGroup}>
+            <CookbookDropdown
+              selectedId={selectedCookbookId}
+              onSelect={handleCookbookSelect}
+              error={cookbookError}
+            />
+          </View>
+        ) : null}
+
+        {/* Import / Add Button */}
+        <Pressable
+          style={[
+            styles.importButton,
+            canSubmit && styles.importButtonActive,
+          ]}
+          onPress={handleImport}
+          disabled={!canSubmit}
+          accessibilityRole="button"
+          accessibilityLabel={submitLabel}
+          accessibilityState={{ disabled: !canSubmit }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon
+              name="download"
+              size={20}
+              color={canSubmit ? Colors.text.inverse : Colors.text.disabled}
+            />
+            <Text style={[
+              styles.importButtonText,
+              !canSubmit && styles.importButtonTextDisabled,
+            ]}>
+              {submitLabel}
+            </Text>
+          </View>
+        </Pressable>
+      </>
+    );
+  };
 
   const canShare = selectedRecipeId && easeRating > 0 && tasteRating > 0 && presentationRating > 0;
 
@@ -481,7 +507,7 @@ export function AddModal(): React.ReactElement {
   const getModalTitle = () => {
     switch (currentView) {
       case 'import':
-        return copy.importUrl.title;
+        return isCookbookContext ? copy.addRecipe.title : copy.importUrl.title;
       case 'share':
         return copy.sharePost.title;
       default:
@@ -762,6 +788,20 @@ const styles = StyleSheet.create({
   },
   importButtonTextDisabled: {
     color: Colors.text.disabled,
+  },
+  hintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  hintText: {
+    ...Typography.caption,
+    color: Colors.text.secondary,
+    flex: 1,
   },
   optionsContainer: {
     marginTop: Spacing.sm,

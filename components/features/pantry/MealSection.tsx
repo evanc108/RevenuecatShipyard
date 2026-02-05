@@ -19,7 +19,7 @@ type MealEntry = {
     imageUrl?: string;
     cuisine?: string;
     totalTimeMinutes?: number;
-    difficulty?: string;
+    difficulty?: string | number;
     calories?: number;
   };
 };

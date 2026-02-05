@@ -403,3 +403,62 @@ export const saveToCookbook = mutation({
     return recipeId;
   },
 });
+
+/**
+ * Get or create a recipe entry from a discover recipe.
+ * Used to navigate to the recipe detail page from a suggested recipe card.
+ * Does NOT add to any cookbook — just ensures the recipe exists in the recipes table.
+ */
+export const getOrCreateRecipe = mutation({
+  args: {
+    discoverRecipeId: v.id('discoverRecipes'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const discoverRecipe = await ctx.db.get(args.discoverRecipeId);
+    if (!discoverRecipe) throw new Error('Recipe not found');
+
+    // Check if this recipe already exists in the recipes table by URL
+    const existingRecipe = await ctx.db
+      .query('recipes')
+      .withIndex('by_url', (q) => q.eq('url', discoverRecipe.sourceUrl))
+      .unique();
+
+    if (existingRecipe) {
+      return existingRecipe._id;
+    }
+
+    // Copy discover recipe into the recipes table
+    const recipeId = await ctx.db.insert('recipes', {
+      url: discoverRecipe.sourceUrl,
+      createdAt: Date.now(),
+      title: discoverRecipe.title,
+      description: discoverRecipe.description,
+      cuisine: discoverRecipe.cuisine,
+      difficulty: discoverRecipe.difficulty,
+      imageUrl: discoverRecipe.imageUrl,
+      servings: discoverRecipe.servings,
+      prepTimeMinutes: discoverRecipe.prepTimeMinutes,
+      cookTimeMinutes: discoverRecipe.cookTimeMinutes,
+      totalTimeMinutes: discoverRecipe.totalTimeMinutes,
+      calories: discoverRecipe.calories,
+      proteinGrams: discoverRecipe.proteinGrams,
+      carbsGrams: discoverRecipe.carbsGrams,
+      fatGrams: discoverRecipe.fatGrams,
+      dietaryTags: discoverRecipe.dietaryTags,
+      keywords: discoverRecipe.keywords,
+      equipment: discoverRecipe.equipment,
+      creatorName: discoverRecipe.creatorName,
+      creatorProfileUrl: discoverRecipe.creatorProfileUrl,
+      ingredients: discoverRecipe.ingredients,
+      instructions: discoverRecipe.instructions,
+      methodUsed: 'website',
+      ratingCount: 0,
+      ratingSum: 0,
+    });
+
+    return recipeId;
+  },
+});

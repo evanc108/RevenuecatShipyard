@@ -324,6 +324,7 @@ export const getRecentlyCooked = query({
       imageUrl: recipe.imageUrl,
       totalTimeMinutes: recipe.totalTimeMinutes,
       cuisine: recipe.cuisine,
+      difficulty: recipe.difficulty,
       cookedAt: recentPost.createdAt,
     };
   },
@@ -414,5 +415,136 @@ export const addRecipe = mutation({
     await ctx.db.patch(args.cookbookId, { updatedAt: Date.now() });
 
     return id;
+  },
+});
+
+/**
+ * Remove a recipe from a cookbook.
+ */
+export const removeRecipe = mutation({
+  args: {
+    cookbookId: v.id('cookbooks'),
+    recipeId: v.id('recipes'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const cookbook = await ctx.db.get(args.cookbookId);
+    if (!cookbook) throw new Error('Cookbook not found');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user || cookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    const entry = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook_recipe', (q) =>
+        q.eq('cookbookId', args.cookbookId).eq('recipeId', args.recipeId)
+      )
+      .unique();
+
+    if (entry) {
+      await ctx.db.delete(entry._id);
+      await ctx.db.patch(args.cookbookId, { updatedAt: Date.now() });
+    }
+  },
+});
+
+/**
+ * Move a recipe from one cookbook to another.
+ */
+export const moveRecipe = mutation({
+  args: {
+    recipeId: v.id('recipes'),
+    fromCookbookId: v.id('cookbooks'),
+    toCookbookId: v.id('cookbooks'),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) throw new Error('User not found');
+
+    const fromCookbook = await ctx.db.get(args.fromCookbookId);
+    if (!fromCookbook || fromCookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    const toCookbook = await ctx.db.get(args.toCookbookId);
+    if (!toCookbook || toCookbook.userId !== user._id) throw new Error('Unauthorized');
+
+    // Remove from source cookbook
+    const existing = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook_recipe', (q) =>
+        q.eq('cookbookId', args.fromCookbookId).eq('recipeId', args.recipeId)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    // Check if already in target cookbook
+    const alreadyInTarget = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_cookbook_recipe', (q) =>
+        q.eq('cookbookId', args.toCookbookId).eq('recipeId', args.recipeId)
+      )
+      .unique();
+
+    if (!alreadyInTarget) {
+      await ctx.db.insert('cookbookRecipes', {
+        cookbookId: args.toCookbookId,
+        recipeId: args.recipeId,
+        addedAt: Date.now(),
+      });
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.fromCookbookId, { updatedAt: now });
+    await ctx.db.patch(args.toCookbookId, { updatedAt: now });
+  },
+});
+
+/**
+ * Check whether a recipe is in any of the user's cookbooks.
+ * Returns true if the recipe exists in at least one cookbook.
+ */
+export const isRecipeInAnyCookbook = query({
+  args: { recipeId: v.id('recipes') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return false;
+
+    // Get all cookbook-recipe entries for this recipe
+    const entries = await ctx.db
+      .query('cookbookRecipes')
+      .withIndex('by_recipe', (q) => q.eq('recipeId', args.recipeId))
+      .collect();
+
+    // Check if any of those cookbooks belong to this user
+    for (const entry of entries) {
+      const cookbook = await ctx.db.get(entry.cookbookId);
+      if (cookbook && cookbook.userId === user._id) {
+        return true;
+      }
+    }
+
+    return false;
   },
 });

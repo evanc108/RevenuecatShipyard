@@ -1,9 +1,11 @@
-import { Icon } from '@/components/ui/Icon';
+import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
 import type { IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -17,15 +19,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation, useQuery } from 'convex/react';
 
 // --- Constants ---
 
 const copy = COPY.recipeDetail;
 const HERO_HEIGHT = 360;
 const CONTENT_OVERLAP = 28;
-const STEP_CIRCLE_SIZE = 28;
 const SERVINGS_BUTTON_SIZE = 36;
 const STAR_SIZE = 28;
 const STAR_COLOR_ACTIVE = '#FFB800';
@@ -33,6 +39,8 @@ const INGREDIENT_IMAGE_SIZE = 44;
 const NAV_BUTTON_SIZE = 40;
 const HEADER_BUTTON_SIZE = 38;
 const NAV_ICON_STROKE = 2.5;
+const NAV_EXPANDED_HEIGHT = NAV_BUTTON_SIZE * 5 + Spacing.xs * 2;
+const FLOATING_BAR_HEIGHT = 56;
 
 const PASTEL_COLORS: readonly string[] = [
   '#E0D6FF', '#FFD6E0', '#D6E8FF', '#D6FFE8',
@@ -50,9 +58,9 @@ const CATEGORY_COLORS = {
 type IngredientCategory = keyof typeof CATEGORY_COLORS;
 
 const JUMP_SECTIONS: { key: string; icon: IconName }[] = [
-  { key: 'top', icon: 'home' },
+  { key: 'top', icon: 'arrow-up' },
   { key: 'nutrition', icon: 'flame' },
-  { key: 'ingredients', icon: 'layers' },
+  { key: 'ingredients', icon: 'apple' },
   { key: 'instructions', icon: 'book-open' },
 ];
 
@@ -211,8 +219,9 @@ const ingStyles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.sm + 2,
-    borderRadius: Radius.md,
+    paddingVertical: Spacing.sm + 4,
+    paddingHorizontal: Spacing.sm + 2,
+    borderRadius: Radius.lg,
     marginBottom: Spacing.sm,
   },
   imageCircle: {
@@ -223,25 +232,25 @@ const ingStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginRight: Spacing.md,
+    marginRight: Spacing.sm,
   },
   imageFallback: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
   },
   info: {
     flex: 1,
+    gap: 2,
   },
   name: {
-    ...Typography.body,
+    ...Typography.label,
     fontWeight: '700',
     color: Colors.text.primary,
   },
   detail: {
     ...Typography.bodySmall,
-    color: Colors.text.secondary,
-    marginTop: 2,
+    color: Colors.text.primary,
   },
   optional: {
     fontWeight: '400',
@@ -269,31 +278,22 @@ function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactEle
 function SectionDivider({ title }: { title: string }): React.ReactElement {
   return (
     <View style={divStyles.container}>
-      <View style={divStyles.line} />
       <Text style={divStyles.title}>{title}</Text>
-      <View style={divStyles.line} />
     </View>
   );
 }
 
 const divStyles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: Spacing.xl,
     marginBottom: Spacing.md,
-    gap: Spacing.md,
-  },
-  line: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
   },
   title: {
-    ...Typography.label,
-    color: Colors.text.secondary,
+    ...Typography.h3,
+    color: Colors.text.primary,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
 });
 
@@ -310,9 +310,21 @@ export default function RecipeDetailScreen() {
   const rateMutation = useMutation(api.recipes.rate);
   const myPost = useQuery(api.posts.getMyPostForRecipe, recipeId ? { recipeId } : 'skip');
   const updatePostMutation = useMutation(api.posts.update);
+  const isInCookbook = useQuery(
+    api.cookbooks.isRecipeInAnyCookbook,
+    recipeId ? { recipeId } : 'skip',
+  );
+  const addToCookbookMutation = useMutation(api.cookbooks.addRecipe);
 
   const [servingsMultiplier, setServingsMultiplier] = useState(1);
+  const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
+  const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
   const [jumpMenuOpen, setJumpMenuOpen] = useState(false);
+  const menuProgress = useSharedValue(0);
+
+  const navPillStyle = useAnimatedStyle(() => ({
+    height: interpolate(menuProgress.value, [0, 1], [NAV_BUTTON_SIZE, NAV_EXPANDED_HEIGHT]),
+  }));
 
   // Review edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -393,6 +405,20 @@ export default function RecipeDetailScreen() {
     setIsEditing(false);
   };
 
+  const handleSaveToCookbook = useCallback(
+    async (cookbookId: Id<'cookbooks'>) => {
+      if (!recipeId || isSavingToCookbook) return;
+      setIsSavingToCookbook(true);
+      try {
+        await addToCookbookMutation({ cookbookId, recipeId });
+        setIsSaveModalVisible(false);
+      } finally {
+        setIsSavingToCookbook(false);
+      }
+    },
+    [recipeId, addToCookbookMutation, isSavingToCookbook],
+  );
+
   const handleSectionLayout = useCallback((section: string, y: number) => {
     sectionYMap.current[section] = y;
   }, []);
@@ -400,6 +426,7 @@ export default function RecipeDetailScreen() {
   const scrollToSection = useCallback(
     (section: string) => {
       setJumpMenuOpen(false);
+      menuProgress.value = withTiming(0, { duration: 200 });
       if (section === 'top') {
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         return;
@@ -410,12 +437,18 @@ export default function RecipeDetailScreen() {
         scrollViewRef.current?.scrollTo({ y: Math.max(0, targetY), animated: true });
       }
     },
-    [],
+    [menuProgress],
   );
 
   const toggleJumpMenu = useCallback(() => {
-    setJumpMenuOpen((prev) => !prev);
-  }, []);
+    setJumpMenuOpen((prev) => {
+      const nextOpen = !prev;
+      menuProgress.value = nextOpen
+        ? withTiming(1, { duration: 250 })
+        : withTiming(0, { duration: 200 });
+      return nextOpen;
+    });
+  }, [menuProgress]);
 
   // --- Early Returns ---
 
@@ -726,37 +759,6 @@ export default function RecipeDetailScreen() {
             </>
           ) : null}
 
-          {/* Rating */}
-          <SectionDivider title={copy.rateThisRecipe} />
-          <View style={styles.ratingSection}>
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => {
-                const filled = userRating != null && star <= userRating;
-                return (
-                  <Pressable
-                    key={star}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                    onPress={() => handleRate(star)}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                  >
-                    <Icon
-                      name="star"
-                      size={STAR_SIZE}
-                      color={filled ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
-                      filled={filled}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-            {recipe.averageRating !== undefined && recipe.averageRating !== null ? (
-              <Text style={styles.avgRatingText}>
-                {copy.communityAverage(recipe.averageRating)}
-              </Text>
-            ) : null}
-          </View>
-
           {/* Nutrition */}
           {hasNutrition ? (
             <View
@@ -812,16 +814,17 @@ export default function RecipeDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Decrease servings"
-                  style={styles.servingsButton}
+                  style={[
+                    styles.servingsButton,
+                    servingsMultiplier <= 0.25 && styles.servingsButtonDisabled,
+                  ]}
                   onPress={() => adjustServings(-0.5)}
                   disabled={servingsMultiplier <= 0.25}
                 >
                   <Icon
                     name="minus"
                     size={18}
-                    color={
-                      servingsMultiplier <= 0.25 ? Colors.text.tertiary : Colors.accent
-                    }
+                    color={Colors.text.inverse}
                   />
                 </Pressable>
                 <View style={styles.servingsDisplay}>
@@ -835,14 +838,17 @@ export default function RecipeDetailScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Increase servings"
-                  style={styles.servingsButton}
+                  style={[
+                    styles.servingsButton,
+                    servingsMultiplier >= 10 && styles.servingsButtonDisabled,
+                  ]}
                   onPress={() => adjustServings(0.5)}
                   disabled={servingsMultiplier >= 10}
                 >
                   <Icon
                     name="plus"
                     size={18}
-                    color={servingsMultiplier >= 10 ? Colors.text.tertiary : Colors.accent}
+                    color={Colors.text.inverse}
                   />
                 </Pressable>
                 {servingsMultiplier !== 1 ? (
@@ -882,11 +888,13 @@ export default function RecipeDetailScreen() {
             <SectionDivider title={`${copy.instructions} (${recipe.instructions.length})`} />
 
             {recipe.instructions.map((inst) => (
-              <View key={inst.stepNumber} style={styles.instructionRow}>
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepCircleText}>{inst.stepNumber}</Text>
-                </View>
-                <View style={styles.instructionContent}>
+                <View
+                  key={inst.stepNumber}
+                  style={styles.instructionCard}
+                >
+                  <Text style={styles.stepNumber}>
+                    {inst.stepNumber}
+                  </Text>
                   <Text style={styles.instructionText}>{inst.text}</Text>
 
                   {inst.tip ? (
@@ -906,8 +914,8 @@ export default function RecipeDetailScreen() {
                       ) : null}
                       {inst.timeSeconds ? (
                         <View style={styles.instructionMetaItem}>
-                          <Icon name="clock" size={14} color={Colors.text.secondary} />
-                          <Text style={styles.instructionMetaTextMuted}>
+                          <Icon name="clock" size={14} color={Colors.text.tertiary} />
+                          <Text style={styles.instructionMetaText}>
                             {Math.ceil(inst.timeSeconds / 60)} min
                           </Text>
                         </View>
@@ -915,7 +923,6 @@ export default function RecipeDetailScreen() {
                     </View>
                   ) : null}
                 </View>
-              </View>
             ))}
           </View>
 
@@ -930,6 +937,37 @@ export default function RecipeDetailScreen() {
               </View>
             </>
           ) : null}
+
+          {/* Rating */}
+          <SectionDivider title={copy.rateThisRecipe} />
+          <View style={styles.ratingSection}>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => {
+                const filled = userRating != null && star <= userRating;
+                return (
+                  <Pressable
+                    key={star}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                    onPress={() => handleRate(star)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Icon
+                      name="star"
+                      size={STAR_SIZE}
+                      color={filled ? STAR_COLOR_ACTIVE : Colors.text.tertiary}
+                      filled={filled}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+            {recipe.averageRating !== undefined && recipe.averageRating !== null ? (
+              <Text style={styles.avgRatingText}>
+                {copy.communityAverage(recipe.averageRating)}
+              </Text>
+            ) : null}
+          </View>
 
           {/* Source Footer */}
           <View style={styles.sourceFooter}>
@@ -956,6 +994,44 @@ export default function RecipeDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* Floating Action Bar — Cook + Meal Plan */}
+      <View style={[styles.floatingBar, { paddingBottom: insets.bottom + Spacing.sm }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.cook}
+          style={styles.floatingButtonCook}
+          onPress={() => {
+            // TODO: cook action
+          }}
+        >
+          <Icon name="flame" size={18} color={Colors.text.inverse} />
+          <Text style={styles.floatingButtonText}>{copy.cook}</Text>
+        </Pressable>
+        {isInCookbook === false ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.saveToCookbook}
+            style={styles.floatingButtonMealPlan}
+            onPress={() => setIsSaveModalVisible(true)}
+          >
+            <Icon name="bookmark" size={18} color={Colors.text.primary} />
+            <Text style={styles.floatingButtonMealPlanText}>{copy.saveToCookbook}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={copy.mealPlan}
+            style={styles.floatingButtonMealPlan}
+            onPress={() => {
+              // TODO: meal plan action
+            }}
+          >
+            <Icon name="calendar" size={18} color={Colors.text.primary} />
+            <Text style={styles.floatingButtonMealPlanText}>{copy.mealPlan}</Text>
+          </Pressable>
+        )}
+      </View>
+
       {/* Floating Header — overlays on top of hero image */}
       <View style={[styles.floatingHeader, { paddingTop: insets.top + Spacing.sm }]}>
         <Pressable
@@ -965,40 +1041,31 @@ export default function RecipeDetailScreen() {
           hitSlop={12}
           style={styles.headerBackButton}
         >
-          <Icon name="arrow-back" size={22} color={Colors.text.inverse} strokeWidth={2} />
+          <Icon name="arrow-back" size={24} color={Colors.text.inverse} strokeWidth={2.5} />
         </Pressable>
 
         <View style={styles.headerRight}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Jump to section"
-            onPress={toggleJumpMenu}
-            style={styles.navButton}
-          >
-            <Icon name="menu" size={20} color={Colors.text.inverse} strokeWidth={NAV_ICON_STROKE} />
-          </Pressable>
-        </View>
-      </View>
+          <Animated.View style={[styles.navPill, navPillStyle]}>
+            {/* Menu toggle — always visible at top */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Jump to section"
+              onPress={toggleJumpMenu}
+              style={styles.navPillItem}
+            >
+              <Icon
+                name={jumpMenuOpen ? 'close' : 'menu'}
+                size={20}
+                color={Colors.text.inverse}
+                strokeWidth={NAV_ICON_STROKE}
+              />
+            </Pressable>
 
-      {/* Jump Menu — extends directly below nav button, same width, icons only */}
-      {jumpMenuOpen ? (
-        <>
-          <Pressable
-            style={styles.jumpBackdrop}
-            onPress={() => setJumpMenuOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Close menu"
-          />
-          <View
-            style={[
-              styles.jumpMenu,
-              { top: insets.top + Spacing.sm + HEADER_BUTTON_SIZE + Spacing.xs },
-            ]}
-          >
+            {/* Section shortcuts — revealed as pill expands */}
             {JUMP_SECTIONS.map((section) => (
               <Pressable
                 key={section.key}
-                style={styles.jumpMenuItem}
+                style={styles.navPillItem}
                 onPress={() => scrollToSection(section.key)}
                 accessibilityRole="button"
                 accessibilityLabel={`Go to ${section.key}`}
@@ -1011,9 +1078,31 @@ export default function RecipeDetailScreen() {
                 />
               </Pressable>
             ))}
-          </View>
-        </>
+          </Animated.View>
+        </View>
+      </View>
+
+      {/* Backdrop to close expanded nav */}
+      {jumpMenuOpen ? (
+        <Pressable
+          style={styles.jumpBackdrop}
+          onPress={() => {
+            setJumpMenuOpen(false);
+            menuProgress.value = withTiming(0, { duration: 200 });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Close menu"
+        />
       ) : null}
+
+      {/* Save to Cookbook modal */}
+      <CookbookSelectionModal
+        visible={isSaveModalVisible}
+        recipe={recipe ? { title: recipe.title, imageUrl: recipe.imageUrl, url: recipe.url } : null}
+        onClose={() => setIsSaveModalVisible(false)}
+        onSelect={handleSaveToCookbook}
+        isLoading={isSavingToCookbook}
+      />
     </View>
   );
 }
@@ -1029,7 +1118,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: Spacing.xxl,
+    paddingBottom: FLOATING_BAR_HEIGHT + Spacing.xxl + Spacing.lg,
   },
   centeredContainer: {
     flex: 1,
@@ -1039,7 +1128,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...Typography.body,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     textAlign: 'center',
   },
 
@@ -1050,7 +1139,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.sm,
@@ -1058,21 +1147,25 @@ const styles = StyleSheet.create({
   },
   headerBackButton: {
     width: HEADER_BUTTON_SIZE,
-    height: HEADER_BUTTON_SIZE,
-    borderRadius: HEADER_BUTTON_SIZE / 2,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    height: NAV_BUTTON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerRight: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
-  navButton: {
+  navPill: {
     width: NAV_BUTTON_SIZE,
-    height: NAV_BUTTON_SIZE,
     borderRadius: NAV_BUTTON_SIZE / 2,
     backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    overflow: 'hidden',
+    zIndex: 52,
+  },
+  navPillItem: {
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1155,7 +1248,7 @@ const styles = StyleSheet.create({
   },
   dietaryTagText: {
     ...Typography.caption,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
   },
 
   // Description
@@ -1184,7 +1277,7 @@ const styles = StyleSheet.create({
   },
   reviewRatingLabel: {
     ...Typography.body,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     width: 100,
   },
   starsRow: {
@@ -1196,7 +1289,7 @@ const styles = StyleSheet.create({
   },
   reviewNotesLabel: {
     ...Typography.caption,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   reviewNotesText: {
@@ -1235,7 +1328,7 @@ const styles = StyleSheet.create({
   },
   avgRatingText: {
     ...Typography.caption,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     marginTop: Spacing.sm,
   },
 
@@ -1254,12 +1347,12 @@ const styles = StyleSheet.create({
   },
   nutritionStatLabel: {
     ...Typography.caption,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     marginTop: 2,
   },
   nutritionNote: {
     ...Typography.caption,
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
     textAlign: 'center',
     marginTop: Spacing.sm,
   },
@@ -1275,9 +1368,12 @@ const styles = StyleSheet.create({
     width: SERVINGS_BUTTON_SIZE,
     height: SERVINGS_BUTTON_SIZE,
     borderRadius: SERVINGS_BUTTON_SIZE / 2,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: Colors.text.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  servingsButtonDisabled: {
+    backgroundColor: Colors.text.disabled,
   },
   servingsDisplay: {
     alignItems: 'center',
@@ -1290,7 +1386,7 @@ const styles = StyleSheet.create({
   },
   servingsOriginal: {
     ...Typography.caption,
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
     fontSize: 10,
   },
   resetButton: {
@@ -1301,29 +1397,24 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
 
-  // Instructions
-  instructionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.lg,
+  // Instructions — centered card list with shadow and bold step numbers
+  instructionCard: {
+    backgroundColor: Colors.background.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  stepCircle: {
-    width: STEP_CIRCLE_SIZE,
-    height: STEP_CIRCLE_SIZE,
-    borderRadius: STEP_CIRCLE_SIZE / 2,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-    marginTop: 2,
-  },
-  stepCircleText: {
-    ...Typography.caption,
-    color: Colors.text.inverse,
-    fontWeight: '700',
-  },
-  instructionContent: {
-    flex: 1,
+  stepNumber: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
   },
   instructionText: {
     ...Typography.body,
@@ -1356,10 +1447,6 @@ const styles = StyleSheet.create({
   },
   instructionMetaText: {
     ...Typography.caption,
-    color: Colors.accent,
-  },
-  instructionMetaTextMuted: {
-    ...Typography.caption,
     color: Colors.text.secondary,
   },
 
@@ -1369,7 +1456,7 @@ const styles = StyleSheet.create({
   },
   tagsText: {
     ...Typography.body,
-    color: Colors.text.secondary,
+    color: Colors.text.primary,
     lineHeight: 24,
   },
 
@@ -1384,7 +1471,7 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     ...Typography.bodySmall,
-    color: Colors.text.tertiary,
+    color: Colors.text.primary,
   },
   sourceLinkRow: {
     flexDirection: 'row',
@@ -1398,26 +1485,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Jump Menu — same width as nav button, icons only, extends below
+  // Floating Action Bar
+  floatingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    gap: Spacing.md,
+    ...Shadow.elevated,
+  },
+  floatingButtonCook: {
+    flex: 1,
+    height: FLOATING_BAR_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.full,
+    ...Shadow.elevated,
+  },
+  floatingButtonText: {
+    ...Typography.label,
+    color: Colors.text.inverse,
+    fontWeight: '700',
+  },
+  floatingButtonMealPlan: {
+    flex: 1,
+    height: FLOATING_BAR_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.full,
+    ...Shadow.elevated,
+  },
+  floatingButtonMealPlanText: {
+    ...Typography.label,
+    color: Colors.text.primary,
+    fontWeight: '700',
+  },
+
+  // Backdrop — closes expanded nav pill
   jumpBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 50,
-  },
-  jumpMenu: {
-    position: 'absolute',
-    right: Spacing.lg,
-    width: NAV_BUTTON_SIZE,
-    backgroundColor: Colors.text.primary,
-    borderRadius: NAV_BUTTON_SIZE / 2,
-    paddingVertical: Spacing.xs,
-    alignItems: 'center',
-    ...Shadow.elevated,
-    zIndex: 51,
-  },
-  jumpMenuItem: {
-    width: NAV_BUTTON_SIZE,
-    height: NAV_BUTTON_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
