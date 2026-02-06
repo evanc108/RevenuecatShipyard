@@ -26,6 +26,9 @@ import { ShareIntentProvider } from '@/context/ShareIntentContext';
 import { AddPantryItemModal } from '@/components/features/pantry/AddPantryItemModal';
 import { GenerateMealPlanModal } from '@/components/features/pantry/GenerateMealPlanModal';
 import { useCookbookCacheSync } from '@/hooks/useCookbookCacheSync';
+import { configureRevenueCat, identifyUser } from '@/lib/revenuecat/client';
+import { useSubscriptionStore } from '@/stores/useSubscriptionStore';
+import Purchases, { type CustomerInfo } from 'react-native-purchases';
 import '@/global.css';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -104,6 +107,26 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Sync cookbooks to App Groups for the share extension
   useCookbookCacheSync();
+
+  // Initialize RevenueCat and identify user
+  useEffect(() => {
+    if (!isSignedIn || !clerkUser?.id) return;
+
+    configureRevenueCat();
+    identifyUser(clerkUser.id).then(() => {
+      useSubscriptionStore.getState().checkSubscription();
+    });
+
+    // Listen for subscription changes
+    const onCustomerInfoUpdate = (info: CustomerInfo) => {
+      useSubscriptionStore.getState().updateFromCustomerInfo(info);
+    };
+    Purchases.addCustomerInfoUpdateListener(onCustomerInfoUpdate);
+
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(onCustomerInfoUpdate);
+    };
+  }, [isSignedIn, clerkUser?.id]);
 
   // Auth routing — reads segments inside effect, not in deps (avoids redirect loops)
   useEffect(() => {

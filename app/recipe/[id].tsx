@@ -1,5 +1,4 @@
 import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
-import type { IconName } from '@/components/ui/Icon';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
 import { RateRecipeModal } from '@/components/ui/RateRecipeModal';
@@ -12,8 +11,11 @@ import { getIngredientImageUrl } from '@/utils/ingredientImage';
 import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSubscription, type PaywallFeature } from '@/hooks/useSubscription';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -22,12 +24,6 @@ import {
   TextInput,
   View
 } from 'react-native';
-import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- Constants ---
@@ -40,7 +36,6 @@ const STAR_COLOR_ACTIVE = '#FFB800';
 const INGREDIENT_IMAGE_SIZE = 44;
 const NAV_BUTTON_SIZE = 40;
 const NAV_ICON_STROKE = 2.5;
-const NAV_EXPANDED_HEIGHT = NAV_BUTTON_SIZE * 5 + Spacing.xs * 2;
 const FLOATING_BAR_HEIGHT = 56;
 
 const PASTEL_COLORS: readonly string[] = [
@@ -63,13 +58,6 @@ const CATEGORY_COLORS = {
 } as const;
 
 type IngredientCategory = keyof typeof CATEGORY_COLORS;
-
-const JUMP_SECTIONS: { key: string; icon: IconName }[] = [
-	{ key: 'top', icon: 'arrow-up' },
-	{ key: 'nutrition', icon: 'flame' },
-	{ key: 'ingredients', icon: 'apple' },
-	{ key: 'instructions', icon: 'book-open' }
-];
 
 const DIFFICULTY_MAP: Record<string, number> = {
 	easy: 1,
@@ -402,7 +390,7 @@ const divStyles = StyleSheet.create({
 // --- Main Component ---
 
 export default function RecipeDetailScreen() {
-	const { id, scrollToReview } = useLocalSearchParams<{ id: string; scrollToReview?: string }>();
+	const { id } = useLocalSearchParams<{ id: string }>();
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
 	const { openModal: openAddModal } = useAddModal();
@@ -422,21 +410,17 @@ export default function RecipeDetailScreen() {
 		recipeId ? { recipeId } : 'skip'
 	);
 	const addToCookbookMutation = useMutation(api.cookbooks.addRecipe);
+	const addToGrocery = useMutation(api.groceryList.addFromRecipe);
+
+	const { isPro } = useSubscription();
+	const [paywallFeature, setPaywallFeature] = useState<PaywallFeature | null>(null);
 
 	const [servingsMultiplier, setServingsMultiplier] = useState(1);
 	const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
 	const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
-	const [jumpMenuOpen, setJumpMenuOpen] = useState(false);
 	const [isRateModalVisible, setIsRateModalVisible] = useState(false);
-	const menuProgress = useSharedValue(0);
-
-	const navPillStyle = useAnimatedStyle(() => ({
-		height: interpolate(
-			menuProgress.value,
-			[0, 1],
-			[NAV_BUTTON_SIZE, NAV_EXPANDED_HEIGHT]
-		)
-	}));
+	const [groceryAdded, setGroceryAdded] = useState(false);
+	const [groceryLoading, setGroceryLoading] = useState(false);
 
 	// Review edit state
 	const [isEditing, setIsEditing] = useState(false);
@@ -448,8 +432,6 @@ export default function RecipeDetailScreen() {
 
 	// Section scroll refs
 	const scrollViewRef = useRef<ScrollView>(null);
-	const contentBoxY = useRef(0);
-	const sectionYMap = useRef<Record<string, number>>({});
 
 	useEffect(() => {
 		if (myPost) {
@@ -460,25 +442,19 @@ export default function RecipeDetailScreen() {
 		}
 	}, [myPost]);
 
-	// Handle scroll to review section when coming from edit
-	useEffect(() => {
-		if (scrollToReview === 'true' && myPost) {
-			// Wait for layout to complete, then scroll to review section
-			const timer = setTimeout(() => {
-				const reviewY = sectionYMap.current['review'];
-				if (reviewY !== undefined) {
-					const targetY = contentBoxY.current + reviewY - Spacing.md;
-					scrollViewRef.current?.scrollTo({
-						y: Math.max(0, targetY),
-						animated: true
-					});
-					// Start editing immediately
-					setIsEditing(true);
-				}
-			}, 500);
-			return () => clearTimeout(timer);
+	const handleAddToGrocery = useCallback(async () => {
+		if (groceryAdded || !recipeId) return;
+		setGroceryLoading(true);
+		try {
+			await addToGrocery({ recipeId, servingsMultiplier });
+			setGroceryAdded(true);
+			setTimeout(() => setGroceryAdded(false), 2000);
+		} catch (error) {
+			console.error('Failed to add to grocery list:', error);
+		} finally {
+			setGroceryLoading(false);
 		}
-	}, [scrollToReview, myPost]);
+	}, [recipeId, servingsMultiplier, addToGrocery, groceryAdded]);
 
 	const originalServings = recipe?.servings ?? 1;
 	const adjustedServings = Math.round(originalServings * servingsMultiplier);
@@ -545,40 +521,6 @@ export default function RecipeDetailScreen() {
 		},
 		[recipeId, addToCookbookMutation, isSavingToCookbook]
 	);
-
-	const handleSectionLayout = useCallback((section: string, y: number) => {
-		sectionYMap.current[section] = y;
-	}, []);
-
-	const scrollToSection = useCallback(
-		(section: string) => {
-			setJumpMenuOpen(false);
-			menuProgress.value = withTiming(0, { duration: 200 });
-			if (section === 'top') {
-				scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-				return;
-			}
-			const sectionY = sectionYMap.current[section];
-			if (sectionY !== undefined) {
-				const targetY = contentBoxY.current + sectionY - Spacing.md;
-				scrollViewRef.current?.scrollTo({
-					y: Math.max(0, targetY),
-					animated: true
-				});
-			}
-		},
-		[menuProgress]
-	);
-
-	const toggleJumpMenu = useCallback(() => {
-		setJumpMenuOpen((prev) => {
-			const nextOpen = !prev;
-			menuProgress.value = nextOpen
-				? withTiming(1, { duration: 250 })
-				: withTiming(0, { duration: 200 });
-			return nextOpen;
-		});
-	}, [menuProgress]);
 
 	// --- Early Returns ---
 
@@ -740,9 +682,6 @@ export default function RecipeDetailScreen() {
 				{/* Content Box — rounded top, overlaps image bottom */}
 				<View
 					style={styles.contentBox}
-					onLayout={(e) => {
-						contentBoxY.current = e.nativeEvent.layout.y;
-					}}
 				>
 					{/* Title */}
 					<Text
@@ -794,14 +733,7 @@ export default function RecipeDetailScreen() {
 
 					{/* Nutrition */}
 					{hasNutrition ? (
-						<View
-							onLayout={(e) =>
-								handleSectionLayout(
-									'nutrition',
-									e.nativeEvent.layout.y
-								)
-							}
-						>
+						<View>
 							<SectionDivider title={copy.nutrition.title} />
 							<View style={styles.nutritionGrid}>
 								{recipe.calories ? (
@@ -867,14 +799,7 @@ export default function RecipeDetailScreen() {
 					) : null}
 
 					{/* Ingredients */}
-					<View
-						onLayout={(e) =>
-							handleSectionLayout(
-								'ingredients',
-								e.nativeEvent.layout.y
-							)
-						}
-					>
+					<View>
 						<SectionDivider
 							title={`${copy.ingredients} (${recipe.ingredients.length})`}
 						/>
@@ -960,14 +885,7 @@ export default function RecipeDetailScreen() {
 					</View>
 
 					{/* Instructions */}
-					<View
-						onLayout={(e) =>
-							handleSectionLayout(
-								'instructions',
-								e.nativeEvent.layout.y
-							)
-						}
-					>
+					<View>
 						<SectionDivider
 							title={`${copy.instructions} (${recipe.instructions.length})`}
 						/>
@@ -1062,11 +980,7 @@ export default function RecipeDetailScreen() {
 
 					{/* Your Review or Rate This Recipe */}
 					{myPost ? (
-						<View
-							onLayout={(e) =>
-								handleSectionLayout('review', e.nativeEvent.layout.y)
-							}
-						>
+						<View>
 							<SectionDivider title={copy.yourReview.title} />
 							<View style={styles.reviewSectionFlat}>
 								<View style={styles.reviewHeader}>
@@ -1334,7 +1248,7 @@ export default function RecipeDetailScreen() {
 				</View>
 			</ScrollView>
 
-			{/* Floating Action Bar — Cook + Save/Post */}
+			{/* Floating Action Bar — Cook + Save/Meal Plan + Post */}
 			<View
 				style={[
 					styles.floatingBar,
@@ -1346,6 +1260,10 @@ export default function RecipeDetailScreen() {
 					accessibilityLabel={copy.cook}
 					style={styles.floatingButtonCook}
 					onPress={() => {
+						if (!isPro) {
+							setPaywallFeature('cook');
+							return;
+						}
 						router.push(`/recipe/cook/${recipeId}`);
 					}}
 				>
@@ -1374,6 +1292,10 @@ export default function RecipeDetailScreen() {
 						accessibilityLabel={copy.mealPlan}
 						style={styles.floatingButtonMealPlan}
 						onPress={() => {
+							if (!isPro) {
+								setPaywallFeature('mealPlan');
+								return;
+							}
 							// TODO: meal plan action
 						}}
 					>
@@ -1423,55 +1345,30 @@ export default function RecipeDetailScreen() {
 				</Pressable>
 
 				<View style={styles.headerRight}>
-					<Animated.View style={[styles.navPill, navPillStyle]}>
-						{/* Menu toggle — always visible at top */}
-						<Pressable
-							accessibilityRole="button"
-							accessibilityLabel="Jump to section"
-							onPress={toggleJumpMenu}
-							style={styles.navPillItem}
-						>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel={groceryAdded ? copy.addedToCart : copy.addToCart}
+						style={[
+							styles.headerCartButton,
+							groceryAdded && styles.headerCartButtonAdded,
+						]}
+						onPress={handleAddToGrocery}
+						disabled={groceryLoading || groceryAdded}
+						hitSlop={8}
+					>
+						{groceryLoading ? (
+							<ActivityIndicator size="small" color={Colors.text.inverse} />
+						) : (
 							<Icon
-								name={jumpMenuOpen ? 'close' : 'menu'}
+								name={groceryAdded ? 'check' : 'cart'}
 								size={20}
 								color={Colors.text.inverse}
 								strokeWidth={NAV_ICON_STROKE}
 							/>
-						</Pressable>
-
-						{/* Section shortcuts — revealed as pill expands */}
-						{JUMP_SECTIONS.map((section) => (
-							<Pressable
-								key={section.key}
-								style={styles.navPillItem}
-								onPress={() => scrollToSection(section.key)}
-								accessibilityRole="button"
-								accessibilityLabel={`Go to ${section.key}`}
-							>
-								<Icon
-									name={section.icon}
-									size={20}
-									color={Colors.text.inverse}
-									strokeWidth={NAV_ICON_STROKE}
-								/>
-							</Pressable>
-						))}
-					</Animated.View>
+						)}
+					</Pressable>
 				</View>
 			</View>
-
-			{/* Backdrop to close expanded nav */}
-			{jumpMenuOpen ? (
-				<Pressable
-					style={styles.jumpBackdrop}
-					onPress={() => {
-						setJumpMenuOpen(false);
-						menuProgress.value = withTiming(0, { duration: 200 });
-					}}
-					accessibilityRole="button"
-					accessibilityLabel="Close menu"
-				/>
-			) : null}
 
 			{/* Save to Cookbook modal */}
 			<CookbookSelectionModal
@@ -1495,6 +1392,13 @@ export default function RecipeDetailScreen() {
 				recipeId={recipeId}
 				recipeTitle={recipe?.title ?? ''}
 				onClose={() => setIsRateModalVisible(false)}
+			/>
+
+			{/* Paywall Modal */}
+			<PaywallModal
+				visible={paywallFeature !== null}
+				onClose={() => setPaywallFeature(null)}
+				feature={paywallFeature ?? 'cook'}
 			/>
 		</View>
 	);
@@ -1548,23 +1452,20 @@ const styles = StyleSheet.create({
 	},
 	headerRight: {
 		flexDirection: 'row',
-		alignItems: 'flex-start'
+		alignItems: 'flex-start',
+		gap: Spacing.sm,
 	},
-	navPill: {
+	headerCartButton: {
 		width: NAV_BUTTON_SIZE,
+		height: NAV_BUTTON_SIZE,
 		borderRadius: NAV_BUTTON_SIZE / 2,
 		backgroundColor: Colors.text.primary,
 		alignItems: 'center',
-		overflow: 'hidden',
-		zIndex: 52
+		justifyContent: 'center',
 	},
-	navPillItem: {
-		width: NAV_BUTTON_SIZE,
-		height: NAV_BUTTON_SIZE,
-		alignItems: 'center',
-		justifyContent: 'center'
+	headerCartButtonAdded: {
+		backgroundColor: Colors.semantic.success,
 	},
-
 	// Hero — full bleed
 	heroContainer: {
 		overflow: 'hidden'
@@ -1951,10 +1852,4 @@ const styles = StyleSheet.create({
 		borderRadius: Radius.full,
 		...Shadow.elevated
 	},
-
-	// Backdrop — closes expanded nav pill
-	jumpBackdrop: {
-		...StyleSheet.absoluteFillObject,
-		zIndex: 50
-	}
 });

@@ -508,6 +508,31 @@ export const getUserRating = query({
 });
 
 /**
+ * Count how many recipes the authenticated user has saved.
+ */
+export const countSaved = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { count: 0 };
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return { count: 0 };
+
+    const saved = await ctx.db
+      .query('userSavedRecipes')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect();
+
+    return { count: saved.length };
+  },
+});
+
+/**
  * Delete user's rating for a recipe.
  */
 export const deleteRating = mutation({

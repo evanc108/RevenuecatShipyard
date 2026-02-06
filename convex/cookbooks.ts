@@ -99,14 +99,6 @@ export const create = mutation({
       }
     }
 
-    // Check if this is the user's first cookbook
-    const existingCookbook = await ctx.db
-      .query('cookbooks')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .first();
-
-    const isFirstCookbook = existingCookbook === null;
-
     const now = Date.now();
     const cookbookId = await ctx.db.insert('cookbooks', {
       userId: user._id,
@@ -116,20 +108,6 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
-
-    // Auto-populate the first cookbook with all existing recipes
-    if (isFirstCookbook) {
-      const allRecipes = await ctx.db.query('recipes').collect();
-      await Promise.all(
-        allRecipes.map((recipe) =>
-          ctx.db.insert('cookbookRecipes', {
-            cookbookId,
-            recipeId: recipe._id,
-            addedAt: now,
-          })
-        )
-      );
-    }
 
     return cookbookId;
   },

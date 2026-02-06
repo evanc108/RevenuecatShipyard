@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
+  Alert,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
@@ -17,6 +18,8 @@ import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { ONBOARDING_COPY, DIETARY_RESTRICTIONS } from '@/constants/onboarding';
 import { Colors, NAV_BUTTON_SIZE, Spacing, Radius, Typography } from '@/constants/theme';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 
 export default function DietaryScreen() {
   const router = useRouter();
@@ -29,6 +32,8 @@ export default function DietaryScreen() {
   );
   const [dislikes, setDislikes] = useState<string[]>([]);
   const [dislikeInput, setDislikeInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const completeOnboarding = useMutation(api.users.completeOnboarding);
 
   const toggleRestriction = (restriction: string) => {
     setSelectedRestrictions((prev) =>
@@ -50,26 +55,28 @@ export default function DietaryScreen() {
     setDislikes((prev) => prev.filter((d) => d !== ingredient));
   };
 
+  const finishOnboarding = async (dietary: string[], ingredientDislikes: string[]) => {
+    try {
+      setIsSaving(true);
+      await completeOnboarding({
+        goals: JSON.parse(params.goals || '[]'),
+        dietaryRestrictions: dietary,
+        ingredientDislikes: ingredientDislikes,
+      });
+      router.replace('/(tabs)');
+    } catch {
+      Alert.alert('Oops', 'Something went wrong. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleContinue = () => {
-    router.push({
-      pathname: '/(onboarding)/first-recipe',
-      params: {
-        goals: params.goals,
-        dietary: JSON.stringify(selectedRestrictions),
-        dislikes: JSON.stringify(dislikes),
-      },
-    });
+    finishOnboarding(selectedRestrictions, dislikes);
   };
 
   const handleSkip = () => {
-    router.push({
-      pathname: '/(onboarding)/first-recipe',
-      params: {
-        goals: params.goals,
-        dietary: JSON.stringify([]),
-        dislikes: JSON.stringify([]),
-      },
-    });
+    finishOnboarding([], []);
   };
 
   const bottomBarContent = (
@@ -79,11 +86,11 @@ export default function DietaryScreen() {
     >
       <View style={styles.bottomLeft}>
         <PageIndicator current={6} />
-        <Pressable onPress={handleSkip} hitSlop={8}>
+        <Pressable onPress={handleSkip} hitSlop={8} disabled={isSaving}>
           <Text style={styles.skipText}>{copy.skip}</Text>
         </Pressable>
       </View>
-      <PageTurnButton label="Next >" onPress={handleContinue} />
+      <PageTurnButton label="Done" onPress={handleContinue} disabled={isSaving} />
     </Animated.View>
   );
 
