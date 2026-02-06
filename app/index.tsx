@@ -1,22 +1,22 @@
 import { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
-import { useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  runOnJS,
 } from 'react-native-reanimated';
 import { PlaceholderAsset } from '@/components/onboarding/PlaceholderAsset';
 import { Colors, Typography } from '@/constants/theme';
 
+/**
+ * Splash screen that shows briefly, then redirects.
+ * AuthGuard in _layout.tsx handles all routing logic - we just redirect to welcome
+ * and let AuthGuard decide where to actually go based on auth state.
+ */
 export default function SplashScreen() {
-  const router = useRouter();
-  const { isSignedIn, isLoaded } = useAuth();
-  const convexUser = useQuery(api.users.current);
+  const { isLoaded } = useAuth();
 
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.9);
@@ -26,33 +26,10 @@ export default function SplashScreen() {
     scale.value = withTiming(1, { duration: 400 });
   }, []);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    // Wait for Convex user to load when signed in
-    if (isSignedIn && convexUser === undefined) return;
-
-    const navigate = () => {
-      if (isSignedIn) {
-        const hasOnboarded = convexUser?.hasCompletedOnboarding ?? false;
-        if (hasOnboarded) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/(onboarding)/profile-setup');
-        }
-      } else {
-        router.replace('/(onboarding)/welcome');
-      }
-    };
-
-    const timer = setTimeout(() => {
-      opacity.value = withTiming(0, { duration: 300 }, () => {
-        runOnJS(navigate)();
-      });
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [isLoaded, isSignedIn, convexUser]);
+  // Once Clerk is loaded, redirect to welcome - AuthGuard will handle actual routing
+  if (isLoaded) {
+    return <Redirect href="/(onboarding)/welcome" />;
+  }
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

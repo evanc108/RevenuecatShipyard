@@ -12,7 +12,8 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSSO, useSignIn, useAuth } from '@clerk/clerk-expo';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -40,6 +41,9 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Generate redirect URL for OAuth - needed for Expo Go on physical devices
+  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
+
   const handleSSO = useCallback(
     async (strategy: 'oauth_apple' | 'oauth_google') => {
       const provider = strategy === 'oauth_apple' ? 'apple' : 'google';
@@ -52,7 +56,10 @@ export default function AuthScreen() {
           await signOut();
         }
 
-        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive } = await startSSOFlow({ strategy });
+        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive } = await startSSOFlow({
+          strategy,
+          redirectUrl,
+        });
 
         // Handle completed sign-up (new user via SSO) - redirect to onboarding
         // Check this FIRST since createdSessionId can be set for new users too
@@ -84,11 +91,11 @@ export default function AuthScreen() {
         setIsLoading(null);
       }
     },
-    [startSSOFlow, copy.errorFallback, router, mode],
+    [startSSOFlow, copy.errorFallback, router, redirectUrl, isSignedIn, signOut],
   );
 
   const handleEmailSignIn = async () => {
-    if (!isSignInLoaded || !signIn) return;
+    if (!isSignInLoaded || !signIn || isLoading) return;
     setError('');
 
     try {

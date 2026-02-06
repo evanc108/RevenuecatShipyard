@@ -1,6 +1,7 @@
 import { useSSO, useSignIn, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -27,6 +28,9 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  // Generate redirect URL for OAuth - needed for Expo Go on physical devices
+  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
 
   const onSignIn = async () => {
     if (!isLoaded) return;
@@ -57,7 +61,10 @@ export default function SignInScreen() {
           await signOut();
         }
 
-        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive: setOAuthActive } = await startSSOFlow({ strategy });
+        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive: setOAuthActive } = await startSSOFlow({
+          strategy,
+          redirectUrl,
+        });
 
         // Handle completed sign-up (new user via SSO) - redirect to onboarding
         // Check this FIRST since createdSessionId can be set for new users too
@@ -88,7 +95,7 @@ export default function SignInScreen() {
         setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
       }
     },
-    [startSSOFlow, router],
+    [startSSOFlow, router, redirectUrl, isSignedIn, signOut],
   );
 
   return (

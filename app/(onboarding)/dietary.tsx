@@ -4,9 +4,9 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  ScrollView,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -72,6 +72,21 @@ export default function DietaryScreen() {
     });
   };
 
+  const bottomBarContent = (
+    <Animated.View
+      entering={FadeInUp.delay(200).duration(400)}
+      style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.sm }]}
+    >
+      <View style={styles.bottomLeft}>
+        <PageIndicator current={6} />
+        <Pressable onPress={handleSkip} hitSlop={8}>
+          <Text style={styles.skipText}>{copy.skip}</Text>
+        </Pressable>
+      </View>
+      <PageTurnButton label="Next >" onPress={handleContinue} />
+    </Animated.View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Pressable
@@ -90,11 +105,9 @@ export default function DietaryScreen() {
         <Icon name="chevron-back" size={28} color={Colors.text.primary} />
       </Pressable>
 
-      <ScrollView
-        style={styles.scrollView}
+      <KeyboardAwareScrollView
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        bottomBar={bottomBarContent}
       >
         <Text style={styles.headline}>{copy.headline}</Text>
         <Text style={styles.subhead}>{copy.subhead}</Text>
@@ -136,22 +149,7 @@ export default function DietaryScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
-
-      <Animated.View
-        entering={FadeInUp.delay(200).duration(400)}
-        style={styles.bottomBar}
-      >
-        <View
-          style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
-        >
-          <PageIndicator current={6} />
-          <Pressable onPress={handleSkip} hitSlop={8}>
-            <Text style={styles.skipText}>{copy.skip}</Text>
-          </Pressable>
-        </View>
-        <PageTurnButton label="Next >" onPress={handleContinue} />
-      </Animated.View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -166,9 +164,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     alignSelf: 'flex-start' as const,
-  },
-  scrollView: {
-    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: Spacing.lg,

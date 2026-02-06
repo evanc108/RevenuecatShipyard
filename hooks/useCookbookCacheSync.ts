@@ -32,8 +32,8 @@ export function useCookbookCacheSync(): void {
     if (json === lastJsonRef.current) return;
     lastJsonRef.current = json;
 
-    setCachedCookbooks(mapped).catch((err) => {
-      console.warn('Failed to sync cookbooks to App Groups:', err);
+    setCachedCookbooks(mapped).catch(() => {
+      // Silently ignore - this is expected in Expo Go where native module isn't available
     });
   }, [cookbooks]);
 }

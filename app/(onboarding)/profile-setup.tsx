@@ -4,15 +4,13 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -81,167 +79,151 @@ export default function ProfileSetupScreen() {
     isUsernameAvailable;
   const photoLabel = localImageUri ? copy.changePhoto : copy.addPhoto;
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  const bottomBarContent = (
+    <Animated.View
+      entering={FadeInUp.delay(200).duration(400)}
+      style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.sm }]}
     >
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(onboarding)/sign-up');
-            }
-          }}
-          hitSlop={8}
-          style={styles.backButton}
-        >
-          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
-        </Pressable>
+      <View style={styles.bottomLeft}>
+        <PageIndicator current={4} total={7} />
+      </View>
+      <PageTurnButton
+        label="Next >"
+        onPress={handleContinue}
+        disabled={!canContinue || isSaving}
+      />
+    </Animated.View>
+  );
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View entering={FadeInDown.duration(400)}>
-            <Text style={styles.headline}>{copy.headline}</Text>
-            <Text style={styles.subhead}>{copy.subhead}</Text>
-          </Animated.View>
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        onPress={() => router.back()}
+        hitSlop={8}
+        style={styles.backButton}
+      >
+        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+      </Pressable>
 
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(400)}
-            style={styles.avatarSection}
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Select profile photo"
-              onPress={handlePickImage}
-              disabled={isUploading}
-              style={styles.avatarContainer}
-            >
-              {isUploading ? (
-                <View style={styles.avatarPlaceholder}>
-                  <ActivityIndicator size="large" color={Colors.accent} />
-                </View>
-              ) : localImageUri ? (
-                <Image
-                  source={{ uri: localImageUri }}
-                  style={styles.avatarImage}
-                  contentFit="cover"
-                  transition={200}
-                />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Icon name="camera" size={40} color={Colors.text.tertiary} />
-                </View>
-              )}
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={photoLabel}
-              onPress={handlePickImage}
-              hitSlop={8}
-              disabled={isUploading}
-            >
-              <Text style={styles.photoLabel}>{photoLabel}</Text>
-            </Pressable>
-          </Animated.View>
-
-          <Animated.View
-            entering={FadeInDown.delay(150).duration(400)}
-            style={styles.formSection}
-          >
-            <TextInput
-              style={styles.textInput}
-              placeholder={copy.firstNamePlaceholder}
-              placeholderTextColor={Colors.text.tertiary}
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-              autoCorrect={false}
-              textContentType="givenName"
-              returnKeyType="next"
-              accessibilityLabel={copy.firstNamePlaceholder}
-            />
-
-            <TextInput
-              style={styles.textInput}
-              placeholder={copy.lastNamePlaceholder}
-              placeholderTextColor={Colors.text.tertiary}
-              value={lastName}
-              onChangeText={setLastName}
-              autoCapitalize="words"
-              autoCorrect={false}
-              textContentType="familyName"
-              returnKeyType="next"
-              accessibilityLabel={copy.lastNamePlaceholder}
-            />
-
-            <View style={styles.usernameContainer}>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  styles.usernameInput,
-                  username.length >= 3 && !isUsernameAvailable && styles.inputError,
-                ]}
-                placeholder="@username"
-                placeholderTextColor={Colors.text.tertiary}
-                value={username}
-                onChangeText={(text) => setUsername(text.replace(/\s/g, ''))}
-                autoCapitalize="none"
-                autoCorrect={false}
-                textContentType="username"
-                returnKeyType="done"
-                accessibilityLabel="Username"
-              />
-              {username.length >= 3 && (
-                <View style={styles.usernameStatus}>
-                  {usernameCheck === undefined ? (
-                    <ActivityIndicator size="small" color={Colors.text.tertiary} />
-                  ) : isUsernameAvailable ? (
-                    <Icon name="checkmark-circle" size={20} color={Colors.semantic.success} />
-                  ) : (
-                    <Icon name="close-circle" size={20} color={Colors.semantic.error} />
-                  )}
-                </View>
-              )}
-            </View>
-            {username.length >= 3 && !isUsernameAvailable && usernameCheck !== undefined && (
-              <Text style={styles.usernameError}>Username is already taken</Text>
-            )}
-          </Animated.View>
-        </ScrollView>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.scrollContent}
+        bottomBar={bottomBarContent}
+      >
+        <Animated.View entering={FadeInDown.duration(400)}>
+          <Text style={styles.headline}>{copy.headline}</Text>
+          <Text style={styles.subhead}>{copy.subhead}</Text>
+        </Animated.View>
 
         <Animated.View
-          entering={FadeInUp.delay(200).duration(400)}
-          style={styles.bottomBar}
+          entering={FadeInDown.delay(100).duration(400)}
+          style={styles.avatarSection}
         >
-          <View
-            style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Select profile photo"
+            onPress={handlePickImage}
+            disabled={isUploading}
+            style={styles.avatarContainer}
           >
-            <PageIndicator current={4} total={7} />
-          </View>
-          <PageTurnButton
-            label="Next >"
-            onPress={handleContinue}
-            disabled={!canContinue || isSaving}
-          />
+            {isUploading ? (
+              <View style={styles.avatarPlaceholder}>
+                <ActivityIndicator size="large" color={Colors.accent} />
+              </View>
+            ) : localImageUri ? (
+              <Image
+                source={{ uri: localImageUri }}
+                style={styles.avatarImage}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Icon name="camera" size={40} color={Colors.text.tertiary} />
+              </View>
+            )}
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={photoLabel}
+            onPress={handlePickImage}
+            hitSlop={8}
+            disabled={isUploading}
+          >
+            <Text style={styles.photoLabel}>{photoLabel}</Text>
+          </Pressable>
         </Animated.View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(400)}
+          style={styles.formSection}
+        >
+          <TextInput
+            style={styles.textInput}
+            placeholder={copy.firstNamePlaceholder}
+            placeholderTextColor={Colors.text.tertiary}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            textContentType="givenName"
+            returnKeyType="next"
+            accessibilityLabel={copy.firstNamePlaceholder}
+          />
+
+          <TextInput
+            style={styles.textInput}
+            placeholder={copy.lastNamePlaceholder}
+            placeholderTextColor={Colors.text.tertiary}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+            autoCorrect={false}
+            textContentType="familyName"
+            returnKeyType="next"
+            accessibilityLabel={copy.lastNamePlaceholder}
+          />
+
+          <View style={styles.usernameContainer}>
+            <TextInput
+              style={[
+                styles.textInput,
+                styles.usernameInput,
+                username.length >= 3 && !isUsernameAvailable && styles.inputError,
+              ]}
+              placeholder="@username"
+              placeholderTextColor={Colors.text.tertiary}
+              value={username}
+              onChangeText={(text) => setUsername(text.replace(/\s/g, ''))}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="username"
+              returnKeyType="done"
+              accessibilityLabel="Username"
+            />
+            {username.length >= 3 && (
+              <View style={styles.usernameStatus}>
+                {usernameCheck === undefined ? (
+                  <ActivityIndicator size="small" color={Colors.text.tertiary} />
+                ) : isUsernameAvailable ? (
+                  <Icon name="checkmark-circle" size={20} color={Colors.semantic.success} />
+                ) : (
+                  <Icon name="close-circle" size={20} color={Colors.semantic.error} />
+                )}
+              </View>
+            )}
+          </View>
+          {username.length >= 3 && !isUsernameAvailable && usernameCheck !== undefined && (
+            <Text style={styles.usernameError}>Username is already taken</Text>
+          )}
+        </Animated.View>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary,
@@ -251,9 +233,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     alignSelf: 'flex-start' as const,
-  },
-  scrollView: {
-    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: Spacing.lg,

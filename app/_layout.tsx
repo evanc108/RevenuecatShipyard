@@ -41,28 +41,41 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const hasNavigated = useRef(false);
   const isCreatingUser = useRef(false);
+  const createAttempts = useRef(0);
 
   // Ensure a Convex user record exists when signed in
   useEffect(() => {
     // convexUser: undefined = loading, null = not found, object = exists
-    // undefined !== null → true, so loading is skipped
-    // object !== null → true, so existing user is skipped
-    // null !== null → false, so we proceed to create
+    // Only proceed if: signed in, have clerk user, convexUser is null (not found), not already creating
     if (!isSignedIn || !clerkUser || convexUser !== null || isCreatingUser.current) return;
+
+    // Limit retry attempts to prevent rate limiting - only try once per session
+    if (createAttempts.current >= 1) {
+      return;
+    }
 
     const email = clerkUser.emailAddresses[0]?.emailAddress;
     if (!email) return;
 
     isCreatingUser.current = true;
+    createAttempts.current += 1;
+
     createOrGet({
       email,
       firstName: clerkUser.firstName ?? undefined,
       lastName: clerkUser.lastName ?? undefined,
       imageUrl: clerkUser.imageUrl ?? undefined,
-    }).catch(() => {
-      // May fail if Convex token hasn't arrived yet; will retry on next query update
-      isCreatingUser.current = false;
-    });
+    })
+      .then(() => {
+        // Success - the query should update automatically
+        isCreatingUser.current = false;
+      })
+      .catch(() => {
+        // Failed - don't retry automatically, let timeout fallback handle it
+        isCreatingUser.current = false;
+      });
+    // Note: createOrGet intentionally not in deps - we only want to trigger on auth state changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, clerkUser?.id, convexUser]);
 
   // Reset refs on sign out
@@ -70,8 +83,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isSignedIn) {
       isCreatingUser.current = false;
       hasNavigated.current = false;
+      createAttempts.current = 0;
     }
   }, [isSignedIn]);
+
+  // Timeout fallback: if signed in but convexUser never resolves, force navigation
+  useEffect(() => {
+    if (!isSignedIn || !isLoaded || convexUser || hasNavigated.current) return;
+
+    const timeout = setTimeout(() => {
+      if (isSignedIn && !convexUser && !hasNavigated.current) {
+        console.warn('AuthGuard: Timeout waiting for Convex user, forcing navigation');
+        hasNavigated.current = true;
+        router.replace('/(onboarding)/profile-setup');
+      }
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [isSignedIn, isLoaded, convexUser, router]);
 
   // Sync cookbooks to App Groups for the share extension
   useCookbookCacheSync();

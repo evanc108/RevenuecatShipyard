@@ -39,8 +39,8 @@ export function usePendingShareImports(): void {
       }
 
       await clearPendingImports();
-    } catch (err) {
-      console.warn('Failed to process pending share imports:', err);
+    } catch {
+      // Silently ignore - this is expected in Expo Go where native module isn't available
     } finally {
       isProcessingRef.current = false;
     }
@@ -55,8 +55,7 @@ export function usePendingShareImports(): void {
       try {
         cookbookId = await createCookbook({ name: item.newCookbookName });
         cookbookName = item.newCookbookName;
-      } catch (err) {
-        console.warn('Failed to create cookbook for share import:', err);
+      } catch {
         // Continue without cookbook — recipe still gets imported
       }
     } else if (item.cookbookId) {
