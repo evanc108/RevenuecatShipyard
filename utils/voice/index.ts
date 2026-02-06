@@ -10,6 +10,8 @@ export {
   precacheText,
   precacheTexts,
   precacheCommonResponses,
+  // Audio session synchronization
+  onAudioSessionReleased,
 } from './textToSpeech';
 
 export {

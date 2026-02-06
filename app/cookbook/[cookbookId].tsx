@@ -4,7 +4,7 @@ import { RecipeOptionsSheet } from '@/components/cookbook/RecipeOptionsSheet';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
 import { COPY } from '@/constants/copy';
-import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useAddModal } from '@/context/AddModalContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -81,7 +81,7 @@ type CookbookRecipe = {
 
 // --- Constants ---
 
-const SEARCH_ICON_SIZE = 48;
+const SEARCH_ICON_SIZE = 40;
 const STROKE_FILL_PRIMARY = '#EEEEF3';
 const STROKE_FILL_SECONDARY = '#F2F2F6';
 const SWIPE_VELOCITY_THRESHOLD = 500;
@@ -902,13 +902,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel="Go back"
+						style={styles.backButton}
 						onPress={() => router.back()}
 						hitSlop={12}
 					>
 						<Icon
 							name="arrow-back"
-							size={24}
-							color={Colors.text.primary}
+							size={20}
+							color={Colors.text.inverse}
+							strokeWidth={2}
 						/>
 					</Pressable>
 				</View>
@@ -932,13 +934,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel="Go back"
+						style={styles.backButton}
 						onPress={() => router.back()}
 						hitSlop={12}
 					>
 						<Icon
 							name="arrow-back"
-							size={24}
-							color={Colors.text.primary}
+							size={20}
+							color={Colors.text.inverse}
+							strokeWidth={2}
 						/>
 					</Pressable>
 
@@ -1345,14 +1349,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					pointerEvents="none"
 				>
 					<Animated.View style={successIconAnimatedStyle}>
-						<View style={styles.successIconCircle}>
-							<Icon
-								name="check"
-								size={40}
-								color={Colors.background.primary}
-								strokeWidth={3}
-							/>
-						</View>
+						<Image
+							source={require('@/assets/images/loading_icon.svg')}
+							style={styles.successLoadingIcon}
+							contentFit="contain"
+						/>
 					</Animated.View>
 				</Animated.View>
 			) : null}
@@ -1379,6 +1380,14 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between'
+	},
+	backButton: {
+		width: NAV_BUTTON_SIZE,
+		height: NAV_BUTTON_SIZE,
+		borderRadius: NAV_BUTTON_SIZE / 2,
+		backgroundColor: Colors.text.primary,
+		alignItems: 'center',
+		justifyContent: 'center'
 	},
 	headerActions: {
 		flexDirection: 'row',
@@ -1643,17 +1652,13 @@ const styles = StyleSheet.create({
 	// Success overlay
 	successOverlay: {
 		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(255,255,255,0.97)',
+		backgroundColor: '#FFFFFF',
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 999
 	},
-	successIconCircle: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: Colors.semantic.success,
-		alignItems: 'center',
-		justifyContent: 'center'
+	successLoadingIcon: {
+		width: 200,
+		height: 200
 	}
 });

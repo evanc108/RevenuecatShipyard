@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 
 type ProfilePostCardProps = {
@@ -13,6 +14,7 @@ type ProfilePostCardProps = {
   notes?: string | null;
   createdAt: number;
   onPress: () => void;
+  onMenuPress?: () => void;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -54,6 +56,7 @@ export const ProfilePostCard = memo(function ProfilePostCard({
   notes,
   createdAt,
   onPress,
+  onMenuPress,
 }: ProfilePostCardProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(recipeTitle);
 
@@ -79,6 +82,20 @@ export const ProfilePostCard = memo(function ProfilePostCard({
             <Ionicons name="restaurant-outline" size={48} color={Colors.text.tertiary} />
           </View>
         )}
+        {onMenuPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Post options"
+            style={styles.menuButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onMenuPress();
+            }}
+            hitSlop={12}
+          >
+            <Icon name="apps" size={22} color={Colors.text.inverse} />
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Content */}
@@ -114,6 +131,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: IMAGE_HEIGHT,
+    position: 'relative',
   },
   image: {
     width: '100%',
@@ -123,6 +141,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuButton: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    padding: Spacing.xs,
   },
   content: {
     padding: Spacing.md,

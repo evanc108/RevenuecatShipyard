@@ -1,35 +1,36 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Animated,
-  Dimensions,
-  useWindowDimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@clerk/clerk-expo';
-import { useQuery, useMutation } from 'convex/react';
-import { useRouter } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
-import { Image } from 'expo-image';
-import { Icon } from '@/components/ui/Icon';
-import { Loading } from '@/components/ui/Loading';
-import { api } from '@/convex/_generated/api';
-import { Avatar } from '@/components/ui/Avatar';
-import { ProfileStats } from '@/components/ui/ProfileStats';
 import { CookbookCard } from '@/components/cookbook/CookbookCard';
 import { CookbookOptionsSheet } from '@/components/cookbook/CookbookOptionsSheet';
 import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
-import { ProfilePostCard } from '@/components/ui/ProfilePostCard';
+import { Avatar } from '@/components/ui/Avatar';
+import { Icon } from '@/components/ui/Icon';
+import { Loading } from '@/components/ui/Loading';
 import { PostGridItem } from '@/components/ui/PostGridItem';
-import { SmallProfileCard } from '@/components/ui/SmallProfileCard';
-import { ViewModeToggle, ViewMode } from '@/components/ui/ViewModeToggle';
-import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
+import { PostOptionsSheet } from '@/components/ui/PostOptionsSheet';
+import { ProfilePostCard } from '@/components/ui/ProfilePostCard';
+import { ProfileStats } from '@/components/ui/ProfileStats';
+import type { ViewMode } from '@/components/ui/ViewModeToggle';
 import { COPY } from '@/constants/copy';
+import { Colors, NAV_BUTTON_SIZE, Radius, Spacing, Typography } from '@/constants/theme';
+import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useAuth } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 // Decorative stroke colors for add cookbook card
 const STROKE_FILL_PRIMARY = '#EEEEF3';
@@ -44,13 +45,9 @@ const GRID_GAP = Spacing.sm;
 const POSTS_GRID_COLUMNS = 2;
 const POSTS_GRID_GAP = 1; // Thin gap creates border effect
 
-// Profile card carousel constants - 2.5 cards visible for bigger cards
-const PROFILE_CARD_GAP = Spacing.sm;
-const VISIBLE_CARDS = 2.5;
-
-// Cookbook carousel constants - 2.3 visible for less white space when scrolling
+// Cookbook carousel constants - 1.8 visible for bigger cards
 const COOKBOOK_CARD_GAP = Spacing.md;
-const VISIBLE_COOKBOOK_CARDS = 2.3;
+const VISIBLE_COOKBOOK_CARDS = 1.8;
 
 type ProfileTab = 'cookbooks' | 'posts';
 
@@ -194,31 +191,22 @@ function ProfileTabBar({
               style={styles.tabItem}
               onPress={() => onTabPress(tab.key)}
             >
-              <View style={styles.tabItemContent}>
-                <Icon
-                  name={tab.icon}
-                  size={20}
-                  color={isActive ? Colors.accent : Colors.text.tertiary}
-                />
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    isActive && styles.tabLabelActive,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.tabUnderline,
-                  isActive && styles.tabUnderlineActive,
-                ]}
+              <Icon
+                name={tab.icon}
+                size={26}
+                color={isActive ? Colors.accent : Colors.text.tertiary}
+                strokeWidth={isActive ? 2 : 1.5}
               />
+              {isActive ? <View style={styles.tabUnderlineActive} /> : null}
             </Pressable>
           );
         })}
       </View>
+      {/* Shadow gradient below tabs */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.00)', 'transparent']}
+        style={styles.tabBarShadow}
+      />
     </View>
   );
 }
@@ -233,7 +221,6 @@ export default function ProfileScreen(): React.ReactElement {
     user ? { userId: user._id } : 'skip'
   );
   const posts = useQuery(api.posts.listMine);
-  const suggestedUsers = useQuery(api.users.suggested, { limit: 10 });
 
   // Cookbooks from Convex
   const cookbooks = useQuery(api.cookbooks.list);
@@ -243,16 +230,15 @@ export default function ProfileScreen(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [showSuggestedUsers, setShowSuggestedUsers] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('slider');
-  const [dismissedUserIds, setDismissedUserIds] = useState<Set<Id<'users'>>>(new Set());
   const [optionsSheetVisible, setOptionsSheetVisible] = useState(false);
   const [selectedCookbook, setSelectedCookbook] = useState<{ id: Id<'cookbooks'>; name: string } | null>(null);
+  const [postOptionsVisible, setPostOptionsVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<{ id: Id<'posts'>; recipeId: Id<'recipes'>; recipeTitle: string } | null>(null);
 
   // Calculate card widths
-  const profileCardWidth = (screenWidth - Spacing.lg * 2 - PROFILE_CARD_GAP * 3) / VISIBLE_CARDS;
   const cookbookCardWidth = (screenWidth - Spacing.lg * 2 - COOKBOOK_CARD_GAP) / VISIBLE_COOKBOOK_CARDS;
-  const gridItemWidth = (screenWidth - Spacing.lg * 2 - GRID_GAP) / GRID_COLUMNS;
+  const gridItemWidth = (screenWidth - Spacing.xl * 2 - GRID_GAP) / GRID_COLUMNS;
   const postsGridItemWidth = (screenWidth - POSTS_GRID_GAP * (POSTS_GRID_COLUMNS - 1)) / POSTS_GRID_COLUMNS;
 
   const handleCreateCookbook = useCallback(
@@ -289,16 +275,13 @@ export default function ProfileScreen(): React.ReactElement {
     router.push(`/recipe/${recipeId}`);
   }, [router]);
 
-  const handleUserPress = useCallback((userId: Id<'users'>) => {
-    router.push(`/user/${userId}`);
-  }, [router]);
-
-  const handleDismissUser = useCallback((userId: Id<'users'>) => {
-    setDismissedUserIds((prev) => new Set([...prev, userId]));
-  }, []);
-
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === 'slider' ? 'grid' : 'slider'));
+  }, []);
+
+  const handlePostOptions = useCallback((postId: Id<'posts'>, recipeId: Id<'recipes'>, recipeTitle: string) => {
+    setSelectedPost({ id: postId, recipeId, recipeTitle });
+    setPostOptionsVisible(true);
   }, []);
 
   if (user === undefined) {
@@ -327,46 +310,69 @@ export default function ProfileScreen(): React.ReactElement {
   const isClerkDefaultAvatar = user.imageUrl?.includes('img.clerk.com');
   const avatarUrl = isClerkDefaultAvatar ? null : user.imageUrl;
 
-  // Filter out dismissed users from suggestions
-  const filteredSuggestedUsers = suggestedUsers?.filter(
-    (u) => !dismissedUserIds.has(u._id)
-  ) ?? [];
-
-  // Check if suggested profiles should be centered
-  const suggestedCount = filteredSuggestedUsers.length;
-  const shouldCenterSuggestedProfiles = suggestedCount <= 3;
-
   // Check if cookbooks should be centered (for carousel view)
   const cookbookCount = cookbooks?.length ?? 0;
   const shouldCenterCookbooks = cookbookCount <= 1;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerName}>{fullName}</Text>
-        <View style={styles.headerActions}>
-          <ViewModeToggle
-            viewMode={viewMode}
-            onToggle={toggleViewMode}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open menu"
-            style={styles.settingsButton}
-            onPress={() => setDrawerVisible(true)}
-            hitSlop={8}
-          >
-            <Icon name="menu" size={24} color={Colors.text.inverse} />
-          </Pressable>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[2]}
+        stickyHeaderIndices={[3]}
       >
+        {/* Header - scrolls with content */}
+        <View style={styles.header}>
+          {/* Center: Username (absolutely positioned for true centering) */}
+          <Text style={styles.headerName} numberOfLines={1}>
+            {user.username ? `@${user.username}` : fullName}
+          </Text>
+
+          {/* Left: Find people button */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Find people to follow"
+            style={styles.headerNavButton}
+            onPress={() => router.push('/suggested-users')}
+            hitSlop={12}
+          >
+            <Icon
+              name="user-plus"
+              size={20}
+              color={Colors.text.inverse}
+              strokeWidth={1.5}
+            />
+          </Pressable>
+
+          {/* Right: View toggle + Menu */}
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Switch to ${viewMode === 'slider' ? 'grid' : 'slider'} view`}
+              style={styles.headerNavButton}
+              onPress={toggleViewMode}
+              hitSlop={12}
+            >
+              <Icon
+                name={viewMode === 'slider' ? 'apps' : 'layers'}
+                size={20}
+                color={Colors.text.inverse}
+                strokeWidth={1.5}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+              style={styles.headerNavButton}
+              onPress={() => setDrawerVisible(true)}
+              hitSlop={12}
+            >
+              <Icon name="menu" size={20} color={Colors.text.inverse} strokeWidth={1.5} />
+            </Pressable>
+          </View>
+        </View>
+
         {/* Profile Header Section */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarRow}>
@@ -385,72 +391,16 @@ export default function ProfileScreen(): React.ReactElement {
               <Icon name="pencil" size={16} color={Colors.text.inverse} />
             </Pressable>
           </View>
-          {user.username ? (
-            <Text style={styles.username}>@{user.username}</Text>
-          ) : null}
+          <Text style={styles.fullName}>{fullName}</Text>
 
           {stats ? (
-            <View style={styles.statsRow}>
-              {/* Spacer to balance the suggested button on the right */}
-              <View style={styles.statsRowSpacer} />
-
-              <ProfileStats
-                userId={user._id}
-                followerCount={stats.followerCount}
-                followingCount={stats.followingCount}
-              />
-
-              {/* Suggested Users Toggle Button */}
-              {filteredSuggestedUsers.length > 0 ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={showSuggestedUsers ? "Hide suggested users" : "Show suggested users"}
-                  style={styles.suggestedToggleButton}
-                  onPress={() => setShowSuggestedUsers(!showSuggestedUsers)}
-                  hitSlop={8}
-                >
-                  <Icon
-                    name="user"
-                    size={22}
-                    color={Colors.accent}
-                    filled={showSuggestedUsers}
-                  />
-                </Pressable>
-              ) : (
-                <View style={styles.statsRowSpacer} />
-              )}
-            </View>
+            <ProfileStats
+              userId={user._id}
+              followerCount={stats.followerCount}
+              followingCount={stats.followingCount}
+            />
           ) : null}
         </View>
-
-        {/* Suggested Users Section (expandable) */}
-        {showSuggestedUsers && filteredSuggestedUsers.length > 0 ? (
-          <View style={styles.suggestedSection}>
-            <Text style={styles.suggestedTitle}>{COPY.socialFeed.suggestedUsers}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[
-                styles.suggestedScrollContent,
-                shouldCenterSuggestedProfiles && styles.suggestedScrollCentered,
-              ]}
-            >
-              {filteredSuggestedUsers.map((suggestedUser) => (
-                <View
-                  key={suggestedUser._id}
-                  style={[styles.profileCardWrapper, { width: profileCardWidth }]}
-                >
-                  <SmallProfileCard
-                    user={suggestedUser}
-                    onPress={() => handleUserPress(suggestedUser._id)}
-                    onDismiss={handleDismissUser}
-                    showDismiss
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
 
         {/* Sticky Tab Bar */}
         <ProfileTabBar
@@ -488,6 +438,7 @@ export default function ProfileScreen(): React.ReactElement {
                         recipeCount={cookbook.recipeCount}
                         coverImageUrl={cookbook.coverImageUrl}
                         variant="carousel"
+                        size="compact"
                         onPress={() => handleCookbookPress(cookbook._id)}
                         onMorePress={() => handleCookbookOptions(cookbook._id, cookbook.name)}
                       />
@@ -556,6 +507,7 @@ export default function ProfileScreen(): React.ReactElement {
                         recipeCount={cookbook.recipeCount}
                         coverImageUrl={cookbook.coverImageUrl}
                         variant="grid"
+                        size="compact"
                         onPress={() => handleCookbookPress(cookbook._id)}
                         onMorePress={() => handleCookbookOptions(cookbook._id, cookbook.name)}
                       />
@@ -563,45 +515,49 @@ export default function ProfileScreen(): React.ReactElement {
                   ))}
 
                   {/* Add Cookbook Card */}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Create new cookbook"
+                  <View
                     style={[
                       styles.addCookbookGridCard,
                       { width: gridItemWidth },
                     ]}
-                    onPress={() => setCreateModalVisible(true)}
                   >
-                    {/* Decorative brush stroke */}
-                    <Svg
-                      style={styles.addCardStrokeGrid}
-                      viewBox="0 0 200 160"
-                      preserveAspectRatio="xMidYMid meet"
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Create new cookbook"
+                      style={styles.addCookbookGridCardPressable}
+                      onPress={() => setCreateModalVisible(true)}
                     >
-                      <Path
-                        d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
-                        fill={STROKE_FILL_PRIMARY}
+                      {/* Decorative brush stroke */}
+                      <Svg
+                        style={styles.addCardStrokeGrid}
+                        viewBox="0 0 200 160"
+                        preserveAspectRatio="xMidYMid meet"
+                      >
+                        <Path
+                          d="M30,80 C45,30 90,15 130,40 C155,55 175,30 185,55 C195,80 170,110 135,105 C100,100 70,120 45,105 C20,90 20,95 30,80Z"
+                          fill={STROKE_FILL_PRIMARY}
+                        />
+                        <Path
+                          d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
+                          fill={STROKE_FILL_SECONDARY}
+                        />
+                      </Svg>
+                      {/* Cookbook icon - centered */}
+                      <Image
+                        source={ADD_COOKBOOK_ICON}
+                        style={styles.addCardIconGrid}
+                        contentFit="contain"
                       />
-                      <Path
-                        d="M145,25 C155,18 170,22 165,35 C160,48 148,40 145,25Z"
-                        fill={STROKE_FILL_SECONDARY}
-                      />
-                    </Svg>
-                    {/* Cookbook icon - centered */}
-                    <Image
-                      source={ADD_COOKBOOK_ICON}
-                      style={styles.addCardIconGrid}
-                      contentFit="contain"
-                    />
-                    {/* Plus icon - top right */}
-                    <View style={styles.addCardPlusIconGrid}>
-                      <Icon name="plus" size={26} color={Colors.accent} />
-                    </View>
-                    {/* Title - top left */}
-                    <View style={styles.addCardLabelGrid}>
-                      <Text style={styles.addCookbookTitleGrid}>{'Add\nCookbook'}</Text>
-                    </View>
-                  </Pressable>
+                      {/* Plus icon - top right */}
+                      <View style={styles.addCardPlusIconGrid}>
+                        <Icon name="plus" size={26} color={Colors.accent} />
+                      </View>
+                      {/* Title - top left */}
+                      <View style={styles.addCardLabelGrid}>
+                        <Text style={styles.addCookbookTitleGrid}>{'Add\nCookbook'}</Text>
+                      </View>
+                    </Pressable>
+                  </View>
                 </View>
               )}
 
@@ -632,28 +588,26 @@ export default function ProfileScreen(): React.ReactElement {
                           notes={post.notes}
                           createdAt={post.createdAt}
                           onPress={() => post.recipe && handlePostPress(post.recipe._id)}
+                          onMenuPress={() => post.recipe && handlePostOptions(post._id, post.recipe._id, post.recipe.title)}
                         />
                       ))}
                     </View>
                   ) : (
                     /* Posts Grid View */
                     <View style={styles.postsGrid}>
-                      {posts.map((post, index) => (
+                      {posts.map((post) => (
                         <View
                           key={post._id}
                           style={[
                             styles.postGridItemWrapper,
                             { width: postsGridItemWidth, height: postsGridItemWidth },
-                            // Add right border except for last in row
-                            index % POSTS_GRID_COLUMNS !== POSTS_GRID_COLUMNS - 1 && styles.postGridItemBorderRight,
-                            // Add bottom border for all except last row
-                            index < posts.length - POSTS_GRID_COLUMNS && styles.postGridItemBorderBottom,
                           ]}
                         >
                           <PostGridItem
                             imageUrl={post.recipe?.imageUrl}
                             title={post.recipe?.title ?? 'Unknown Recipe'}
                             onPress={() => post.recipe && handlePostPress(post.recipe._id)}
+                            onMenuPress={() => post.recipe && handlePostOptions(post._id, post.recipe._id, post.recipe.title)}
                           />
                         </View>
                       ))}
@@ -698,6 +652,17 @@ export default function ProfileScreen(): React.ReactElement {
         }}
         onEdit={handleEditCookbook}
       />
+
+      <PostOptionsSheet
+        visible={postOptionsVisible}
+        postId={selectedPost?.id ?? null}
+        recipeId={selectedPost?.recipeId ?? null}
+        recipeTitle={selectedPost?.recipeTitle ?? ''}
+        onClose={() => {
+          setPostOptionsVisible(false);
+          setSelectedPost(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -729,23 +694,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+    position: 'relative',
   },
   headerName: {
     ...Typography.h2,
     color: Colors.text.primary,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.xl * 2,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    zIndex: 1,
   },
-  settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  headerNavButton: {
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
     backgroundColor: Colors.text.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
+  },
+  headerNavButtonSpacer: {
+    width: NAV_BUTTON_SIZE,
+    zIndex: 1,
   },
   scrollView: {
     flex: 1,
@@ -772,51 +749,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  username: {
-    ...Typography.body,
-    color: Colors.text.secondary,
+  fullName: {
+    ...Typography.h3,
+    color: Colors.text.primary,
     marginTop: Spacing.sm,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.sm,
-    width: '100%',
-  },
-  statsRowSpacer: {
-    width: 36,
-  },
-  suggestedToggleButton: {
-    width: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Spacing.md,
-  },
-  // Suggested Users Section
-  suggestedSection: {
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  suggestedTitle: {
-    ...Typography.label,
-    color: Colors.text.secondary,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  suggestedScrollContent: {
-    paddingHorizontal: Spacing.lg,
-    gap: PROFILE_CARD_GAP,
-  },
-  suggestedScrollCentered: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  profileCardWrapper: {
-    height: 220,
-    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   // Drawer styles
   drawerOverlayAbsolute: {
@@ -876,47 +813,31 @@ const styles = StyleSheet.create({
   // Tab Bar styles
   tabBarWrapper: {
     backgroundColor: Colors.background.primary,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+  },
+  tabBarShadow: {
+    height: 12,
   },
   tabBarContainer: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: Spacing.md,
-  },
-  tabItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingBottom: Spacing.md,
-  },
-  tabLabel: {
-    ...Typography.label,
-    color: Colors.text.tertiary,
-  },
-  tabLabelActive: {
-    color: Colors.accent,
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: 'transparent',
+    paddingVertical: Spacing.md,
   },
   tabUnderlineActive: {
+    position: 'absolute',
+    bottom: 0,
+    width: 60,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: Colors.accent,
   },
   // Tab Content styles
   tabContent: {
     minHeight: 400,
+    overflow: 'visible',
   },
   emptyState: {
     alignItems: 'center',
@@ -938,6 +859,7 @@ const styles = StyleSheet.create({
   // Cookbook styles
   cookbooksContainer: {
     flex: 1,
+    overflow: 'visible',
   },
   cookbookCarouselContent: {
     paddingHorizontal: Spacing.lg,
@@ -949,7 +871,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cookbookCarouselCard: {
-    aspectRatio: 0.65,
+    aspectRatio: 0.58,
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
     shadowColor: '#000000',
@@ -959,7 +881,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   addCookbookCard: {
-    aspectRatio: 0.65,
+    aspectRatio: 0.58,
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
     shadowColor: '#000000',
@@ -1005,47 +927,52 @@ const styles = StyleSheet.create({
   cookbookGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing.xxl,
     gap: GRID_GAP,
+    overflow: 'visible',
   },
   cookbookGridCard: {
-    aspectRatio: 1,
+    aspectRatio: 0.65,
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
   },
   addCookbookGridCard: {
-    aspectRatio: 1,
+    aspectRatio: 0.65,
     borderRadius: Radius.xl,
     backgroundColor: Colors.background.primary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  addCookbookGridCardPressable: {
+    flex: 1,
+    borderRadius: Radius.xl,
   },
   addCardStrokeGrid: {
     position: 'absolute',
-    width: '85%',
-    height: '50%',
-    top: '40%',
-    left: '7.5%',
+    width: '95%',
+    height: '60%',
+    top: '25%',
+    left: '2.5%',
   },
   addCardIconGrid: {
     position: 'absolute',
-    width: 88,
-    height: 88,
-    top: '52%',
+    width: 110,
+    height: 110,
+    top: '38%',
     left: '50%',
-    marginLeft: -44,
+    marginLeft: -55,
     zIndex: 1,
   },
   addCardPlusIconGrid: {
@@ -1090,13 +1017,7 @@ const styles = StyleSheet.create({
   },
   postGridItemWrapper: {
     overflow: 'hidden',
-  },
-  postGridItemBorderRight: {
-    borderRightWidth: 1,
-    borderRightColor: Colors.border,
-  },
-  postGridItemBorderBottom: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderWidth: 0.5,
+    borderColor: Colors.border,
   },
 });

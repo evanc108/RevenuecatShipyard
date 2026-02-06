@@ -16,7 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Avatar } from '@/components/ui/Avatar';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Radius, Typography } from '@/constants/theme';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
 import { Image } from 'expo-image';
@@ -217,10 +217,11 @@ export default function EditProfileScreen(): React.ReactElement {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
+            style={styles.backButton}
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
           </Pressable>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <Pressable
@@ -449,6 +450,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+  backButton: {
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...Typography.h3,

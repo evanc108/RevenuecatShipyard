@@ -30,6 +30,7 @@ import {
   Share2,
   Users,
   User,
+  UserPlus,
   LogOut,
 
   // Content Types
@@ -129,6 +130,8 @@ const ICON_MAP = {
   person: User,
   'person-outline': User,
   user: User,
+  'user-plus': UserPlus,
+  'person-add': UserPlus,
   'log-out': LogOut,
   'log-out-outline': LogOut,
   logout: LogOut,

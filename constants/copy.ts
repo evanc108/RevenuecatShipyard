@@ -446,6 +446,13 @@ export const COPY = {
       following: 'Following',
     },
   },
+  suggestedUsers: {
+    title: 'Search Users',
+    searchPlaceholder: 'Search users...',
+    noResults: 'No users found',
+    emptyTitle: 'No Suggestions',
+    emptySubtitle: 'Check back later for new people to follow',
+  },
   comments: {
     title: 'Comments',
     placeholder: 'Add a comment...',

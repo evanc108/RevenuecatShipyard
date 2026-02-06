@@ -3,7 +3,7 @@ import { CreateCookbookModal } from '@/components/cookbook/CreateCookbookModal';
 import { PendingImportRow } from '@/components/cookbook/PendingImportRow';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
-import { Colors, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Colors, Shadow, Spacing } from '@/constants/theme';
 import { useShareIntent } from '@/context/ShareIntentContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -29,7 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- Constants ---
 
-const SEARCH_ICON_SIZE = 48;
+const SEARCH_ICON_SIZE = 40;
 
 const COPY = {
 	titleTop: 'Your',
@@ -85,7 +85,7 @@ export default function CookbookScreen() {
 		width: interpolate(
 			searchProgress.value,
 			[0, 1],
-			[SEARCH_ICON_SIZE, 260]
+			[SEARCH_ICON_SIZE, 200]
 		)
 	}));
 
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
 	// Search
 	searchBar: {
 		height: SEARCH_ICON_SIZE,
-		backgroundColor: Colors.accent,
+		backgroundColor: Colors.text.primary,
 		borderRadius: SEARCH_ICON_SIZE / 2,
 		flexDirection: 'row-reverse',
 		alignItems: 'center',
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
 	},
 	searchInput: {
 		flex: 1,
-		...Typography.body,
+		fontSize: 14,
 		fontFamily: 'Lora_400Regular',
 		color: Colors.text.inverse,
 		paddingVertical: 0

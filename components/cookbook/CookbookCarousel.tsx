@@ -514,8 +514,8 @@ const GridAddCard = memo(function GridAddCard({
         style={styles.gridAddGradient}
       />
 
-      {/* Bottom-left label */}
-      <View style={styles.gridAddBottom}>
+      {/* Top-left label */}
+      <View style={styles.gridAddTop}>
         <Text style={styles.gridAddTitle}>{'Add\nCookbook'}</Text>
       </View>
     </Pressable>
@@ -843,14 +843,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '92%',
     height: '65%',
-    top: '8%',
+    top: '25%',
     left: '4%',
   },
   gridAddImage: {
     position: 'absolute',
     width: '88%',
     height: '80%',
-    top: '8%',
+    top: '20%',
     left: '6%',
   },
   gridAddGradient: {
@@ -862,9 +862,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
   },
-  gridAddBottom: {
+  gridAddTop: {
     position: 'absolute',
-    bottom: Spacing.lg,
+    top: Spacing.lg,
     left: Spacing.md,
   },
   gridAddTitle: {

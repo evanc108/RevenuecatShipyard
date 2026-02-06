@@ -19,11 +19,21 @@ const PLAYBACK_AUDIO_MODE = {
 };
 
 // Wake word variations - Whisper often mishears "Nom" in various ways
+// Includes both "hey nom" variants and standalone "nom" variants for flexibility
 const WAKE_PHRASES = [
+  // "Hey Nom" variations
   'hey nom', 'hey nam', 'hey gnome', 'hey norm', 'hey noem', 'hey nome',
   'hey numb', 'hey num', 'hey known', 'hey non', 'hey nohm', 'hey nahm',
   'a nom', 'a]nom', 'heynom', 'hey, nom', 'hey. nom', 'hey no',
   'hey mom', 'hey nah', 'hey na', 'hey nyom', 'haynom', 'hey, nah',
+  // Standalone "Nom" variations (without "hey" prefix)
+  // These are checked as exact matches or at word boundaries to avoid false positives
+];
+
+// Standalone wake words - matched more strictly to avoid false positives
+const STANDALONE_WAKE_WORDS = [
+  'nom', 'nam', 'gnome', 'nome', 'norm', 'nohm', 'nahm',
+  'noem', 'nyom', 'numb', 'num',
 ];
 
 // Optimized timing for faster wake word detection
@@ -148,7 +158,27 @@ export function useWakeWord({
 
   const checkForWakeWord = (transcript: string): boolean => {
     const normalizedTranscript = transcript.toLowerCase().trim();
-    return WAKE_PHRASES.some((phrase) => normalizedTranscript.includes(phrase));
+
+    // Check for "hey nom" style phrases (can be anywhere in transcript)
+    if (WAKE_PHRASES.some((phrase) => normalizedTranscript.includes(phrase))) {
+      return true;
+    }
+
+    // Check for standalone wake words - must be exact match or at word boundary
+    // to avoid false positives (e.g., "gnome" in "genome")
+    for (const word of STANDALONE_WAKE_WORDS) {
+      // Exact match (just the wake word alone)
+      if (normalizedTranscript === word) {
+        return true;
+      }
+      // Word boundary match - wake word at start, end, or surrounded by spaces/punctuation
+      const wordBoundaryRegex = new RegExp(`(^|[\\s,.!?])${word}([\\s,.!?]|$)`, 'i');
+      if (wordBoundaryRegex.test(normalizedTranscript)) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   // Check if transcript should be skipped (noise, music, or too long to be wake word)

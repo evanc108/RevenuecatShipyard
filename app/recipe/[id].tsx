@@ -1,6 +1,8 @@
 import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
+import { RateRecipeModal } from '@/components/ui/RateRecipeModal';
+import { useAddModal } from '@/context/AddModalContext';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
@@ -30,7 +32,6 @@ const copy = COPY.recipeDetail;
 const HERO_HEIGHT = 360;
 const CONTENT_OVERLAP = 28;
 const SERVINGS_BUTTON_SIZE = 36;
-const STAR_SIZE = 28;
 const STAR_COLOR_ACTIVE = '#FFB800';
 const INGREDIENT_IMAGE_SIZE = 44;
 const NAV_BUTTON_SIZE = 40;
@@ -392,17 +393,13 @@ export default function RecipeDetailScreen() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
+	const { openModal: openAddModal } = useAddModal();
 	const recipeId = id as Id<'recipes'>;
 
 	const recipe = useQuery(
 		api.recipes.get,
 		recipeId ? { id: recipeId } : 'skip'
 	);
-	const userRating = useQuery(
-		api.recipes.getUserRating,
-		recipeId ? { recipeId } : 'skip'
-	);
-	const rateMutation = useMutation(api.recipes.rate);
 	const myPost = useQuery(
 		api.posts.getMyPostForRecipe,
 		recipeId ? { recipeId } : 'skip'
@@ -421,8 +418,10 @@ export default function RecipeDetailScreen() {
 	const [servingsMultiplier, setServingsMultiplier] = useState(1);
 	const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
 	const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
+	const [isRateModalVisible, setIsRateModalVisible] = useState(false);
 	const [groceryAdded, setGroceryAdded] = useState(false);
 	const [groceryLoading, setGroceryLoading] = useState(false);
+
 	// Review edit state
 	const [isEditing, setIsEditing] = useState(false);
 	const [editEase, setEditEase] = useState(0);
@@ -481,11 +480,6 @@ export default function RecipeDetailScreen() {
 		},
 		[servingsMultiplier]
 	);
-
-	const handleRate = async (value: number) => {
-		if (!recipeId) return;
-		await rateMutation({ recipeId, value });
-	};
 
 	const handleSaveReview = async () => {
 		if (!myPost) return;
@@ -569,8 +563,8 @@ export default function RecipeDetailScreen() {
 					>
 						<Icon
 							name="arrow-back"
-							size={22}
-							color={Colors.text.primary}
+							size={20}
+							color={Colors.text.inverse}
 							strokeWidth={2}
 						/>
 					</Pressable>
@@ -735,234 +729,6 @@ export default function RecipeDetailScreen() {
 						<Text style={styles.descriptionText}>
 							{recipe.description}
 						</Text>
-					) : null}
-
-					{/* Your Review */}
-					{myPost ? (
-						<>
-							<SectionDivider title={copy.yourReview.title} />
-							<View style={styles.reviewSection}>
-								<View style={styles.reviewHeader}>
-									{isEditing ? (
-										<Pressable
-											accessibilityRole="button"
-											accessibilityLabel="Cancel editing"
-											onPress={handleCancelEdit}
-											hitSlop={8}
-										>
-											<Icon
-												name="close"
-												size={20}
-												color={Colors.text.tertiary}
-											/>
-										</Pressable>
-									) : (
-										<Pressable
-											accessibilityRole="button"
-											accessibilityLabel="Edit review"
-											onPress={() => setIsEditing(true)}
-											hitSlop={8}
-										>
-											<Icon
-												name="pencil"
-												size={18}
-												color={Colors.accent}
-											/>
-										</Pressable>
-									)}
-								</View>
-
-								{/* Ease Rating */}
-								<View style={styles.reviewRatingRow}>
-									<Text style={styles.reviewRatingLabel}>
-										{copy.yourReview.ease}
-									</Text>
-									<View style={styles.starsRow}>
-										{[1, 2, 3, 4, 5].map((star) => {
-											const value = isEditing
-												? editEase
-												: myPost.easeRating;
-											return (
-												<Pressable
-													key={star}
-													accessibilityRole="button"
-													accessibilityLabel={`Rate ease ${star} stars`}
-													onPress={() =>
-														isEditing &&
-														setEditEase(star)
-													}
-													disabled={!isEditing}
-													hitSlop={{
-														top: 4,
-														bottom: 4,
-														left: 2,
-														right: 2
-													}}
-												>
-													<Icon
-														name={
-															star <= value
-																? 'star'
-																: 'star-outline'
-														}
-														size={20}
-														color={
-															star <= value
-																? STAR_COLOR_ACTIVE
-																: Colors.text
-																		.tertiary
-														}
-													/>
-												</Pressable>
-											);
-										})}
-									</View>
-								</View>
-
-								{/* Taste Rating */}
-								<View style={styles.reviewRatingRow}>
-									<Text style={styles.reviewRatingLabel}>
-										{copy.yourReview.taste}
-									</Text>
-									<View style={styles.starsRow}>
-										{[1, 2, 3, 4, 5].map((star) => {
-											const value = isEditing
-												? editTaste
-												: myPost.tasteRating;
-											return (
-												<Pressable
-													key={star}
-													accessibilityRole="button"
-													accessibilityLabel={`Rate taste ${star} stars`}
-													onPress={() =>
-														isEditing &&
-														setEditTaste(star)
-													}
-													disabled={!isEditing}
-													hitSlop={{
-														top: 4,
-														bottom: 4,
-														left: 2,
-														right: 2
-													}}
-												>
-													<Icon
-														name={
-															star <= value
-																? 'star'
-																: 'star-outline'
-														}
-														size={20}
-														color={
-															star <= value
-																? STAR_COLOR_ACTIVE
-																: Colors.text
-																		.tertiary
-														}
-													/>
-												</Pressable>
-											);
-										})}
-									</View>
-								</View>
-
-								{/* Presentation Rating */}
-								<View style={styles.reviewRatingRow}>
-									<Text style={styles.reviewRatingLabel}>
-										{copy.yourReview.presentation}
-									</Text>
-									<View style={styles.starsRow}>
-										{[1, 2, 3, 4, 5].map((star) => {
-											const value = isEditing
-												? editPresentation
-												: myPost.presentationRating;
-											return (
-												<Pressable
-													key={star}
-													accessibilityRole="button"
-													accessibilityLabel={`Rate presentation ${star} stars`}
-													onPress={() =>
-														isEditing &&
-														setEditPresentation(
-															star
-														)
-													}
-													disabled={!isEditing}
-													hitSlop={{
-														top: 4,
-														bottom: 4,
-														left: 2,
-														right: 2
-													}}
-												>
-													<Icon
-														name={
-															star <= value
-																? 'star'
-																: 'star-outline'
-														}
-														size={20}
-														color={
-															star <= value
-																? STAR_COLOR_ACTIVE
-																: Colors.text
-																		.tertiary
-														}
-													/>
-												</Pressable>
-											);
-										})}
-									</View>
-								</View>
-
-								{/* Notes */}
-								<View style={styles.reviewNotesContainer}>
-									<Text style={styles.reviewNotesLabel}>
-										{copy.yourReview.notes}
-									</Text>
-									{isEditing ? (
-										<TextInput
-											style={styles.reviewNotesInput}
-											value={editNotes}
-											onChangeText={setEditNotes}
-											multiline
-											placeholder={
-												copy.yourReview.noNotes
-											}
-											placeholderTextColor={
-												Colors.text.tertiary
-											}
-										/>
-									) : (
-										<Text style={styles.reviewNotesText}>
-											{myPost.notes ||
-												copy.yourReview.noNotes}
-										</Text>
-									)}
-								</View>
-
-								{/* Save Button */}
-								{isEditing ? (
-									<Pressable
-										accessibilityRole="button"
-										accessibilityLabel="Save review"
-										style={[
-											styles.saveButton,
-											isSaving &&
-												styles.saveButtonDisabled
-										]}
-										onPress={handleSaveReview}
-										disabled={isSaving}
-									>
-										<Text style={styles.saveButtonText}>
-											{isSaving
-												? copy.yourReview.saving
-												: copy.yourReview.save}
-										</Text>
-									</Pressable>
-								) : null}
-							</View>
-						</>
 					) : null}
 
 					{/* Nutrition */}
@@ -1212,47 +978,242 @@ export default function RecipeDetailScreen() {
 						</>
 					) : null}
 
-					{/* Rating */}
-					<SectionDivider title={copy.rateThisRecipe} />
-					<View style={styles.ratingSection}>
-						<View style={styles.starsRow}>
-							{[1, 2, 3, 4, 5].map((star) => {
-								const filled =
-									userRating != null && star <= userRating;
-								return (
-									<Pressable
-										key={star}
-										accessibilityRole="button"
-										accessibilityLabel={`Rate ${star} star${star > 1 ? 's' : ''}`}
-										onPress={() => handleRate(star)}
-										hitSlop={{
-											top: 8,
-											bottom: 8,
-											left: 4,
-											right: 4
-										}}
-									>
-										<Icon
-											name="star"
-											size={STAR_SIZE}
-											color={
-												filled
-													? STAR_COLOR_ACTIVE
-													: Colors.text.tertiary
-											}
-											filled={filled}
+					{/* Your Review or Rate This Recipe */}
+					{myPost ? (
+						<View>
+							<SectionDivider title={copy.yourReview.title} />
+							<View style={styles.reviewSectionFlat}>
+								<View style={styles.reviewHeader}>
+									{isEditing ? (
+										<Pressable
+											accessibilityRole="button"
+											accessibilityLabel="Cancel editing"
+											onPress={handleCancelEdit}
+											hitSlop={8}
+										>
+											<Icon
+												name="close"
+												size={20}
+												color={Colors.text.tertiary}
+											/>
+										</Pressable>
+									) : (
+										<Pressable
+											accessibilityRole="button"
+											accessibilityLabel="Edit review"
+											onPress={() => setIsEditing(true)}
+											hitSlop={8}
+										>
+											<Icon
+												name="pencil"
+												size={18}
+												color={Colors.accent}
+											/>
+										</Pressable>
+									)}
+								</View>
+
+								{/* Ease Rating */}
+								<View style={styles.reviewRatingRow}>
+									<Text style={styles.reviewRatingLabel}>
+										{copy.yourReview.ease}
+									</Text>
+									<View style={styles.starsRow}>
+										{[1, 2, 3, 4, 5].map((star) => {
+											const value = isEditing
+												? editEase
+												: myPost.easeRating;
+											return (
+												<Pressable
+													key={star}
+													accessibilityRole="button"
+													accessibilityLabel={`Rate ease ${star} stars`}
+													onPress={() =>
+														isEditing &&
+														setEditEase(star)
+													}
+													disabled={!isEditing}
+													hitSlop={{
+														top: 4,
+														bottom: 4,
+														left: 2,
+														right: 2
+													}}
+												>
+													<Icon
+														name={
+															star <= value
+																? 'star'
+																: 'star-outline'
+														}
+														size={20}
+														color={
+															star <= value
+																? STAR_COLOR_ACTIVE
+																: Colors.text.tertiary
+														}
+													/>
+												</Pressable>
+											);
+										})}
+									</View>
+								</View>
+
+								{/* Taste Rating */}
+								<View style={styles.reviewRatingRow}>
+									<Text style={styles.reviewRatingLabel}>
+										{copy.yourReview.taste}
+									</Text>
+									<View style={styles.starsRow}>
+										{[1, 2, 3, 4, 5].map((star) => {
+											const value = isEditing
+												? editTaste
+												: myPost.tasteRating;
+											return (
+												<Pressable
+													key={star}
+													accessibilityRole="button"
+													accessibilityLabel={`Rate taste ${star} stars`}
+													onPress={() =>
+														isEditing &&
+														setEditTaste(star)
+													}
+													disabled={!isEditing}
+													hitSlop={{
+														top: 4,
+														bottom: 4,
+														left: 2,
+														right: 2
+													}}
+												>
+													<Icon
+														name={
+															star <= value
+																? 'star'
+																: 'star-outline'
+														}
+														size={20}
+														color={
+															star <= value
+																? STAR_COLOR_ACTIVE
+																: Colors.text.tertiary
+														}
+													/>
+												</Pressable>
+											);
+										})}
+									</View>
+								</View>
+
+								{/* Presentation Rating */}
+								<View style={styles.reviewRatingRow}>
+									<Text style={styles.reviewRatingLabel}>
+										{copy.yourReview.presentation}
+									</Text>
+									<View style={styles.starsRow}>
+										{[1, 2, 3, 4, 5].map((star) => {
+											const value = isEditing
+												? editPresentation
+												: myPost.presentationRating;
+											return (
+												<Pressable
+													key={star}
+													accessibilityRole="button"
+													accessibilityLabel={`Rate presentation ${star} stars`}
+													onPress={() =>
+														isEditing &&
+														setEditPresentation(star)
+													}
+													disabled={!isEditing}
+													hitSlop={{
+														top: 4,
+														bottom: 4,
+														left: 2,
+														right: 2
+													}}
+												>
+													<Icon
+														name={
+															star <= value
+																? 'star'
+																: 'star-outline'
+														}
+														size={20}
+														color={
+															star <= value
+																? STAR_COLOR_ACTIVE
+																: Colors.text.tertiary
+														}
+													/>
+												</Pressable>
+											);
+										})}
+									</View>
+								</View>
+
+								{/* Notes */}
+								<View style={styles.reviewNotesContainer}>
+									<Text style={styles.reviewNotesLabel}>
+										{copy.yourReview.notes}
+									</Text>
+									{isEditing ? (
+										<TextInput
+											style={styles.reviewNotesInput}
+											value={editNotes}
+											onChangeText={setEditNotes}
+											multiline
+											placeholder={copy.yourReview.noNotes}
+											placeholderTextColor={Colors.text.tertiary}
 										/>
+									) : (
+										<Text style={styles.reviewNotesText}>
+											{myPost.notes || copy.yourReview.noNotes}
+										</Text>
+									)}
+								</View>
+
+								{/* Save Button */}
+								{isEditing ? (
+									<Pressable
+										accessibilityRole="button"
+										accessibilityLabel="Save review"
+										style={[
+											styles.saveButton,
+											isSaving && styles.saveButtonDisabled
+										]}
+										onPress={handleSaveReview}
+										disabled={isSaving}
+									>
+										<Text style={styles.saveButtonText}>
+											{isSaving
+												? copy.yourReview.saving
+												: copy.yourReview.save}
+										</Text>
 									</Pressable>
-								);
-							})}
+								) : null}
+							</View>
 						</View>
-						{recipe.averageRating !== undefined &&
-						recipe.averageRating !== null ? (
-							<Text style={styles.avgRatingText}>
-								{copy.communityAverage(recipe.averageRating)}
-							</Text>
-						) : null}
-					</View>
+					) : (
+						<View style={styles.ratingSection}>
+							<Pressable
+								accessibilityRole="button"
+								accessibilityLabel="Rate this recipe"
+								style={styles.rateButton}
+								onPress={() => setIsRateModalVisible(true)}
+							>
+								<Icon name="star" size={20} color={Colors.text.inverse} />
+								<Text style={styles.rateButtonText}>
+									{copy.rateThisRecipe}
+								</Text>
+							</Pressable>
+							{recipe.averageRating !== undefined &&
+							recipe.averageRating !== null ? (
+								<Text style={styles.avgRatingText}>
+									{copy.communityAverage(recipe.averageRating)}
+								</Text>
+							) : null}
+						</View>
+					)}
 
 					{/* Source Footer */}
 					<View style={styles.sourceFooter}>
@@ -1287,7 +1248,7 @@ export default function RecipeDetailScreen() {
 				</View>
 			</ScrollView>
 
-			{/* Floating Action Bar — Cook + Save/Meal Plan */}
+			{/* Floating Action Bar — Cook + Save/Meal Plan + Post */}
 			<View
 				style={[
 					styles.floatingBar,
@@ -1348,6 +1309,17 @@ export default function RecipeDetailScreen() {
 						</Text>
 					</Pressable>
 				)}
+				{/* Post button - only show if user hasn't posted */}
+				{!myPost ? (
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel="Share post"
+						style={styles.floatingButtonPost}
+						onPress={() => openAddModal()}
+					>
+						<Icon name="plus" size={20} color={Colors.text.inverse} />
+					</Pressable>
+				) : null}
 			</View>
 
 			{/* Floating Header — overlays on top of hero image */}
@@ -1366,9 +1338,9 @@ export default function RecipeDetailScreen() {
 				>
 					<Icon
 						name="arrow-back"
-						size={22}
+						size={20}
 						color={Colors.text.inverse}
-						strokeWidth={NAV_ICON_STROKE}
+						strokeWidth={2}
 					/>
 				</Pressable>
 
@@ -1413,6 +1385,13 @@ export default function RecipeDetailScreen() {
 				onClose={() => setIsSaveModalVisible(false)}
 				onSelect={handleSaveToCookbook}
 				isLoading={isSavingToCookbook}
+			/>
+
+			<RateRecipeModal
+				visible={isRateModalVisible}
+				recipeId={recipeId}
+				recipeTitle={recipe?.title ?? ''}
+				onClose={() => setIsRateModalVisible(false)}
 			/>
 
 			{/* Paywall Modal */}
@@ -1581,6 +1560,9 @@ const styles = StyleSheet.create({
 		borderRadius: Radius.md,
 		padding: Spacing.md
 	},
+	reviewSectionFlat: {
+		// No background - flat inline style
+	},
 	reviewHeader: {
 		flexDirection: 'row',
 		justifyContent: 'flex-end',
@@ -1641,7 +1623,22 @@ const styles = StyleSheet.create({
 	// Rating
 	ratingSection: {
 		alignItems: 'center',
-		paddingVertical: Spacing.sm
+		paddingVertical: Spacing.md
+	},
+	rateButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: Spacing.sm,
+		backgroundColor: Colors.accent,
+		borderRadius: Radius.md,
+		paddingVertical: Spacing.md,
+		paddingHorizontal: Spacing.xl
+	},
+	rateButtonText: {
+		...Typography.label,
+		color: Colors.text.inverse,
+		fontSize: 16
 	},
 	avgRatingText: {
 		...Typography.caption,
@@ -1845,5 +1842,14 @@ const styles = StyleSheet.create({
 		...Typography.label,
 		color: Colors.text.primary,
 		fontWeight: '700'
+	},
+	floatingButtonPost: {
+		width: FLOATING_BAR_HEIGHT,
+		height: FLOATING_BAR_HEIGHT,
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: Colors.accent,
+		borderRadius: Radius.full,
+		...Shadow.elevated
 	},
 });
