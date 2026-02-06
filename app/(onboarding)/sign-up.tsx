@@ -12,7 +12,8 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSSO, useSignIn } from '@clerk/clerk-expo';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
+import * as Linking from 'expo-linking';
 import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
@@ -36,6 +37,9 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Generate redirect URL for OAuth - needed for Expo Go on physical devices
+  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
+
   const handleSSO = useCallback(
     async (strategy: 'oauth_apple' | 'oauth_google') => {
       const provider = strategy === 'oauth_apple' ? 'apple' : 'google';
@@ -45,6 +49,7 @@ export default function AuthScreen() {
 
         const { createdSessionId, setActive } = await startSSOFlow({
           strategy,
+          redirectUrl,
         });
 
         if (createdSessionId && setActive) {
@@ -62,11 +67,11 @@ export default function AuthScreen() {
         setIsLoading(null);
       }
     },
-    [startSSOFlow, copy.errorFallback, router, mode],
+    [startSSOFlow, copy.errorFallback, router, mode, redirectUrl],
   );
 
   const handleEmailSignIn = async () => {
-    if (!isSignInLoaded || !signIn) return;
+    if (!isSignInLoaded || !signIn || isLoading) return;
     setError('');
 
     try {

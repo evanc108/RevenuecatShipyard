@@ -77,6 +77,10 @@ import {
   Info,
   Bell,
   MessageCircle,
+  Mic,
+  MicOff,
+  Volume2,
+  Loader,
 } from 'lucide-react-native';
 import type { OpaqueColorValue, StyleProp, ViewStyle } from 'react-native';
 
@@ -207,6 +211,12 @@ const ICON_MAP = {
   'bell-outline': Bell,
   'message-circle': MessageCircle,
   'chatbubble-outline': MessageCircle,
+  mic: Mic,
+  'mic-outline': Mic,
+  'mic-off': MicOff,
+  'volume-2': Volume2,
+  volume: Volume2,
+  loader: Loader,
 } as const;
 
 export type IconName = keyof typeof ICON_MAP;

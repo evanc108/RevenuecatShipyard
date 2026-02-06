@@ -1,6 +1,7 @@
 import { useSSO, useSignIn } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
+import * as Linking from 'expo-linking';
 import {
   Text,
   TextInput,
@@ -23,6 +24,9 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  // Generate redirect URL for OAuth - needed for Expo Go on physical devices
+  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
 
   const onSignIn = async () => {
     if (!isLoaded) return;
@@ -48,7 +52,10 @@ export default function SignInScreen() {
     async (strategy: 'oauth_apple' | 'oauth_google') => {
       setError('');
       try {
-        const { createdSessionId, setActive: setOAuthActive } = await startSSOFlow({ strategy });
+        const { createdSessionId, setActive: setOAuthActive } = await startSSOFlow({
+          strategy,
+          redirectUrl,
+        });
         if (createdSessionId && setOAuthActive) {
           await setOAuthActive({ session: createdSessionId });
           router.replace('/(tabs)');
@@ -58,7 +65,7 @@ export default function SignInScreen() {
         setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
       }
     },
-    [startSSOFlow, router],
+    [startSSOFlow, router, redirectUrl],
   );
 
   return (

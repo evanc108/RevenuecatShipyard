@@ -1358,7 +1358,7 @@ export default function RecipeDetailScreen() {
 					accessibilityLabel={copy.cook}
 					style={styles.floatingButtonCook}
 					onPress={() => {
-						// TODO: cook action
+						router.push(`/recipe/cook/${recipeId}`);
 					}}
 				>
 					<Icon name="flame" size={18} color={Colors.text.inverse} />

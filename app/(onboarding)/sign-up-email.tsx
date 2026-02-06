@@ -5,9 +5,6 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -15,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSignUp } from '@clerk/clerk-expo';
 import { useRef, useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
@@ -42,7 +40,7 @@ export default function SignUpEmailScreen() {
   const [resendSuccess, setResendSuccess] = useState(false);
 
   const handleFormSubmit = async () => {
-    if (!isLoaded || !signUp) return;
+    if (!isLoaded || !signUp || isLoading) return;
     try {
       setIsLoading('submit');
       setError('');
@@ -57,8 +55,8 @@ export default function SignUpEmailScreen() {
   };
 
   const handleVerify = async () => {
-    if (!isLoaded || !signUp || !setActive) {
-      setError('Authentication not ready. Please try again.');
+    if (!isLoaded || !signUp || !setActive || isLoading) {
+      if (!isLoading) setError('Authentication not ready. Please try again.');
       return;
     }
     try {
@@ -122,213 +120,206 @@ export default function SignUpEmailScreen() {
   const isValidPassword = password.length >= 8;
   const canSubmit = isValidEmail && isValidPassword;
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  const bottomBarContent = (
+    <View
+      style={[
+        styles.legalContainer,
+        { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+      ]}
     >
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={handleBack}
-          hitSlop={8}
-          style={styles.backButton}
-        >
-          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
-        </Pressable>
+      <Text style={styles.legalText}>
+        {copy.legalPrefix}
+        <Text style={styles.legalLink}>{copy.terms}</Text>
+        {copy.and}
+        <Text style={styles.legalLink}>{copy.privacy}</Text>
+      </Text>
+    </View>
+  );
 
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        onPress={handleBack}
+        hitSlop={8}
+        style={styles.backButton}
+      >
+        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+      </Pressable>
+
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.scrollContent}
+        bottomBar={bottomBarContent}
+      >
+        <Animated.View
+          key={`headline-${mode}`}
+          entering={FadeInDown.delay(0).duration(400)}
+          style={styles.headlineContainer}
         >
-          <Animated.View
-            key={`headline-${mode}`}
-            entering={FadeInDown.delay(0).duration(400)}
-            style={styles.headlineContainer}
-          >
-            <Text style={styles.headline}>
-              {mode === 'verify' ? copy.verifyHeadline : copy.headline}
+          <Text style={styles.headline}>
+            {mode === 'verify' ? copy.verifyHeadline : copy.headline}
+          </Text>
+          {mode === 'verify' && (
+            <Text style={styles.subhead}>
+              {copy.verifySubtitle} {email}
             </Text>
-            {mode === 'verify' && (
-              <Text style={styles.subhead}>
-                {copy.verifySubtitle} {email}
-              </Text>
+          )}
+        </Animated.View>
+
+        {mode === 'form' && (
+          <Animated.View
+            key="form"
+            entering={FadeInDown.delay(50).duration(400)}
+            style={styles.formSection}
+          >
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TextInput
+              style={styles.textInput}
+              placeholder={copy.emailPlaceholder}
+              placeholderTextColor={Colors.text.tertiary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoFocus
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              accessibilityLabel={copy.emailPlaceholder}
+            />
+
+            <TextInput
+              ref={passwordInputRef}
+              style={styles.textInput}
+              placeholder="Password (min 8 characters)"
+              placeholderTextColor={Colors.text.tertiary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              textContentType="oneTimeCode"
+              autoComplete="off"
+              returnKeyType="done"
+              onSubmitEditing={canSubmit ? handleFormSubmit : undefined}
+              accessibilityLabel="Password"
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue"
+              style={[styles.primaryButton, !canSubmit && styles.buttonDisabled]}
+              onPress={handleFormSubmit}
+              disabled={isLoading !== null || !canSubmit}
+            >
+              {isLoading === 'submit' ? (
+                <ActivityIndicator color={Colors.text.inverse} />
+              ) : (
+                <Text style={styles.primaryButtonText}>Continue</Text>
+              )}
+            </Pressable>
+          </Animated.View>
+        )}
+
+        {mode === 'verify' && (
+          <Animated.View
+            key="verify"
+            entering={FadeInDown.delay(50).duration(400)}
+            style={styles.formSection}
+          >
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => codeInputRef.current?.focus()}
+              style={styles.codeContainer}
+              accessibilityLabel={copy.codePlaceholder}
+            >
+              {Array.from({ length: CODE_LENGTH }).map((_, index) => {
+                const isActive = index === code.length && code.length < CODE_LENGTH;
+                const isFilled = index < code.length;
+                return (
+                  <View
+                    key={index}
+                    style={[
+                      styles.codeBox,
+                      isActive && styles.codeBoxActive,
+                      isFilled && styles.codeBoxFilled,
+                    ]}
+                  >
+                    <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
+                  </View>
+                );
+              })}
+            </Pressable>
+
+            <TextInput
+              ref={codeInputRef}
+              value={code}
+              onChangeText={handleCodeChange}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              maxLength={CODE_LENGTH}
+              caretHidden
+              autoFocus
+              style={styles.hiddenInput}
+              accessibilityLabel={copy.codePlaceholder}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.verify}
+              style={[
+                styles.primaryButton,
+                code.length < CODE_LENGTH && styles.buttonDisabled,
+              ]}
+              onPress={handleVerify}
+              disabled={isLoading !== null || code.length < CODE_LENGTH}
+            >
+              {isLoading === 'verify' ? (
+                <ActivityIndicator color={Colors.text.inverse} />
+              ) : (
+                <Text style={styles.primaryButtonText}>{copy.verify}</Text>
+              )}
+            </Pressable>
+
+            {resendSuccess ? (
+              <View style={styles.resendSuccessContainer}>
+                <Icon name="checkmark-circle" size={18} color={Colors.semantic.success} />
+                <Text style={styles.resendSuccessText}>{copy.resendSuccess}</Text>
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={copy.resend}
+                onPress={handleResend}
+                hitSlop={8}
+                disabled={isLoading === 'resend'}
+              >
+                {isLoading === 'resend' ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <Text style={styles.linkText}>{copy.resend}</Text>
+                )}
+              </Pressable>
             )}
           </Animated.View>
+        )}
 
-          {mode === 'form' && (
-            <Animated.View
-              key="form"
-              entering={FadeInDown.delay(50).duration(400)}
-              style={styles.formSection}
-            >
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-
-              <TextInput
-                style={styles.textInput}
-                placeholder={copy.emailPlaceholder}
-                placeholderTextColor={Colors.text.tertiary}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                autoFocus
-                returnKeyType="next"
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
-                accessibilityLabel={copy.emailPlaceholder}
-              />
-
-              <TextInput
-                ref={passwordInputRef}
-                style={styles.textInput}
-                placeholder="Password (min 8 characters)"
-                placeholderTextColor={Colors.text.tertiary}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                textContentType="oneTimeCode"
-                autoComplete="off"
-                returnKeyType="done"
-                onSubmitEditing={canSubmit ? handleFormSubmit : undefined}
-                accessibilityLabel="Password"
-              />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Continue"
-                style={[styles.primaryButton, !canSubmit && styles.buttonDisabled]}
-                onPress={handleFormSubmit}
-                disabled={isLoading !== null || !canSubmit}
-              >
-                {isLoading === 'submit' ? (
-                  <ActivityIndicator color={Colors.text.inverse} />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Continue</Text>
-                )}
-              </Pressable>
-            </Animated.View>
-          )}
-
-          {mode === 'verify' && (
-            <Animated.View
-              key="verify"
-              entering={FadeInDown.delay(50).duration(400)}
-              style={styles.formSection}
-            >
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => codeInputRef.current?.focus()}
-                style={styles.codeContainer}
-                accessibilityLabel={copy.codePlaceholder}
-              >
-                {Array.from({ length: CODE_LENGTH }).map((_, index) => {
-                  const isActive = index === code.length && code.length < CODE_LENGTH;
-                  const isFilled = index < code.length;
-                  return (
-                    <View
-                      key={index}
-                      style={[
-                        styles.codeBox,
-                        isActive && styles.codeBoxActive,
-                        isFilled && styles.codeBoxFilled,
-                      ]}
-                    >
-                      <Text style={styles.codeDigit}>{code[index] ?? ''}</Text>
-                    </View>
-                  );
-                })}
-              </Pressable>
-
-              <TextInput
-                ref={codeInputRef}
-                value={code}
-                onChangeText={handleCodeChange}
-                keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                maxLength={CODE_LENGTH}
-                caretHidden
-                autoFocus
-                style={styles.hiddenInput}
-                accessibilityLabel={copy.codePlaceholder}
-              />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={copy.verify}
-                style={[
-                  styles.primaryButton,
-                  code.length < CODE_LENGTH && styles.buttonDisabled,
-                ]}
-                onPress={handleVerify}
-                disabled={isLoading !== null || code.length < CODE_LENGTH}
-              >
-                {isLoading === 'verify' ? (
-                  <ActivityIndicator color={Colors.text.inverse} />
-                ) : (
-                  <Text style={styles.primaryButtonText}>{copy.verify}</Text>
-                )}
-              </Pressable>
-
-              {resendSuccess ? (
-                <View style={styles.resendSuccessContainer}>
-                  <Icon name="checkmark-circle" size={18} color={Colors.semantic.success} />
-                  <Text style={styles.resendSuccessText}>{copy.resendSuccess}</Text>
-                </View>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={copy.resend}
-                  onPress={handleResend}
-                  hitSlop={8}
-                  disabled={isLoading === 'resend'}
-                >
-                  {isLoading === 'resend' ? (
-                    <ActivityIndicator size="small" color={Colors.accent} />
-                  ) : (
-                    <Text style={styles.linkText}>{copy.resend}</Text>
-                  )}
-                </Pressable>
-              )}
-            </Animated.View>
-          )}
-
-          <View style={styles.illustrationContainer}>
-            <Image
-              source={require('@/assets/images/sign-up-email-icon.png')}
-              style={styles.illustration}
-              contentFit="contain"
-            />
-          </View>
-        </ScrollView>
-
-        <View
-          style={[
-            styles.legalContainer,
-            { paddingBottom: Math.max(insets.bottom, Spacing.md) },
-          ]}
-        >
-          <Text style={styles.legalText}>
-            {copy.legalPrefix}
-            <Text style={styles.legalLink}>{copy.terms}</Text>
-            {copy.and}
-            <Text style={styles.legalLink}>{copy.privacy}</Text>
-          </Text>
+        <View style={styles.illustrationContainer}>
+          <Image
+            source={require('@/assets/images/sign-up-email-icon.png')}
+            style={styles.illustration}
+            contentFit="contain"
+          />
         </View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary,

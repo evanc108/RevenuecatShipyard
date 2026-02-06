@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 
 // Illustration: People illustrations by Storyset (https://storyset.com/people)
 
@@ -93,6 +94,31 @@ export default function FirstRecipeScreen() {
 
   const hasValidLink = isValidRecipeUrl(linkValue);
 
+  const bottomBarContent = (
+    <Animated.View
+      entering={FadeInUp.delay(200).duration(400)}
+      style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.sm }]}
+    >
+      <View style={styles.bottomLeft}>
+        <PageIndicator current={7} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={copy.skip}
+          onPress={handleSkip}
+          hitSlop={8}
+          disabled={isSaving}
+        >
+          <Text style={styles.skipText}>{copy.skip}</Text>
+        </Pressable>
+      </View>
+      <PageTurnButton
+        label={copy.start}
+        onPress={handleContinue}
+        disabled={!hasValidLink || isSaving}
+      />
+    </Animated.View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Pressable
@@ -105,82 +131,62 @@ export default function FirstRecipeScreen() {
         <Icon name="chevron-back" size={28} color={Colors.text.primary} />
       </Pressable>
 
-      <Animated.View
-        entering={FadeInDown.delay(0).duration(400)}
-        style={styles.headlineContainer}
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.scrollContent}
+        bottomBar={bottomBarContent}
       >
-        <Text style={styles.headline}>{copy.headline}</Text>
-        <Text style={styles.subhead}>{copy.subhead}</Text>
-      </Animated.View>
-
-      <Animated.View
-        entering={FadeInDown.delay(100).duration(400)}
-        style={styles.illustrationContainer}
-      >
-        <Image
-          source={require('@/assets/images/first-recipe.icon.png')}
-          style={styles.illustration}
-          contentFit="contain"
-        />
-      </Animated.View>
-
-      <Animated.View
-        entering={FadeInDown.delay(150).duration(400)}
-        style={styles.inputSection}
-      >
-        <TextInput
-          style={styles.linkInput}
-          placeholder={copy.inputPlaceholder}
-          placeholderTextColor={Colors.text.tertiary}
-          value={linkValue}
-          onChangeText={setLinkValue}
-          autoCapitalize="none"
-          autoCorrect={false}
-          multiline
-          accessibilityLabel={copy.inputPlaceholder}
-        />
-
-        <Text style={styles.orText}>{copy.orText}</Text>
-
-        <View style={styles.shareCard}>
-          <Icon
-            name="share-outline"
-            size={24}
-            color={Colors.text.secondary}
-          />
-          <View style={styles.shareCardText}>
-            <Text style={styles.shareTitle}>{copy.shareTitle}</Text>
-            <Text style={styles.shareDescription}>
-              {copy.shareDescription}
-            </Text>
-          </View>
-        </View>
-      </Animated.View>
-
-      <Animated.View
-        entering={FadeInUp.delay(200).duration(400)}
-        style={styles.bottomBar}
-      >
-        <View
-          style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
+        <Animated.View
+          entering={FadeInDown.delay(0).duration(400)}
+          style={styles.headlineContainer}
         >
-          <PageIndicator current={7} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.skip}
-            onPress={handleSkip}
-            hitSlop={8}
-            disabled={isSaving}
-          >
-            <Text style={styles.skipText}>{copy.skip}</Text>
-          </Pressable>
-        </View>
-        <PageTurnButton
-          label={copy.start}
-          onPress={handleContinue}
-          disabled={!hasValidLink || isSaving}
-        />
-      </Animated.View>
+          <Text style={styles.headline}>{copy.headline}</Text>
+          <Text style={styles.subhead}>{copy.subhead}</Text>
+        </Animated.View>
+
+        <Animated.View
+          entering={FadeInDown.delay(100).duration(400)}
+          style={styles.illustrationContainer}
+        >
+          <Image
+            source={require('@/assets/images/first-recipe.icon.png')}
+            style={styles.illustration}
+            contentFit="contain"
+          />
+        </Animated.View>
+
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(400)}
+          style={styles.inputSection}
+        >
+          <TextInput
+            style={styles.linkInput}
+            placeholder={copy.inputPlaceholder}
+            placeholderTextColor={Colors.text.tertiary}
+            value={linkValue}
+            onChangeText={setLinkValue}
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            accessibilityLabel={copy.inputPlaceholder}
+          />
+
+          <Text style={styles.orText}>{copy.orText}</Text>
+
+          <View style={styles.shareCard}>
+            <Icon
+              name="share-outline"
+              size={24}
+              color={Colors.text.secondary}
+            />
+            <View style={styles.shareCardText}>
+              <Text style={styles.shareTitle}>{copy.shareTitle}</Text>
+              <Text style={styles.shareDescription}>
+                {copy.shareDescription}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -189,6 +195,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.primary,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   backButton: {
     paddingHorizontal: Spacing.md,

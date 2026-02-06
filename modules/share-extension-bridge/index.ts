@@ -3,9 +3,11 @@
  *
  * Provides App Groups UserDefaults read/write and extension lifecycle
  * methods (close, openHostApp) that post NSNotifications to the Swift VC.
+ *
+ * In Expo Go, the native module is not available, so we provide no-op fallbacks.
  */
 
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 type ShareExtensionBridgeType = {
   close: () => void;
@@ -15,6 +17,37 @@ type ShareExtensionBridgeType = {
   removeItem: (key: string) => Promise<void>;
 };
 
-const { ShareExtensionBridge } = NativeModules;
+const { ShareExtensionBridge: NativeBridge } = NativeModules;
 
-export default ShareExtensionBridge as ShareExtensionBridgeType;
+/**
+ * Check if we're running in Expo Go (native module won't be available)
+ */
+const isExpoGo = !NativeBridge;
+
+/**
+ * No-op fallback for when native module isn't available (Expo Go)
+ */
+const fallbackBridge: ShareExtensionBridgeType = {
+  close: () => {
+    // No-op in Expo Go
+  },
+  openHostApp: () => {
+    // No-op in Expo Go
+  },
+  getItem: async () => {
+    // Return null in Expo Go - no App Groups storage available
+    return null;
+  },
+  setItem: async () => {
+    // No-op in Expo Go
+  },
+  removeItem: async () => {
+    // No-op in Expo Go
+  },
+};
+
+const ShareExtensionBridge: ShareExtensionBridgeType = isExpoGo
+  ? fallbackBridge
+  : NativeBridge;
+
+export default ShareExtensionBridge;
