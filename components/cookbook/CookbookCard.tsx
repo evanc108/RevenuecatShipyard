@@ -13,6 +13,7 @@ type CookbookCardProps = {
   onPress: () => void;
   onMorePress?: () => void;
   variant?: 'grid' | 'carousel';
+  size?: 'default' | 'compact';
 };
 
 // Solid pastel palette for cookbooks without cover images
@@ -40,9 +41,11 @@ export const CookbookCard = memo(function CookbookCard({
   onPress,
   onMorePress,
   variant = 'grid',
+  size = 'default',
 }: CookbookCardProps): React.ReactElement {
   const pastelBg = getPastelForName(name);
   const isCarousel = variant === 'carousel';
+  const isCompact = size === 'compact';
   const hasImage = Boolean(coverImageUrl);
 
   return (
@@ -76,12 +79,15 @@ export const CookbookCard = memo(function CookbookCard({
       ) : null}
 
       {/* Content — top-left with padding */}
-      <View style={[styles.content, isCarousel && styles.contentCarousel]}>
+      <View style={[
+        styles.content,
+        isCarousel && (isCompact ? styles.contentCarouselCompact : styles.contentCarousel),
+      ]}>
         {/* Recipe count */}
         <Text
           style={[
             styles.recipeCount,
-            isCarousel && styles.recipeCountCarousel,
+            isCarousel && (isCompact ? styles.recipeCountCarouselCompact : styles.recipeCountCarousel),
             hasImage && styles.textOnImage,
           ]}
         >
@@ -92,11 +98,11 @@ export const CookbookCard = memo(function CookbookCard({
         <Text
           style={[
             styles.cardTitle,
-            isCarousel ? styles.cardTitleCarousel : styles.cardTitleGrid,
+            isCarousel
+              ? (isCompact ? styles.cardTitleCarouselCompact : styles.cardTitleCarousel)
+              : styles.cardTitleGrid,
             hasImage && styles.titleOnImage,
           ]}
-          numberOfLines={isCarousel ? 2 : 3}
-          ellipsizeMode="tail"
         >
           {name}
         </Text>
@@ -106,11 +112,9 @@ export const CookbookCard = memo(function CookbookCard({
           <Text
             style={[
               styles.cardDescription,
-              styles.cardDescriptionCarousel,
+              isCompact ? styles.cardDescriptionCarouselCompact : styles.cardDescriptionCarousel,
               hasImage && styles.descriptionOnImage,
             ]}
-            numberOfLines={2}
-            ellipsizeMode="tail"
           >
             {description}
           </Text>
@@ -121,13 +125,16 @@ export const CookbookCard = memo(function CookbookCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Cookbook options"
-        style={[styles.moreIcon, isCarousel && styles.moreIconCarousel]}
+        style={[
+          styles.moreIcon,
+          isCarousel && (isCompact ? styles.moreIconCarouselCompact : styles.moreIconCarousel),
+        ]}
         onPress={onMorePress}
         hitSlop={12}
       >
         <Icon
           name="apps"
-          size={isCarousel ? 24 : 18}
+          size={isCarousel ? 20 : 20}
           color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
         />
       </Pressable>
@@ -142,7 +149,7 @@ const styles = StyleSheet.create({
   },
   cardGrid: {
     width: '100%',
-    aspectRatio: 0.65,
+    aspectRatio: 1,
   },
   cardCarousel: {
     flex: 1,
@@ -165,9 +172,15 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingTop: Spacing.xl,
   },
+  // Default carousel content (larger padding)
   contentCarousel: {
-    padding: Spacing.xl,
-    paddingTop: Spacing.xxl,
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+  // Compact carousel content (profile page)
+  contentCarouselCompact: {
+    padding: Spacing.md,
+    paddingTop: Spacing.lg,
   },
 
   // Recipe count — black
@@ -178,9 +191,15 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
+  // Default carousel recipe count
   recipeCountCarousel: {
     fontSize: 14,
     marginBottom: Spacing.sm,
+  },
+  // Compact carousel recipe count (profile page)
+  recipeCountCarouselCompact: {
+    fontSize: 12,
+    marginBottom: Spacing.xs,
   },
 
   // Title — big and bold
@@ -192,13 +211,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   cardTitleGrid: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 22,
+    lineHeight: 26,
   },
+  // Default carousel title (larger)
   cardTitleCarousel: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 32,
     marginBottom: Spacing.sm,
+  },
+  // Compact carousel title (profile page)
+  cardTitleCarouselCompact: {
+    fontSize: 24,
+    lineHeight: 28,
+    marginBottom: Spacing.xs,
   },
 
   // Description
@@ -206,9 +232,15 @@ const styles = StyleSheet.create({
     ...Typography.h1,
     color: Colors.text.primary,
   },
+  // Default carousel description
   cardDescriptionCarousel: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  // Compact carousel description (profile page)
+  cardDescriptionCarouselCompact: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   // Text-on-image overrides (white text with shadow)
@@ -234,11 +266,11 @@ const styles = StyleSheet.create({
   // Clickable indicator — top-right
   moreIcon: {
     position: 'absolute',
-    top: Spacing.xl,
+    top: Spacing.lg,
     right: Spacing.lg,
   },
   moreIconCarousel: {
-    top: Spacing.xxl,
-    right: Spacing.xl,
+    top: Spacing.md,
+    right: Spacing.md,
   },
 });

@@ -1,13 +1,13 @@
-import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
+import { Icon } from '@/components/ui/Icon';
+import { Colors, FontFamily, Radius, Spacing, Typography } from '@/constants/theme';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Icon } from '@/components/ui/Icon';
-import { Colors, FontFamily, Spacing, Radius, Typography } from '@/constants/theme';
 import { memo } from 'react';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 32;
-const CARD_HEIGHT = CARD_WIDTH * 1.4;
+const CARD_HEIGHT = CARD_WIDTH * 1.4; // Taller portrait cards
 
 /**
  * Ingredient type matching the recipes schema

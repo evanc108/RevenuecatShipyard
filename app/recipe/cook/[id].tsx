@@ -6,6 +6,7 @@ import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { useWakeWord } from '@/hooks/useWakeWord';
+import { getIngredientImageUrl } from '@/utils/ingredientImage';
 import { isSpeaking, precacheCommonResponses, precacheTexts } from '@/utils/voice';
 import { useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
@@ -74,14 +75,6 @@ function getIngredientCategory(category?: string, name?: string): IngredientCate
   return 'other';
 }
 
-function getIngredientImageUrl(name: string): string {
-  const mainName = name.split(/[,(]/)[0].trim();
-  const formatted = mainName
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-  return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formatted)}-Small.png`;
-}
 
 // --- Voice Button Component ---
 const VoiceButton = memo(function VoiceButton({

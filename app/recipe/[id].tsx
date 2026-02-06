@@ -6,6 +6,7 @@ import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { getIngredientImageUrl } from '@/utils/ingredientImage';
 import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -39,7 +40,6 @@ const STAR_SIZE = 28;
 const STAR_COLOR_ACTIVE = '#FFB800';
 const INGREDIENT_IMAGE_SIZE = 44;
 const NAV_BUTTON_SIZE = 40;
-const HEADER_BUTTON_SIZE = 38;
 const NAV_ICON_STROKE = 2.5;
 const NAV_EXPANDED_HEIGHT = NAV_BUTTON_SIZE * 5 + Spacing.xs * 2;
 const FLOATING_BAR_HEIGHT = 56;
@@ -230,17 +230,6 @@ function getIngredientCategory(
 	return 'other';
 }
 
-function getIngredientImageUrl(name: string): string {
-	const mainName = name.split(/[,(]/)[0].trim();
-	const formatted = mainName
-		.split(' ')
-		.map(
-			(word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-		)
-		.join(' ');
-	return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formatted)}-Small.png`;
-}
-
 // --- Sub-components ---
 
 type IngredientCardProps = {
@@ -266,6 +255,7 @@ const IngredientCard = memo(function IngredientCard({
 	servingsMultiplier,
 	formatQuantity
 }: IngredientCardProps) {
+	const [imageError, setImageError] = useState(false);
 	const ingredientCategory = getIngredientCategory(category, name);
 	const bgColor = CATEGORY_COLORS[ingredientCategory];
 	const imageUrl = getIngredientImageUrl(name);
@@ -280,16 +270,22 @@ const IngredientCard = memo(function IngredientCard({
 			style={[ingStyles.card, { backgroundColor: bgColor }]}
 			accessibilityLabel={`${name}${isOptional ? ', optional' : ''}`}
 		>
-			<View style={ingStyles.imageCircle}>
-				<Text style={ingStyles.imageFallback}>
-					{name.charAt(0).toUpperCase()}
-				</Text>
-				<Image
-					source={{ uri: imageUrl }}
-					style={StyleSheet.absoluteFillObject}
-					contentFit="contain"
-					cachePolicy="memory-disk"
-				/>
+			<View style={ingStyles.imageContainer}>
+				{imageError ? (
+					<View style={[ingStyles.imageFallback, { backgroundColor: bgColor }]}>
+						<Text style={ingStyles.imageFallbackText}>
+							{name.charAt(0).toUpperCase()}
+						</Text>
+					</View>
+				) : (
+					<Image
+						source={{ uri: imageUrl }}
+						style={ingStyles.ingredientImage}
+						contentFit="contain"
+						cachePolicy="memory-disk"
+						onError={() => setImageError(true)}
+					/>
+				)}
 			</View>
 			<View style={ingStyles.info}>
 				<Text style={ingStyles.name} numberOfLines={1}>
@@ -315,20 +311,28 @@ const ingStyles = StyleSheet.create({
 		borderRadius: Radius.lg,
 		marginBottom: Spacing.sm
 	},
-	imageCircle: {
+	imageContainer: {
 		width: INGREDIENT_IMAGE_SIZE,
 		height: INGREDIENT_IMAGE_SIZE,
-		borderRadius: INGREDIENT_IMAGE_SIZE / 2,
-		backgroundColor: 'rgba(255,255,255,0.7)',
-		alignItems: 'center',
-		justifyContent: 'center',
-		overflow: 'hidden',
 		marginRight: Spacing.sm
 	},
+	ingredientImage: {
+		width: '100%',
+		height: '100%'
+	},
 	imageFallback: {
-		fontSize: 16,
+		width: '100%',
+		height: '100%',
+		borderRadius: Radius.md,
+		alignItems: 'center',
+		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: 'rgba(0,0,0,0.08)'
+	},
+	imageFallbackText: {
+		fontSize: 20,
 		fontWeight: '700',
-		color: Colors.text.primary
+		color: Colors.text.secondary
 	},
 	info: {
 		flex: 1,
@@ -1430,9 +1434,9 @@ export default function RecipeDetailScreen() {
 				>
 					<Icon
 						name="arrow-back"
-						size={24}
+						size={22}
 						color={Colors.text.inverse}
-						strokeWidth={2.5}
+						strokeWidth={NAV_ICON_STROKE}
 					/>
 				</Pressable>
 
@@ -1553,8 +1557,10 @@ const styles = StyleSheet.create({
 		zIndex: 10
 	},
 	headerBackButton: {
-		width: HEADER_BUTTON_SIZE,
+		width: NAV_BUTTON_SIZE,
 		height: NAV_BUTTON_SIZE,
+		borderRadius: NAV_BUTTON_SIZE / 2,
+		backgroundColor: Colors.text.primary,
 		alignItems: 'center',
 		justifyContent: 'center'
 	},
