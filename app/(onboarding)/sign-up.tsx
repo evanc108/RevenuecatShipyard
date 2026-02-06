@@ -42,7 +42,11 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
 
   // Generate redirect URL for OAuth - needed for Expo Go on physical devices
-  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
+  const redirectUrl = useMemo(() => {
+    const url = Linking.createURL('sso-callback');
+    console.log('REDIRECT URL:', url);
+    return url;
+  }, []);
 
   const handleSSO = useCallback(
     async (strategy: 'oauth_apple' | 'oauth_google') => {
