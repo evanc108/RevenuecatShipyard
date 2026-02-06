@@ -644,23 +644,6 @@ export default function DiscoverScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.headerSpacer} />
-
-          {/* Bell notification button */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            style={styles.bellButton}
-            hitSlop={8}
-            onPress={() => {
-              // TODO: open notifications
-            }}
-          >
-            <Icon name="bell" size={28} color={Colors.text.primary} strokeWidth={2} />
-            <View style={styles.notiBadge}>
-              <Text style={styles.notiCount}>3</Text>
-            </View>
-          </Pressable>
         </View>
         {activeTab === 'feed' ? (
           <View style={styles.searchBarContainer}>
@@ -712,36 +695,6 @@ const styles = StyleSheet.create({
   headerLogo: {
     width: 100,
     height: 60,
-  },
-  headerSpacer: {
-    flex: 1,
-  },
-  bellButton: {
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notiBadge: {
-    position: 'absolute',
-    top: 30,
-    right: 8,
-    backgroundColor: Colors.accent,
-    minWidth: 20,
-    height: 20,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-    borderWidth: 2,
-    borderColor: Colors.background.primary,
-  },
-  notiCount: {
-    fontSize: 9,
-    fontFamily: FontFamily.bold,
-    fontWeight: '700' as const,
-    color: Colors.text.inverse,
-    lineHeight: 12,
   },
   tabRow: {
     paddingLeft: Spacing.sm,
