@@ -10,12 +10,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 type LoadingProps = {
-	size?: 'small' | 'large';
+	size?: 'button' | 'small' | 'large';
 	color?: string;
 	style?: ViewStyle;
 };
 
 const SIZE_MAP = {
+	button: 20,
 	small: 72,
 	large: 200
 } as const;

@@ -23,13 +23,25 @@ const WAKE_PHRASES = [
   'hey nom', 'hey nam', 'hey gnome', 'hey norm', 'hey noem', 'hey nome',
   'hey numb', 'hey num', 'hey known', 'hey non', 'hey nohm', 'hey nahm',
   'a nom', 'a]nom', 'heynom', 'hey, nom', 'hey. nom', 'hey no',
+  'hey mom', 'hey nah', 'hey na', 'hey nyom', 'haynom', 'hey, nah',
 ];
-const LISTENING_INTERVAL_MS = 2000; // Reduced from 2.5s to 2s for faster response
-const PAUSE_BETWEEN_LISTENS_MS = 500; // Reduced pause for quicker detection
-const PAUSE_WHEN_QUIET_MS = 800; // Slightly longer pause when no speech detected
-const MIN_AUDIO_FILE_SIZE = 6000; // Slightly lower threshold
-const MAX_WAKE_WORD_LENGTH = 25; // Wake word should be short
-const MIN_AUDIO_LEVEL_DB = -38; // Slightly more sensitive to catch quieter speech
+
+// Optimized timing for faster wake word detection
+const LISTENING_INTERVAL_MS = 1500; // Reduced from 2s for faster detection
+const PAUSE_BETWEEN_LISTENS_MS = 150; // Minimal pause - start next listen ASAP
+const PAUSE_WHEN_QUIET_MS = 400; // Shorter pause even when quiet
+const PAUSE_AFTER_IRRELEVANT_MS = 100; // Very short pause after rejecting non-wake-word
+const MIN_AUDIO_FILE_SIZE = 5000; // Lower threshold to catch quieter speech
+const MAX_WAKE_WORD_LENGTH = 30; // Slightly longer to catch variations
+const MIN_AUDIO_LEVEL_DB = -40; // More sensitive to catch quieter speech
+
+// Words/patterns that clearly indicate NOT a wake word - skip immediately
+const REJECT_PATTERNS = [
+  /^(the|a|an|is|it|this|that|and|or|but|so|if|when|what|how|why|where)\s/i,
+  /music|song|playing|audio|video/i,
+  /\d{3,}/, // Long numbers (likely background audio)
+  /^(um|uh|ah|oh|hmm|huh)\s*$/i, // Filler sounds
+];
 
 type UseWakeWordProps = {
   onWakeWordDetected: () => void;
@@ -140,19 +152,31 @@ export function useWakeWord({
   };
 
   // Check if transcript should be skipped (noise, music, or too long to be wake word)
-  const shouldSkipTranscript = (transcript: string): boolean => {
+  // Returns: { skip: boolean, fastReject: boolean } - fastReject means use shorter pause
+  const shouldSkipTranscript = (transcript: string): { skip: boolean; fastReject: boolean } => {
     const trimmed = transcript.trim();
+
     // Too short to be meaningful
     if (trimmed.length < 3) {
       console.log('[WakeWord] Skipping: too short');
-      return true;
+      return { skip: true, fastReject: true };
     }
-    // Too long to be a wake word - skip without API call next time
+
+    // Check reject patterns first (clearly not wake words)
+    for (const pattern of REJECT_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        console.log('[WakeWord] Fast reject: matches reject pattern');
+        return { skip: true, fastReject: true };
+      }
+    }
+
+    // Too long to be a wake word
     if (trimmed.length > MAX_WAKE_WORD_LENGTH && !checkForWakeWord(trimmed)) {
       console.log('[WakeWord] Skipping: too long for wake word');
-      return true;
+      return { skip: true, fastReject: true };
     }
-    return false;
+
+    return { skip: false, fastReject: false };
   };
 
   const recordAndCheck = useCallback(async () => {
@@ -170,13 +194,37 @@ export function useWakeWord({
     try {
       setIsRecording(true);
 
-      // Configure audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
+      // Configure audio mode for recording with retry
+      // iOS needs time to switch audio session from playback to recording
+      let audioModeSet = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+            shouldDuckAndroid: true,
+          });
+          // Wait for iOS audio session to fully switch
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          audioModeSet = true;
+          break;
+        } catch (audioModeError) {
+          console.log(`[WakeWord] Audio mode attempt ${attempt + 1} failed, retrying...`);
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+      }
+
+      if (!audioModeSet) {
+        console.error('[WakeWord] Failed to set audio mode after retries');
+        setIsRecording(false);
+        isProcessingRef.current = false;
+        // Retry the whole cycle after a delay
+        if (shouldContinueRef.current && enabledRef.current) {
+          timeoutRef.current = setTimeout(recordAndCheck, 500);
+        }
+        return;
+      }
 
       // Create recording with metering enabled
       const { recording } = await Audio.Recording.createAsync(
@@ -303,16 +351,19 @@ export function useWakeWord({
       }
 
       // Skip if transcript should be filtered (too short, too long, noise)
-      if (shouldSkipTranscript(transcript)) {
+      const skipResult = shouldSkipTranscript(transcript);
+      if (skipResult.skip) {
         if (shouldContinueRef.current && enabledRef.current) {
-          timeoutRef.current = setTimeout(recordAndCheck, PAUSE_BETWEEN_LISTENS_MS);
+          // Use faster restart for obvious non-wake-words
+          const pauseTime = skipResult.fastReject ? PAUSE_AFTER_IRRELEVANT_MS : PAUSE_BETWEEN_LISTENS_MS;
+          timeoutRef.current = setTimeout(recordAndCheck, pauseTime);
         }
         return;
       }
 
-      // Continue listening if still enabled
+      // Continue listening if still enabled (transcript was processed but no wake word)
       if (shouldContinueRef.current && enabledRef.current) {
-        timeoutRef.current = setTimeout(recordAndCheck, PAUSE_BETWEEN_LISTENS_MS);
+        timeoutRef.current = setTimeout(recordAndCheck, PAUSE_AFTER_IRRELEVANT_MS);
       }
     } catch (err) {
       console.error('[WakeWord] Error:', err);

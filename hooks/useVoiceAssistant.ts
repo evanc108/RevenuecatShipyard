@@ -41,6 +41,8 @@ type UseVoiceAssistantReturn = {
   voiceState: VoiceState;
   isListening: boolean;
   isSpeakingState: boolean;
+  /** Whether TTS is currently loading/fetching audio (before playback starts) */
+  isLoadingTTS: boolean;
   lastTranscript: string | null;
   error: string | null;
   hasPermission: boolean;
@@ -69,12 +71,16 @@ export function useVoiceAssistant({
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
+  const [isLoadingTTS, setIsLoadingTTS] = useState(false);
 
   const isProcessingRef = useRef(false);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
   const autoListenRef = useRef(false);
+  // Use ref for currentStep to avoid stale closures in callbacks
+  const currentStepRef = useRef(currentStep);
+  currentStepRef.current = currentStep;
 
   const isListening = voiceState === 'listening';
   const isSpeakingState = voiceState === 'speaking';
@@ -350,41 +356,52 @@ export function useVoiceAssistant({
   );
 
   const speakText = useCallback(async (text: string, skipCache = false) => {
+    setIsLoadingTTS(true);
     setVoiceState('speaking');
     try {
       console.log('[Voice] speakText starting...');
       await speak(text, {
         skipCache, // Skip cache for short confirmations like "Yes?"
+        onStart: () => {
+          console.log('[Voice] speakText audio started playing');
+          setIsLoadingTTS(false);
+        },
         onDone: () => {
           console.log('[Voice] speakText done');
+          setIsLoadingTTS(false);
           setVoiceState('idle');
         },
         onError: (error) => {
           console.error('[Voice] speakText error:', error);
+          setIsLoadingTTS(false);
           setVoiceState('idle');
         },
       });
     } catch (error) {
       console.error('[Voice] speakText catch error:', error);
+      setIsLoadingTTS(false);
       setVoiceState('idle');
     }
   }, []);
 
   const stopSpeakingNow = useCallback(async () => {
     await stopSpeaking();
+    setIsLoadingTTS(false);
     setVoiceState('idle');
   }, []);
 
   const speakCurrentStep = useCallback(async () => {
-    console.log('[Voice] speakCurrentStep called, recipe:', !!recipe, 'step:', currentStep);
-    if (!recipe || !recipe.instructions[currentStep]) {
+    // Use ref to get the most current step value (avoids stale closure)
+    const step = currentStepRef.current;
+    console.log('[Voice] speakCurrentStep called, recipe:', !!recipe, 'step:', step);
+    if (!recipe || !recipe.instructions[step]) {
       console.log('[Voice] No recipe or instruction to speak');
       return;
     }
-    const stepText = `Step ${currentStep + 1}: ${recipe.instructions[currentStep].text}`;
+    const stepText = `Step ${step + 1}: ${recipe.instructions[step].text}`;
     console.log('[Voice] Speaking step:', stepText.substring(0, 50));
     await speakText(stepText);
-  }, [recipe, currentStep, speakText]);
+  }, [recipe, speakText]);
 
   const speakIngredients = useCallback(async () => {
     if (!recipe) return;
@@ -398,6 +415,7 @@ export function useVoiceAssistant({
     voiceState,
     isListening,
     isSpeakingState,
+    isLoadingTTS,
     lastTranscript,
     error,
     hasPermission,

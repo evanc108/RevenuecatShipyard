@@ -1,14 +1,15 @@
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
-import { COOK_MODE_COPY } from '@/constants/voiceCommands';
 import { Colors, FontFamily, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { COOK_MODE_COPY } from '@/constants/voiceCommands';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { useWakeWord } from '@/hooks/useWakeWord';
-import { precacheTexts, precacheCommonResponses, isSpeaking } from '@/utils/voice';
+import { isSpeaking, precacheCommonResponses, precacheTexts } from '@/utils/voice';
 import { useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -35,6 +36,52 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Card dimensions calculated inside component using useWindowDimensions
 
 const copy = COOK_MODE_COPY;
+
+// --- Ingredient Helpers ---
+const INGREDIENT_IMAGE_SIZE = 44;
+
+const CATEGORY_COLORS = {
+  protein: '#FFE0E0',
+  vegetable: '#E0F5E0',
+  fruit: '#FFF5D6',
+  dairy: '#DEE8FF',
+  other: '#F5F5F7',
+} as const;
+
+type IngredientCategory = keyof typeof CATEGORY_COLORS;
+
+function getIngredientCategory(category?: string, name?: string): IngredientCategory {
+  const has = (text: string, keys: string[]): boolean =>
+    keys.some((k) => text.includes(k));
+
+  if (category) {
+    const cat = category.toLowerCase();
+    if (has(cat, ['protein', 'meat', 'poultry', 'seafood', 'fish', 'egg'])) return 'protein';
+    if (has(cat, ['vegetable', 'produce', 'veg'])) return 'vegetable';
+    if (has(cat, ['fruit'])) return 'fruit';
+    if (has(cat, ['dairy', 'milk', 'cheese'])) return 'dairy';
+    return 'other';
+  }
+
+  if (name) {
+    const lower = name.toLowerCase();
+    if (has(lower, ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'fish', 'salmon', 'tuna', 'shrimp', 'egg', 'bacon', 'sausage', 'steak', 'tofu'])) return 'protein';
+    if (has(lower, ['onion', 'garlic', 'tomato', 'pepper', 'carrot', 'celery', 'broccoli', 'spinach', 'potato', 'mushroom', 'zucchini', 'cucumber', 'corn', 'peas'])) return 'vegetable';
+    if (has(lower, ['lemon', 'lime', 'orange', 'apple', 'banana', 'berry', 'mango', 'avocado', 'coconut'])) return 'fruit';
+    if (has(lower, ['milk', 'cream', 'cheese', 'yogurt', 'butter'])) return 'dairy';
+  }
+
+  return 'other';
+}
+
+function getIngredientImageUrl(name: string): string {
+  const mainName = name.split(/[,(]/)[0].trim();
+  const formatted = mainName
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+  return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formatted)}-Small.png`;
+}
 
 // --- Voice Button Component ---
 const VoiceButton = memo(function VoiceButton({
@@ -177,13 +224,88 @@ const InstructionCard = memo(function InstructionCard({
   );
 });
 
+// --- Ingredient Card for Modal ---
+const IngredientCard = memo(function IngredientCard({
+  name,
+  rawText,
+  category,
+}: {
+  name: string;
+  rawText: string;
+  category?: string;
+}) {
+  const ingredientCategory = getIngredientCategory(category, name);
+  const bgColor = CATEGORY_COLORS[ingredientCategory];
+  const imageUrl = getIngredientImageUrl(name);
+
+  return (
+    <View style={[ingStyles.card, { backgroundColor: bgColor }]}>
+      <View style={ingStyles.imageCircle}>
+        <Text style={ingStyles.imageFallback}>{name.charAt(0).toUpperCase()}</Text>
+        <Image
+          source={{ uri: imageUrl }}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+      </View>
+      <View style={ingStyles.info}>
+        <Text style={ingStyles.name} numberOfLines={1}>{name}</Text>
+        <Text style={ingStyles.detail} numberOfLines={1}>{rawText}</Text>
+      </View>
+    </View>
+  );
+});
+
+const ingStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 4,
+    paddingHorizontal: Spacing.sm + 2,
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.sm,
+  },
+  imageCircle: {
+    width: INGREDIENT_IMAGE_SIZE,
+    height: INGREDIENT_IMAGE_SIZE,
+    borderRadius: INGREDIENT_IMAGE_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginRight: Spacing.sm,
+  },
+  imageFallback: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  info: {
+    flex: 1,
+    gap: 2,
+  },
+  name: {
+    ...Typography.label,
+    fontWeight: '700',
+    color: Colors.text.primary,
+  },
+  detail: {
+    ...Typography.bodySmall,
+    color: Colors.text.primary,
+  },
+});
+
 // --- Ingredients Modal ---
 const IngredientsModal = memo(function IngredientsModal({
   visible,
   onClose,
   ingredients,
-  onReadIngredients,
+  onToggleRead,
+  isSpeaking,
+  isLoading,
   maxHeight,
+  bottomInset,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -192,43 +314,89 @@ const IngredientsModal = memo(function IngredientsModal({
     rawText: string;
     quantity: number;
     unit: string;
+    category?: string;
   }>;
-  onReadIngredients: () => void;
+  onToggleRead: () => void;
+  isSpeaking: boolean;
+  isLoading: boolean;
   maxHeight: number;
+  bottomInset: number;
 }) {
+  // Animate sheet slide up independently from backdrop
+  const translateY = useSharedValue(maxHeight);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withTiming(0, { duration: 300 });
+    } else {
+      translateY.value = maxHeight;
+    }
+  }, [visible, maxHeight, translateY]);
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose} />
-      <View style={[styles.modalSheet, { maxHeight }]}>
-        <View style={styles.modalHandle} />
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>{copy.ingredients}</Text>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalContainer}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.modalSheet,
+            {
+              height: maxHeight,
+              paddingBottom: bottomInset + Spacing.lg,
+            },
+            sheetAnimatedStyle,
+          ]}
+        >
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{copy.ingredients}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isSpeaking ? 'Stop reading' : 'Read ingredients aloud'}
+              style={[styles.readButton, isSpeaking && styles.readButtonSpeaking]}
+              onPress={onToggleRead}
+            >
+              {isLoading ? (
+                <Loading size="button" />
+              ) : (
+                <Icon
+                  name={isSpeaking ? 'close' : 'volume-2'}
+                  size={18}
+                  color={isSpeaking ? Colors.text.inverse : Colors.accent}
+                />
+              )}
+              <Text style={[styles.readButtonText, isSpeaking && styles.readButtonTextSpeaking]}>
+                {isLoading ? 'Loading...' : isSpeaking ? 'Stop' : 'Read'}
+              </Text>
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.ingredientsList}
+            contentContainerStyle={styles.ingredientsListContent}
+            showsVerticalScrollIndicator={true}
+          >
+            {ingredients.map((ing, idx) => (
+              <IngredientCard
+                key={`${ing.name}-${idx}`}
+                name={ing.name}
+                rawText={ing.rawText}
+                category={ing.category}
+              />
+            ))}
+          </ScrollView>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Read ingredients aloud"
-            style={styles.readButton}
-            onPress={onReadIngredients}
+            accessibilityLabel="Close ingredients"
+            style={styles.closeButton}
+            onPress={onClose}
           >
-            <Icon name="volume-2" size={18} color={Colors.accent} />
-            <Text style={styles.readButtonText}>{copy.readIngredients}</Text>
+            <Text style={styles.closeButtonText}>Done</Text>
           </Pressable>
-        </View>
-        <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
-          {ingredients.map((ing, idx) => (
-            <View key={`${ing.name}-${idx}`} style={styles.ingredientRow}>
-              <View style={styles.ingredientBullet} />
-              <Text style={styles.ingredientText}>{ing.rawText}</Text>
-            </View>
-          ))}
-        </ScrollView>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close ingredients"
-          style={styles.closeButton}
-          onPress={onClose}
-        >
-          <Text style={styles.closeButtonText}>Done</Text>
-        </Pressable>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -261,6 +429,7 @@ export default function CookModeScreen() {
   const {
     voiceState,
     isSpeakingState,
+    isLoadingTTS,
     isListening,
     toggleListening,
     startListening,
@@ -273,10 +442,10 @@ export default function CookModeScreen() {
   } = useVoiceAssistant({
     recipe: recipe
       ? {
-          title: recipe.title,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-        }
+        title: recipe.title,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+      }
       : null,
     currentStep,
     onStepChange: setCurrentStep,
@@ -289,6 +458,9 @@ export default function CookModeScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     try {
+      // FIRST: Stop any currently playing audio immediately
+      await stopSpeakingNow();
+
       // Use cached "Yes?" audio for instant response (pre-cached on mount)
       console.log('[CookMode] Speaking confirmation...');
       await speakText('Yes?'); // Uses cache - instant playback!
@@ -301,7 +473,7 @@ export default function CookModeScreen() {
       console.error('[CookMode] Error in wake word handler:', error);
       startListening();
     }
-  }, [startListening, speakText]);
+  }, [startListening, speakText, stopSpeakingNow]);
 
   // Check if TTS is actually playing (not just React state)
   const isTTSPlaying = isSpeakingState || isSpeaking();
@@ -331,8 +503,9 @@ export default function CookModeScreen() {
     precacheCommonResponses();
   }, []);
 
-  // Pre-cache all recipe step TTS audio in background when recipe loads
+  // Pre-cache recipe step TTS audio in background when recipe loads
   // This makes "Read Step" instant after the first load
+  // Note: Ingredients audio is NOT pre-cached - only fetched when user presses "Read Ingredients"
   useEffect(() => {
     if (!recipe || precacheStartedRef.current) return;
     precacheStartedRef.current = true;
@@ -341,23 +514,15 @@ export default function CookModeScreen() {
       (instruction, index) => `Step ${index + 1}: ${instruction.text}`
     );
 
-    // Also cache ingredients reading
-    const ingredientsList = recipe.ingredients
-      .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name}`)
-      .join('. ');
-    const ingredientsText = `Ingredients: ${ingredientsList}`;
+    console.log(`[CookMode] Pre-caching ${stepTexts.length} step TTS audio files...`);
 
-    const allTexts = [...stepTexts, ingredientsText];
-
-    console.log(`[CookMode] Pre-caching ${allTexts.length} TTS audio files...`);
-
-    // Pre-cache in background with progress tracking
-    precacheTexts(allTexts, {
+    // Pre-cache steps only (not ingredients) in background with progress tracking
+    precacheTexts(stepTexts, {
       maxConcurrent: 2, // Conservative to avoid rate limits
       onProgress: (cached, total) => {
         setPrecacheProgress({ cached, total });
         if (cached === total) {
-          console.log('[CookMode] All TTS audio pre-cached!');
+          console.log('[CookMode] All step TTS audio pre-cached!');
         }
       },
     });
@@ -377,17 +542,19 @@ export default function CookModeScreen() {
   // Restart wake word listening after voice interaction completes
   useEffect(() => {
     // Only restart if truly idle and not speaking
-    if (heyNomEnabled && voiceState === 'idle' && !isListening && !isSpeakingState && !isWakeWordRecording) {
-      // Longer delay to ensure TTS has fully finished
+    // Also check isTTSPlaying which uses the actual TTS module state
+    if (heyNomEnabled && voiceState === 'idle' && !isListening && !isSpeakingState && !isWakeWordRecording && !isTTSPlaying) {
+      // Longer delay to ensure TTS audio session has fully released
       const timer = setTimeout(() => {
-        // Double-check using TTS module's actual state, not just React state
+        // Triple-check using TTS module's actual state before restarting
         if (!isWakeWordListening && voiceState === 'idle' && !isSpeaking()) {
+          console.log('[CookMode] Restarting wake word listening after voice interaction');
           startWakeWordListening();
         }
-      }, 500); // Increased from 250ms to 500ms for safety
+      }, 800); // Increased to 800ms to ensure audio session is fully released
       return () => clearTimeout(timer);
     }
-  }, [heyNomEnabled, voiceState, isListening, isSpeakingState, isWakeWordListening, isWakeWordRecording, startWakeWordListening]);
+  }, [heyNomEnabled, voiceState, isListening, isSpeakingState, isWakeWordListening, isWakeWordRecording, isTTSPlaying, startWakeWordListening]);
 
   const totalSteps = recipe?.instructions.length ?? 0;
   const canGoNext = currentStep < totalSteps - 1;
@@ -432,8 +599,9 @@ export default function CookModeScreen() {
   }, [canGoPrev, screenWidth, translateX, cardScale, currentStep]);
 
   const handleVoiceToggle = useCallback(async () => {
-    // If speaking, stop it first
-    if (isSpeakingState) {
+    // If speaking (check both React state AND TTS module state), stop it first
+    if (isSpeakingState || isTTSPlaying) {
+      console.log('[CookMode] Stopping audio on mic button press');
       await stopSpeakingNow();
       return;
     }
@@ -445,38 +613,21 @@ export default function CookModeScreen() {
     // Stop wake word recording before starting manual recording
     if (isWakeWordRecording || isWakeWordListening) {
       await stopWakeWordListening();
-      // Reduced delay - stopWakeWordListening now handles cleanup faster
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Wait for audio session to be released
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
     // Toggle listening with single tap
     await toggleListening();
-  }, [isSpeakingState, stopSpeakingNow, hasPermission, requestPermission, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
+  }, [isSpeakingState, isTTSPlaying, stopSpeakingNow, hasPermission, requestPermission, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
 
   const handleReadStep = useCallback(async () => {
     // Toggle: if speaking, stop; otherwise start speaking
-    if (isSpeakingState) {
+    // Use isTTSPlaying for accurate detection (not just React state)
+    if (isSpeakingState || isTTSPlaying) {
       await stopSpeakingNow();
-    } else {
-      // Stop listening and wake word in parallel if needed
-      const stopPromises: Promise<void>[] = [];
-      if (voiceState === 'listening') {
-        stopPromises.push(toggleListening());
-      }
-      if (isWakeWordRecording || isWakeWordListening) {
-        stopPromises.push(stopWakeWordListening());
-      }
-
-      // Wait for all stop operations in parallel
-      if (stopPromises.length > 0) {
-        await Promise.all(stopPromises);
-      }
-
-      // Start speaking immediately - no extra delay needed
-      await speakCurrentStep();
+      return; // Just stop, don't start new audio
     }
-  }, [isSpeakingState, stopSpeakingNow, speakCurrentStep, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
 
-  const handleReadIngredients = useCallback(async () => {
     // Stop listening and wake word in parallel if needed
     const stopPromises: Promise<void>[] = [];
     if (voiceState === 'listening') {
@@ -491,10 +642,34 @@ export default function CookModeScreen() {
       await Promise.all(stopPromises);
     }
 
-    // Start speaking immediately
+    // Start speaking the current step
+    await speakCurrentStep();
+  }, [isSpeakingState, isTTSPlaying, stopSpeakingNow, speakCurrentStep, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
+
+  const handleReadIngredients = useCallback(async () => {
+    // Toggle: if speaking, stop; otherwise start speaking
+    if (isSpeakingState) {
+      await stopSpeakingNow();
+      return;
+    }
+
+    // Stop listening and wake word in parallel if needed
+    const stopPromises: Promise<void>[] = [];
+    if (voiceState === 'listening') {
+      stopPromises.push(toggleListening());
+    }
+    if (isWakeWordRecording || isWakeWordListening) {
+      stopPromises.push(stopWakeWordListening());
+    }
+
+    // Wait for all stop operations in parallel
+    if (stopPromises.length > 0) {
+      await Promise.all(stopPromises);
+    }
+
+    // Start speaking ingredients (don't close modal - let user close it)
     await speakIngredients();
-    setShowIngredients(false);
-  }, [speakIngredients, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
+  }, [isSpeakingState, stopSpeakingNow, speakIngredients, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening]);
 
   // Helper functions for pan gesture (to avoid animation inside animation)
   const incrementStep = useCallback(() => {
@@ -674,7 +849,7 @@ export default function CookModeScreen() {
                 ? copy.processing
                 : voiceState === 'speaking'
                   ? copy.speaking
-                  : 'Say "Hey Nom" or tap mic'}
+                  : 'Say "Hey Nom" or Tap Mic'}
           </Text>
 
           {/* Action buttons */}
@@ -698,18 +873,22 @@ export default function CookModeScreen() {
               ]}
               onPress={handleReadStep}
             >
-              <Icon
-                name={isSpeakingState ? 'close' : 'volume-2'}
-                size={20}
-                color={isSpeakingState ? Colors.text.inverse : Colors.accent}
-              />
+              {isLoadingTTS ? (
+                <Loading size="button" />
+              ) : (
+                <Icon
+                  name={isSpeakingState ? 'close' : 'volume-2'}
+                  size={20}
+                  color={isSpeakingState ? Colors.text.inverse : Colors.accent}
+                />
+              )}
               <Text
                 style={[
                   styles.actionButtonText,
                   isSpeakingState && styles.actionButtonTextActive,
                 ]}
               >
-                {isSpeakingState ? 'Stop' : 'Read Step'}
+                {isLoadingTTS ? 'Loading...' : isSpeakingState ? 'Stop' : 'Read Step'}
               </Text>
             </Pressable>
           </View>
@@ -720,8 +899,11 @@ export default function CookModeScreen() {
           visible={showIngredients}
           onClose={() => setShowIngredients(false)}
           ingredients={recipe.ingredients}
-          onReadIngredients={handleReadIngredients}
-          maxHeight={screenHeight * 0.7}
+          onToggleRead={handleReadIngredients}
+          isSpeaking={isSpeakingState}
+          isLoading={isLoadingTTS}
+          maxHeight={screenHeight * 0.8}
+          bottomInset={insets.bottom}
         />
       </View>
     </View>
@@ -926,8 +1108,12 @@ const styles = StyleSheet.create({
   },
 
   // Modal
-  modalBackdrop: {
+  modalContainer: {
     flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.background.overlay,
   },
   modalSheet: {
@@ -935,8 +1121,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    // maxHeight set dynamically via inline styles
+    // maxHeight and paddingBottom set dynamically via inline styles
+    // Flex properties for proper ScrollView sizing
+    flexShrink: 1,
   },
   modalHandle: {
     width: 36,
@@ -962,33 +1149,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+  },
+  readButtonSpeaking: {
+    backgroundColor: Colors.accent,
   },
   readButtonText: {
     ...Typography.label,
     color: Colors.accent,
   },
+  readButtonTextSpeaking: {
+    color: Colors.text.inverse,
+  },
   ingredientsList: {
     flex: 1,
+    flexShrink: 1,
+    minHeight: 100,
   },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  ingredientBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.accent,
-    marginTop: 8,
-  },
-  ingredientText: {
-    ...Typography.body,
-    color: Colors.text.primary,
-    flex: 1,
+  ingredientsListContent: {
+    paddingBottom: Spacing.sm,
+    flexGrow: 1,
   },
   closeButton: {
     backgroundColor: Colors.accent,

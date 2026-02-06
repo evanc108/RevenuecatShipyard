@@ -261,12 +261,13 @@ export async function precacheTexts(
 }
 
 // Common responses to pre-cache on init
+// Must match exact strings used in FALLBACK_RESPONSES and wake word handler
 const COMMON_RESPONSES = [
-  'Yes?',
-  'OK',
-  "I didn't catch that. Could you repeat?",
-  "You're on the last step.",
-  "You're on the first step.",
+  'Yes?', // Wake word confirmation - ONLY response for "Hey Nom"
+  "Sorry, I didn't catch that. Try saying 'next step' or 'repeat'.", // notUnderstood
+  "You're already at the first step.", // firstStep
+  "That's the last step! Your dish should be ready.", // lastStep
+  'Sorry, something went wrong. Please try again.', // error
 ];
 
 let commonResponsesCached = false;
@@ -303,19 +304,27 @@ export async function speak(
     return;
   }
 
-  // Prevent concurrent speak operations
-  if (speakingMutex) {
-    console.log('[TTS] Already speaking, stopping previous');
-    await stopSpeaking();
+  // Acquire mutex - if already speaking, stop and take over
+  // This prevents race conditions where multiple speak calls overlap
+  const wasAlreadySpeaking = speakingMutex || isSpeakingState || currentSound !== null;
+  if (wasAlreadySpeaking) {
+    console.log('[TTS] Already speaking, stopping previous before new audio');
   }
+
+  // Immediately claim the mutex to prevent other calls from starting
   speakingMutex = true;
+
+  // Stop any current speech (using internal to not reset our mutex)
+  await stopSpeakingInternal();
+
+  // Small delay to ensure audio system is fully released
+  if (wasAlreadySpeaking) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
 
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
   try {
-    // Stop any current speech
-    await stopSpeaking();
-
     // Try OpenAI TTS first for reliable speaker output
     const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
     if (apiKey) {
@@ -543,9 +552,9 @@ async function speakWithExpoSpeech(
 }
 
 /**
- * Stop current speech
+ * Stop current speech (internal - doesn't reset mutex)
  */
-export async function stopSpeaking(): Promise<void> {
+async function stopSpeakingInternal(): Promise<void> {
   const soundToStop = currentSound;
   currentSound = null;
 
@@ -566,8 +575,16 @@ export async function stopSpeaking(): Promise<void> {
     }
     isSpeakingState = false;
   }
+}
 
+/**
+ * Stop current speech (public API)
+ */
+export async function stopSpeaking(): Promise<void> {
+  await stopSpeakingInternal();
   speakingMutex = false;
+  // Reset audio mode flag so next recording can reconfigure the audio session
+  audioModeConfigured = false;
 }
 
 /**
