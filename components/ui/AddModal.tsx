@@ -16,7 +16,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
   LayoutAnimation,
   Modal,
   Platform,
@@ -28,6 +27,7 @@ import {
   UIManager,
   View
 } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StarRatingInput } from './StarRatingInput';
 
@@ -84,6 +84,12 @@ function getRecipeCardColor(title: string): string {
 export function AddModal(): React.ReactElement {
 	const insets = useSafeAreaInsets();
 	const { isVisible, initialCookbookId, closeModal } = useAddModal();
+
+	// Smooth keyboard animation using Reanimated
+	const keyboard = useAnimatedKeyboard();
+	const keyboardStyle = useAnimatedStyle(() => ({
+		paddingBottom: keyboard.height.value,
+	}));
 
 	// View state
 	const [currentView, setCurrentView] = useState<ModalView>('main');
@@ -150,7 +156,7 @@ export function AddModal(): React.ReactElement {
 	if (isVisible && !prevVisibleRef.current && initialCookbookId) {
 		setSelectedCookbookId(initialCookbookId);
 		setCurrentView('import');
-		setTimeout(() => inputRef.current?.focus(), 300);
+		// Note: Auto-focus removed to prevent keyboard from appearing during modal slide animation
 	}
 	prevVisibleRef.current = isVisible;
 
@@ -211,10 +217,7 @@ export function AddModal(): React.ReactElement {
 					contentOpacity.setValue(1);
 				}, 16);
 
-				// Focus input when navigating to import view
-				if (newView === 'import') {
-					setTimeout(() => inputRef.current?.focus(), 100);
-				}
+				// Note: Auto-focus removed to prevent keyboard from appearing during view transitions
 			}
 		},
 		[contentOpacity, modalTranslateY]
@@ -841,12 +844,8 @@ export function AddModal(): React.ReactElement {
 
 	return (
 		<Modal visible transparent animationType="none" statusBarTranslucent>
-		<View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-			<KeyboardAvoidingView
-				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				style={styles.container}
-				pointerEvents="box-none"
-			>
+		<Reanimated.View style={[styles.fullScreen, keyboardStyle]} pointerEvents="box-none">
+			<View style={styles.container} pointerEvents="box-none">
 				{/* Animated Backdrop */}
 				<Animated.View
 					style={[styles.backdrop, { opacity: backdropOpacity }]}
@@ -985,7 +984,7 @@ export function AddModal(): React.ReactElement {
 						)}
 					</View>
 				</Animated.View>
-			</KeyboardAvoidingView>
+			</View>
 
 			{/* Floating Cookbook Dropdown Overlay */}
 			{isCookbookDropdownOpen && (
@@ -1086,12 +1085,15 @@ export function AddModal(): React.ReactElement {
 				onSubmit={handleCreateCookbookSubmit}
 				isLoading={isCreatingCookbook}
 			/>
-		</View>
+		</Reanimated.View>
 		</Modal>
 	);
 }
 
 const styles = StyleSheet.create({
+	fullScreen: {
+		...StyleSheet.absoluteFillObject,
+	},
 	container: {
 		flex: 1,
 		justifyContent: 'flex-end'

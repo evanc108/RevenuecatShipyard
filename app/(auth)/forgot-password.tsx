@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Icon } from '@/components/ui/Icon';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Radius, Typography } from '@/constants/theme';
 
 export default function ForgotPasswordScreen() {
   const { signIn, isLoaded } = useSignIn();
@@ -78,7 +78,7 @@ export default function ForgotPasswordScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
         </TouchableOpacity>
 
         <View style={styles.header}>
@@ -158,8 +158,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxl,
   },
   backButton: {
-    width: 44,
-    height: 44,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },

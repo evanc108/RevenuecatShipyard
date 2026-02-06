@@ -40,6 +40,36 @@ export const list = query({
 });
 
 /**
+ * List all cookbooks for a specific user by userId, with recipe counts.
+ */
+export const listByUser = query({
+  args: {
+    userId: v.id('users'),
+  },
+  handler: async (ctx, args) => {
+    const cookbooks = await ctx.db
+      .query('cookbooks')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .collect();
+
+    const cookbooksWithCounts = await Promise.all(
+      cookbooks.map(async (cookbook) => {
+        const recipes = await ctx.db
+          .query('cookbookRecipes')
+          .withIndex('by_cookbook', (q) => q.eq('cookbookId', cookbook._id))
+          .collect();
+        return {
+          ...cookbook,
+          recipeCount: recipes.length,
+        };
+      })
+    );
+
+    return cookbooksWithCounts;
+  },
+});
+
+/**
  * Create a new cookbook for the authenticated user.
  * Accepts either a Convex storage ID (resolved to URL) or a direct image URL.
  */

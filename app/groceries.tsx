@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Icon } from '@/components/ui/Icon';
 import { GroceriesContent } from '@/components/features/pantry';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { Text } from 'react-native';
 
@@ -23,7 +23,7 @@ export default function GroceriesScreen() {
           accessibilityLabel="Go back"
           hitSlop={8}
         >
-          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
         </Pressable>
         <Text style={styles.title}>{copy.title}</Text>
         <View style={styles.placeholder} />
@@ -50,7 +50,12 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   backButton: {
-    padding: Spacing.xs,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     ...Typography.h3,

@@ -2,12 +2,14 @@ import { memo } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius } from '@/constants/theme';
+import { Icon } from '@/components/ui/Icon';
+import { Colors, Spacing } from '@/constants/theme';
 
 type PostGridItemProps = {
   imageUrl?: string | null;
   title: string;
   onPress: () => void;
+  onMenuPress?: () => void;
 };
 
 const PASTEL_FALLBACKS: readonly string[] = [
@@ -28,6 +30,7 @@ export const PostGridItem = memo(function PostGridItem({
   imageUrl,
   title,
   onPress,
+  onMenuPress,
 }: PostGridItemProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(title);
 
@@ -51,6 +54,20 @@ export const PostGridItem = memo(function PostGridItem({
           <Ionicons name="restaurant-outline" size={32} color={Colors.text.tertiary} />
         )}
       </View>
+      {onMenuPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Post options"
+          style={styles.menuButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onMenuPress();
+          }}
+          hitSlop={8}
+        >
+          <Icon name="apps" size={18} color={Colors.text.inverse} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 });
@@ -58,8 +75,8 @@ export const PostGridItem = memo(function PostGridItem({
 const styles = StyleSheet.create({
   container: {
     aspectRatio: 1,
-    borderRadius: Radius.sm,
     overflow: 'hidden',
+    position: 'relative',
   },
   imageContainer: {
     flex: 1,
@@ -69,5 +86,11 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  menuButton: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    padding: Spacing.xs,
   },
 });

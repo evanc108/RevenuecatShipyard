@@ -15,7 +15,7 @@ import { useQuery } from 'convex/react';
 import { Icon } from '@/components/ui/Icon';
 import { api } from '@/convex/_generated/api';
 import { UserListItem } from '@/components/ui/UserListItem';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { formatCount } from '@/utils/format';
 import type { Id, Doc } from '@/convex/_generated/dataModel';
@@ -80,7 +80,7 @@ export default function ConnectionsScreen(): React.ReactElement {
             hitSlop={8}
             style={styles.backButton}
           >
-            <Icon name="arrow-back" size={24} color={Colors.text.primary} />
+            <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
           </Pressable>
           <View style={styles.headerCenter}>
             <Text style={styles.headerTitle} numberOfLines={1}>
@@ -108,7 +108,7 @@ export default function ConnectionsScreen(): React.ReactElement {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Icon name="arrow-back" size={24} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -201,7 +201,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   backButton: {
-    padding: Spacing.xs,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerCenter: {
     flex: 1,

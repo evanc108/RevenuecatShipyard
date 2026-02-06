@@ -21,6 +21,14 @@ import {
   View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // --- Types ---
@@ -94,7 +102,7 @@ function toRecipeCard(recipe: DiscoverRecipe): Recipe {
 }
 
 // --- Discover Content Component ---
-function DiscoverContent() {
+function DiscoverContent({ onSaveSuccess }: { onSaveSuccess: () => void }) {
   const router = useRouter();
   const [isPopulating, setIsPopulating] = useState(false);
   const [populateError, setPopulateError] = useState<string | null>(null);
@@ -296,6 +304,7 @@ function DiscoverContent() {
 
       setShowCookbookModal(false);
       setPendingRecipe(null);
+      onSaveSuccess();
     } catch (err) {
       console.error('Failed to save recipe:', err);
     } finally {
@@ -443,7 +452,7 @@ function DiscoverContent() {
 }
 
 // --- Feed Content Component ---
-function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; searchQuery: string }) {
+function FeedContent({ onFindPeople, searchQuery, onSaveSuccess }: { onFindPeople: () => void; searchQuery: string; onSaveSuccess: () => void }) {
   const currentUser = useQuery(api.users.current);
   const feedPosts = useQuery(api.posts.socialFeed, { limit: 50 });
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
@@ -469,12 +478,13 @@ function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; 
       });
       setShowCookbookModal(false);
       setPendingRecipe(null);
+      onSaveSuccess();
     } catch (err) {
       console.error('Failed to add recipe to cookbook:', err);
     } finally {
       setIsSavingToCookbook(false);
     }
-  }, [pendingRecipe, addRecipeToCookbook]);
+  }, [pendingRecipe, addRecipeToCookbook, onSaveSuccess]);
 
   const handleCookbookModalClose = useCallback(() => {
     setShowCookbookModal(false);
@@ -587,8 +597,55 @@ function FeedContent({ onFindPeople, searchQuery }: { onFindPeople: () => void; 
 
 // --- Main Screen Component ---
 export default function DiscoverScreen() {
+  const router = useRouter();
+  const notificationCount = useQuery(api.follows.getNewFollowerCount) ?? 0;
+
   const [activeTab, setActiveTab] = useState<TabKey>('discover');
   const [feedSearchQuery, setFeedSearchQuery] = useState('');
+
+  // Success animation state (shared across tabs)
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const successOverlayOpacity = useSharedValue(0);
+  const successIconScale = useSharedValue(0);
+  const successIconTranslateY = useSharedValue(20);
+
+  const successOverlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: successOverlayOpacity.value,
+  }));
+
+  const successIconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: successIconScale.value },
+      { translateY: successIconTranslateY.value },
+    ],
+  }));
+
+  const playSuccessAnimation = useCallback(() => {
+    setShowSuccessOverlay(true);
+
+    // Fade in, hold, fade out
+    successOverlayOpacity.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withDelay(900, withTiming(0, { duration: 250 }))
+    );
+
+    // Icon: scale up, overshoot, settle, then shrink
+    successIconScale.value = withSequence(
+      withTiming(0, { duration: 0 }),
+      withTiming(1.2, { duration: 250 }),
+      withSpring(1, { damping: 10, stiffness: 200 }),
+      withDelay(500, withTiming(0, { duration: 200 }))
+    );
+
+    // Icon: start below, bounce up, settle
+    successIconTranslateY.value = withSequence(
+      withTiming(20, { duration: 0 }),
+      withSpring(0, { damping: 8, stiffness: 150 })
+    );
+
+    // Clean up after animation completes
+    setTimeout(() => setShowSuccessOverlay(false), 1400);
+  }, [successOverlayOpacity, successIconScale, successIconTranslateY]);
 
   const handleFindPeople = useCallback(() => {
     setActiveTab('discover');
@@ -604,62 +661,67 @@ export default function DiscoverScreen() {
   const content = useMemo(() => {
     switch (activeTab) {
       case 'discover':
-        return <DiscoverContent />;
+        return <DiscoverContent onSaveSuccess={playSuccessAnimation} />;
       case 'feed':
-        return <FeedContent onFindPeople={handleFindPeople} searchQuery={feedSearchQuery} />;
+        return <FeedContent onFindPeople={handleFindPeople} searchQuery={feedSearchQuery} onSaveSuccess={playSuccessAnimation} />;
       default:
-        return <DiscoverContent />;
+        return <DiscoverContent onSaveSuccess={playSuccessAnimation} />;
     }
-  }, [activeTab, handleFindPeople, feedSearchQuery]);
+  }, [activeTab, handleFindPeople, feedSearchQuery, playSuccessAnimation]);
 
   return (
     <GestureHandlerRootView style={styles.gestureRoot}>
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.tabHeader}>
+          {/* Left: Logo */}
           <Image
             source={require('@/assets/images/header_icon.svg')}
             style={styles.headerLogo}
             contentFit="contain"
           />
-          <View style={styles.tabRow}>
+
+          {/* Center: Tabs (absolutely positioned for true centering) */}
+          <View style={styles.tabRowCentered}>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: activeTab === 'discover' }}
               accessibilityLabel={COPY.discover.tabs.discover}
               onPress={() => handleTabChange('discover')}
+              style={styles.tabItem}
             >
               <Text style={activeTab === 'discover' ? styles.tabLabelActive : styles.tabLabelInactive}>
                 {COPY.discover.tabs.discover}
               </Text>
+              <View style={activeTab === 'discover' ? styles.tabUnderline : styles.tabUnderlinePlaceholder} />
             </Pressable>
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: activeTab === 'feed' }}
               accessibilityLabel={COPY.discover.tabs.feed}
               onPress={() => handleTabChange('feed')}
+              style={styles.tabItem}
             >
               <Text style={activeTab === 'feed' ? styles.tabLabelActive : styles.tabLabelInactive}>
                 {COPY.discover.tabs.feed}
               </Text>
+              <View style={activeTab === 'feed' ? styles.tabUnderline : styles.tabUnderlinePlaceholder} />
             </Pressable>
           </View>
 
-          <View style={styles.headerSpacer} />
-
-          {/* Bell notification button */}
+          {/* Right: Bell notification button */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             style={styles.bellButton}
             hitSlop={8}
-            onPress={() => {
-              // TODO: open notifications
-            }}
+            onPress={() => router.push('/notifications')}
           >
-            <Icon name="bell" size={28} color={Colors.text.primary} strokeWidth={2} />
-            <View style={styles.notiBadge}>
-              <Text style={styles.notiCount}>3</Text>
-            </View>
+            <Icon name="bell" size={24} color={Colors.text.primary} strokeWidth={2} />
+            {notificationCount > 0 ? (
+              <View style={styles.notiBadge}>
+                <Text style={styles.notiCount}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+              </View>
+            ) : null}
           </Pressable>
         </View>
         {activeTab === 'feed' ? (
@@ -688,6 +750,22 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
         <View style={styles.content}>{content}</View>
+
+        {/* Success overlay - covers entire screen */}
+        {showSuccessOverlay ? (
+          <Animated.View
+            style={[styles.successOverlay, successOverlayAnimatedStyle]}
+            pointerEvents="none"
+          >
+            <Animated.View style={successIconAnimatedStyle}>
+              <Image
+                source={require('@/assets/images/loading_icon.svg')}
+                style={styles.successLoadingIcon}
+                contentFit="contain"
+              />
+            </Animated.View>
+          </Animated.View>
+        ) : null}
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -702,75 +780,83 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   tabHeader: {
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
     backgroundColor: Colors.background.primary,
   },
   headerLogo: {
-    width: 100,
-    height: 60,
-  },
-  headerSpacer: {
-    flex: 1,
+    width: 70,
+    height: 70,
+    marginTop: -10,
   },
   bellButton: {
-    width: 60,
-    height: 60,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notiBadge: {
     position: 'absolute',
-    top: 30,
-    right: 8,
+    top: 6,
+    right: 4,
     backgroundColor: Colors.accent,
-    minWidth: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 0,
-    borderWidth: 2,
-    borderColor: Colors.background.primary,
+    paddingHorizontal: 4,
   },
   notiCount: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: FontFamily.bold,
     fontWeight: '700' as const,
     color: Colors.text.inverse,
     lineHeight: 12,
   },
-  tabRow: {
-    paddingLeft: Spacing.sm,
-    paddingTop: Spacing.xs,
+  tabRowCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.md,
   },
+  tabItem: {
+    alignItems: 'center',
+  },
   tabLabelActive: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 22,
     fontFamily: FontFamily.bold,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: '#000000',
     letterSpacing: -0.2,
-    textShadowColor: 'rgba(0, 0, 0, 0.05)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 10,
   },
   tabLabelInactive: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 22,
     fontFamily: FontFamily.bold,
-    fontWeight: '800' as const,
+    fontWeight: '700' as const,
     color: '#D1D1D6',
-    letterSpacing: -0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.08)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: -0.2,
+  },
+  tabUnderline: {
+    marginTop: 4,
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.accent,
+  },
+  tabUnderlinePlaceholder: {
+    marginTop: 4,
+    width: 24,
+    height: 3,
+    backgroundColor: 'transparent',
   },
   searchBarContainer: {
     flexDirection: 'row',
@@ -865,5 +951,16 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.text.inverse,
     fontWeight: '600',
+  },
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  successLoadingIcon: {
+    width: 200,
+    height: 200,
   },
 });
