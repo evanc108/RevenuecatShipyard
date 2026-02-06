@@ -123,7 +123,7 @@ export function SwipeableCardStack({
       }
     });
 
-  const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
+  const composedGesture = Gesture.Race(tapGesture, panGesture);
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
