@@ -13,6 +13,7 @@ import EventSource from 'react-native-sse';
 
 import { api } from '@/convex/_generated/api';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
+import { useSubscription } from '@/hooks/useSubscription';
 
 /** SSE event with data field */
 type SSEEvent = { data?: string | null };
@@ -78,12 +79,14 @@ type SSEErrorEvent = {
 };
 
 type UseBackgroundExtractionResult = {
-  /** Start extraction for a URL with an upload ID */
-  startExtraction: (uploadId: string) => void;
+  /** Start extraction for a URL with an upload ID. Returns false if paywall should be shown. */
+  startExtraction: (uploadId: string) => boolean;
   /** Cancel extraction for a specific upload */
   cancelExtraction: (uploadId: string) => void;
   /** Cancel all active extractions */
   cancelAll: () => void;
+  /** Whether the user can import (pro or under free limit) */
+  canImportRecipe: boolean;
 };
 
 /**
@@ -105,6 +108,7 @@ type UseBackgroundExtractionResult = {
 export function useBackgroundExtraction(): UseBackgroundExtractionResult {
   const convex = useConvex();
   const currentUser = useQuery(api.users.current);
+  const { canImportRecipe } = useSubscription();
   const saveRecipe = useMutation(api.recipes.saveExtracted);
   const saveToCollection = useMutation(api.recipes.saveToCollection);
   const addToCookbook = useMutation(api.cookbooks.addRecipe);
@@ -155,18 +159,9 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
     };
   }, [cancelAll]);
 
-  const startExtraction = useCallback(
-    async (uploadId: string) => {
-      const upload = getUpload(uploadId);
-      if (!upload) {
-        console.warn(`Upload ${uploadId} not found in store`);
-        return;
-      }
-
-      if (!currentUser) {
-        setError(uploadId, 'You must be signed in to extract recipes');
-        return;
-      }
+  const runExtraction = useCallback(
+    async (uploadId: string, upload: ReturnType<typeof getUpload>) => {
+      if (!upload || !currentUser) return;
 
       const { url, cookbookId } = upload;
 
@@ -371,7 +366,6 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
       saveToCollection,
       addToCookbook,
       cancelExtraction,
-      getUpload,
       updateStatus,
       updateProgress,
       setComplete,
@@ -379,9 +373,35 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
     ]
   );
 
+  const startExtraction = useCallback(
+    (uploadId: string): boolean => {
+      // Gate: check recipe import limit
+      if (!canImportRecipe) {
+        return false;
+      }
+
+      const upload = getUpload(uploadId);
+      if (!upload) {
+        console.warn(`Upload ${uploadId} not found in store`);
+        return true;
+      }
+
+      if (!currentUser) {
+        setError(uploadId, 'You must be signed in to extract recipes');
+        return true;
+      }
+
+      // Run extraction async
+      void runExtraction(uploadId, upload);
+      return true;
+    },
+    [canImportRecipe, currentUser, getUpload, setError, runExtraction]
+  );
+
   return {
     startExtraction,
     cancelExtraction,
     cancelAll,
+    canImportRecipe,
   };
 }

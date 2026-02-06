@@ -7,8 +7,10 @@ import { useAddModal } from '@/context/AddModalContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { useSubscription, type PaywallFeature } from '@/hooks/useSubscription';
 import { MODAL_ANIMATION, useModalAnimation } from '@/hooks/useModalAnimation';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -112,8 +114,12 @@ export function AddModal(): React.ReactElement {
 	const [isCreatingCookbook, setIsCreatingCookbook] = useState(false);
 
 	// Background extraction
-	const { startExtraction } = useBackgroundExtraction();
+	const { startExtraction, canImportRecipe } = useBackgroundExtraction();
 	const addUpload = usePendingUploadsStore((s) => s.addUpload);
+
+	// Subscription
+	const { isPro, freeRecipesRemaining } = useSubscription();
+	const [showPaywall, setShowPaywall] = useState(false);
 
 	// Get cookbooks to find selected cookbook name
 	const cookbooks = useQuery(api.cookbooks.list);
@@ -168,6 +174,7 @@ export function AddModal(): React.ReactElement {
 		setTasteRating(0);
 		setPresentationRating(0);
 		setShareNotes('');
+		setShowPaywall(false);
 	}, []);
 
 	// Use shared modal animation
@@ -307,7 +314,13 @@ export function AddModal(): React.ReactElement {
 			selectedCookbookId,
 			cookbookName
 		);
-		startExtraction(uploadId);
+		const allowed = startExtraction(uploadId);
+
+		if (!allowed) {
+			// Free limit reached — show paywall
+			setShowPaywall(true);
+			return;
+		}
 
 		// Close modal immediately - progress shown in UploadProgressIndicator
 		closeModal();
@@ -350,6 +363,16 @@ export function AddModal(): React.ReactElement {
 
 	const renderMainView = () => (
 		<View style={styles.optionsContainer}>
+			{/* Free imports remaining badge */}
+			{!isPro && (
+				<View style={styles.freeImportsBadge}>
+					<Icon name="info" size={16} color={Colors.accent} />
+					<Text style={styles.freeImportsBadgeText}>
+						{COPY.subscription.freeRecipesRemaining(freeRecipesRemaining)}
+					</Text>
+				</View>
+			)}
+
 			{/* Import Section Header */}
 			<Text style={styles.sectionTitle}>{copy.importUrl.title}</Text>
 
@@ -1086,6 +1109,13 @@ export function AddModal(): React.ReactElement {
 				onSubmit={handleCreateCookbookSubmit}
 				isLoading={isCreatingCookbook}
 			/>
+
+			{/* Paywall Modal */}
+			<PaywallModal
+				visible={showPaywall}
+				onClose={() => setShowPaywall(false)}
+				feature="recipeLimit"
+			/>
 		</View>
 		</Modal>
 	);
@@ -1260,6 +1290,20 @@ const styles = StyleSheet.create({
 		...Typography.caption,
 		color: Colors.text.secondary,
 		flex: 1
+	},
+	freeImportsBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: Spacing.sm,
+		backgroundColor: Colors.accent + '12',
+		borderRadius: Radius.sm,
+		paddingVertical: Spacing.sm,
+		paddingHorizontal: Spacing.md,
+		marginBottom: Spacing.md,
+	},
+	freeImportsBadgeText: {
+		...Typography.caption,
+		color: Colors.accent,
 	},
 	optionsContainer: {
 		marginTop: Spacing.sm

@@ -9,6 +9,8 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSubscription, type PaywallFeature } from '@/hooks/useSubscription';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Linking,
@@ -421,6 +423,9 @@ export default function RecipeDetailScreen() {
 		recipeId ? { recipeId } : 'skip'
 	);
 	const addToCookbookMutation = useMutation(api.cookbooks.addRecipe);
+
+	const { isPro } = useSubscription();
+	const [paywallFeature, setPaywallFeature] = useState<PaywallFeature | null>(null);
 
 	const [servingsMultiplier, setServingsMultiplier] = useState(1);
 	const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
@@ -1358,6 +1363,10 @@ export default function RecipeDetailScreen() {
 					accessibilityLabel={copy.cook}
 					style={styles.floatingButtonCook}
 					onPress={() => {
+						if (!isPro) {
+							setPaywallFeature('cook');
+							return;
+						}
 						router.push(`/recipe/cook/${recipeId}`);
 					}}
 				>
@@ -1386,6 +1395,10 @@ export default function RecipeDetailScreen() {
 						accessibilityLabel={copy.mealPlan}
 						style={styles.floatingButtonMealPlan}
 						onPress={() => {
+							if (!isPro) {
+								setPaywallFeature('mealPlan');
+								return;
+							}
 							// TODO: meal plan action
 						}}
 					>
@@ -1489,6 +1502,13 @@ export default function RecipeDetailScreen() {
 				onClose={() => setIsSaveModalVisible(false)}
 				onSelect={handleSaveToCookbook}
 				isLoading={isSavingToCookbook}
+			/>
+
+			{/* Paywall Modal */}
+			<PaywallModal
+				visible={paywallFeature !== null}
+				onClose={() => setPaywallFeature(null)}
+				feature={paywallFeature ?? 'cook'}
 			/>
 		</View>
 	);

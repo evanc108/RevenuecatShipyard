@@ -453,4 +453,24 @@ export const COPY = {
       failed: 'Failed to post comment',
     },
   },
+  subscription: {
+    paywallTitle: 'Upgrade to Pro',
+    paywallSubtitle: 'Unlock the full experience',
+    price: '$4.99/mo',
+    features: {
+      unlimitedImports: 'Unlimited recipe imports',
+      cookMode: 'Cook Mode with step-by-step guidance',
+      mealPlanning: 'Full meal planning tools',
+      allFeatures: 'Access to all current and future features',
+    },
+    recipeLimitReached: (limit: number) =>
+      `You've used all ${limit} free recipe imports`,
+    unlockCook: 'Unlock Cook Mode with Pro',
+    unlockMealPlan: 'Unlock Meal Planning with Pro',
+    freeRecipesRemaining: (remaining: number) =>
+      `${remaining} free import${remaining === 1 ? '' : 's'} remaining`,
+    restore: 'Restore Purchases',
+    purchase: 'Subscribe Now',
+    proMember: 'Pro Member',
+  },
 } as const;

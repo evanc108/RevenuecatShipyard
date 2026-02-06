@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cookwithnom.app",
+      "appleTeamId": "F7K5Y98JBK",
       "usesAppleSignIn": true,
       "buildNumber": "1",
       "infoPlist": {
