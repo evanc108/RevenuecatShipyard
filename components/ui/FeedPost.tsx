@@ -354,7 +354,8 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   captionBold: {
-    fontWeight: '600',
+    fontFamily: 'Lora_700Bold',
+    fontWeight: '700',
   },
   imageContainer: {
     marginHorizontal: Spacing.md,
