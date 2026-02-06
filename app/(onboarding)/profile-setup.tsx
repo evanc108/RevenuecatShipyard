@@ -90,7 +90,13 @@ export default function ProfileSetupScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(onboarding)/sign-up');
+            }
+          }}
           hitSlop={8}
           style={styles.backButton}
         >

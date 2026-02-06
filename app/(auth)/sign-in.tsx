@@ -1,6 +1,9 @@
-import { useSSO, useSignIn } from '@clerk/clerk-expo';
+import { useSSO, useSignIn, useAuth } from '@clerk/clerk-expo';
 import { Link, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 import {
   Text,
   TextInput,
@@ -18,6 +21,7 @@ import { COPY } from '@/constants/copy';
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const { startSSOFlow } = useSSO();
+  const { signOut, isSignedIn } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -48,11 +52,37 @@ export default function SignInScreen() {
     async (strategy: 'oauth_apple' | 'oauth_google') => {
       setError('');
       try {
-        const { createdSessionId, setActive: setOAuthActive } = await startSSOFlow({ strategy });
+        // Clear any existing session before starting OAuth
+        if (isSignedIn) {
+          await signOut();
+        }
+
+        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive: setOAuthActive } = await startSSOFlow({ strategy });
+
+        // Handle completed sign-up (new user via SSO) - redirect to onboarding
+        // Check this FIRST since createdSessionId can be set for new users too
+        if (ssoSignUp?.status === 'complete' && ssoSignUp.createdSessionId && setOAuthActive) {
+          await setOAuthActive({ session: ssoSignUp.createdSessionId });
+          router.replace('/(onboarding)/profile-setup');
+          return;
+        }
+
+        // Handle completed sign-in (existing user via SSO)
+        if (ssoSignIn?.status === 'complete' && ssoSignIn.createdSessionId && setOAuthActive) {
+          await setOAuthActive({ session: ssoSignIn.createdSessionId });
+          router.replace('/(tabs)');
+          return;
+        }
+
+        // Handle direct session creation (fallback - AuthGuard will redirect if needed)
         if (createdSessionId && setOAuthActive) {
           await setOAuthActive({ session: createdSessionId });
           router.replace('/(tabs)');
+          return;
         }
+
+        // If we get here, something unexpected happened
+        setError('Sign in was not completed. Please try again.');
       } catch (err: unknown) {
         const clerkError = err as { errors?: Array<{ message: string }> };
         setError(clerkError.errors?.[0]?.message ?? COPY.auth.errors.generic);
