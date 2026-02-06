@@ -11,7 +11,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cookwithnom.app",
-      "usesAppleSignIn": true
+      "appleTeamId": "F7K5Y98JBK",
+      "usesAppleSignIn": true,
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
@@ -24,46 +29,6 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "intentFilters": [
-        {
-          "action": "android.intent.action.SEND",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
-          "data": [
-            {
-              "mimeType": "text/plain"
-            }
-          ]
-        },
-        {
-          "action": "android.intent.action.VIEW",
-          "category": [
-            "android.intent.category.DEFAULT",
-            "android.intent.category.BROWSABLE"
-          ],
-          "data": [
-            {
-              "scheme": "https",
-              "host": "*.tiktok.com"
-            },
-            {
-              "scheme": "https",
-              "host": "vm.tiktok.com"
-            },
-            {
-              "scheme": "https",
-              "host": "*.instagram.com"
-            },
-            {
-              "scheme": "https",
-              "host": "*.youtube.com"
-            },
-            {
-              "scheme": "https",
-              "host": "youtu.be"
-            }
-          ]
-        },
         {
           "action": "android.intent.action.SEND",
           "category": [
@@ -130,6 +95,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "64c22a7a-f76e-4e8a-aa56-ef36bab9b59b"
+      }
     }
   }
 }

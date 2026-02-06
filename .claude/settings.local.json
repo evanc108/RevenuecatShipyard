@@ -36,7 +36,8 @@
       "Bash(GIT_EDITOR=true git rebase:*)",
       "Bash(GIT_EDITOR=\"true\" git:*)",
       "Bash(EDITOR=true git rebase:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(xargs:*)"
     ]
   }
 }
