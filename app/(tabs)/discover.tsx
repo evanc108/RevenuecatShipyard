@@ -11,6 +11,7 @@ import type { Doc, Id } from '@/convex/_generated/dataModel';
 import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
@@ -112,9 +113,11 @@ function DiscoverContent() {
   });
   const unviewedCount = useQuery(api.discoverFeed.getUnviewedCount);
 
+  const router = useRouter();
   const recordView = useMutation(api.discoverFeed.recordView);
   const saveRecipe = useMutation(api.savedRecipes.saveRecipe);
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
+  const ensureFromDiscover = useMutation(api.recipes.ensureFromDiscover);
   const populateFromBackend = useAction(api.discoverFeedActions.populateFromBackend);
 
   const dietaryRestrictions = currentUser?.dietaryRestrictions ?? [];
@@ -210,6 +213,35 @@ function DiscoverContent() {
   const handleSwipeRight = async (recipe: Recipe) => {
     setPendingRecipe(recipe);
     setShowCookbookModal(true);
+  };
+
+  const handleCardPress = async (recipe: Recipe) => {
+    try {
+      const recipeId = await ensureFromDiscover({
+        url: recipe.url,
+        title: recipe.title,
+        description: recipe.description,
+        imageUrl: recipe.imageUrl,
+        cuisine: recipe.cuisine,
+        difficulty: recipe.difficulty,
+        servings: recipe.servings,
+        prepTimeMinutes: recipe.prepTimeMinutes,
+        cookTimeMinutes: recipe.cookTimeMinutes,
+        totalTimeMinutes: recipe.totalTimeMinutes,
+        calories: recipe.calories,
+        proteinGrams: recipe.proteinGrams,
+        carbsGrams: recipe.carbsGrams,
+        fatGrams: recipe.fatGrams,
+        dietaryTags: recipe.dietaryTags,
+        keywords: recipe.keywords,
+        creatorName: recipe.creatorName,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+      });
+      router.push(`/recipe/${recipeId}`);
+    } catch (err) {
+      console.error('Failed to open recipe:', err);
+    }
   };
 
   const handleCookbookSelect = async (cookbookId: Id<'cookbooks'>) => {
@@ -359,6 +391,7 @@ function DiscoverContent() {
         recipes={recipes}
         onSwipeLeft={handleSwipeLeft}
         onSwipeRight={handleSwipeRight}
+        onPress={handleCardPress}
       />
       <CookbookSelectionModal
         visible={showCookbookModal}

@@ -150,7 +150,7 @@ export const COPY = {
       importUrlDesc: 'Save a recipe from a video or website',
       createRecipe: 'Create Recipe',
       createRecipeDesc: 'Write your own recipe from scratch',
-      sharePost: 'Share a Cook',
+      sharePost: 'Post a Meal',
       sharePostDesc: 'Share something you made',
     },
     createRecipe: {

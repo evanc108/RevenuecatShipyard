@@ -20,12 +20,14 @@ type SwipeableCardStackProps = {
   recipes: Recipe[];
   onSwipeLeft?: (recipe: Recipe) => void;
   onSwipeRight?: (recipe: Recipe) => void;
+  onPress?: (recipe: Recipe) => void;
 };
 
 export function SwipeableCardStack({
   recipes,
   onSwipeLeft,
   onSwipeRight,
+  onPress,
 }: SwipeableCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
@@ -89,6 +91,17 @@ export function SwipeableCardStack({
     [translateX, translateY, rotation, cardOpacity, setSwipingFlag, handleSwipeComplete]
   );
 
+  const handlePress = useCallback(() => {
+    if (currentRecipe) {
+      onPress?.(currentRecipe);
+    }
+  }, [currentRecipe, onPress]);
+
+  const tapGesture = Gesture.Tap()
+    .onEnd(() => {
+      runOnJS(handlePress)();
+    });
+
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       translateX.value = event.translationX;
@@ -109,6 +122,8 @@ export function SwipeableCardStack({
         runOnJS(resetPosition)();
       }
     });
+
+  const composedGesture = Gesture.Exclusive(panGesture, tapGesture);
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -170,7 +185,7 @@ export function SwipeableCardStack({
 
         {/* Current card (on top) */}
         {currentRecipe && (
-          <GestureDetector gesture={panGesture}>
+          <GestureDetector gesture={composedGesture}>
             <Animated.View style={[styles.cardContainer, cardAnimatedStyle]}>
               <RecipeCard recipe={currentRecipe} />
             </Animated.View>

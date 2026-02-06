@@ -6,6 +6,7 @@ import {
   Pressable,
   TextInput,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Animated,
   ActivityIndicator,
@@ -107,25 +108,26 @@ export function GenerateMealPlanModal(): React.ReactElement | null {
   if (!isRendered) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-        pointerEvents="box-none"
-      >
-        {/* Backdrop */}
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        </Animated.View>
-
-        {/* Modal */}
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            { transform: [{ translateY: modalTranslateY }] },
-          ]}
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          pointerEvents="box-none"
         >
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+          {/* Backdrop */}
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+          </Animated.View>
+
+          {/* Modal */}
+          <Animated.View
+            style={[
+              styles.modalContainer,
+              { transform: [{ translateY: modalTranslateY }] },
+            ]}
+          >
+            <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
             {/* Handle */}
             <View style={styles.handleContainer}>
               <View style={styles.handle} />
@@ -229,10 +231,11 @@ export function GenerateMealPlanModal(): React.ReactElement | null {
             {pantryCount === 0 && (
               <Text style={styles.emptyWarning}>{copy.emptyPantryPrompt}</Text>
             )}
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
