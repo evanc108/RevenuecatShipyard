@@ -6,6 +6,7 @@ import {
   Pressable,
   TextInput,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   ActivityIndicator,
@@ -133,28 +134,29 @@ export function AddPantryItemModal(): React.ReactElement | null {
       : copy.addModal.add;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-        pointerEvents="box-none"
-      >
-        {/* Backdrop */}
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        </Animated.View>
-
-        {/* Modal */}
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            { transform: [{ translateY: modalTranslateY }] },
-          ]}
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          pointerEvents="box-none"
         >
-          <View style={styles.modalContent}>
-            {/* Handle */}
-            <View style={styles.handleContainer}>
-              <View style={styles.handle} />
+          {/* Backdrop */}
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+          </Animated.View>
+
+          {/* Modal */}
+          <Animated.View
+            style={[
+              styles.modalContainer,
+              { transform: [{ translateY: modalTranslateY }] },
+            ]}
+          >
+            <View style={styles.modalContent}>
+              {/* Handle */}
+              <View style={styles.handleContainer}>
+                <View style={styles.handle} />
             </View>
 
             {/* Header */}
@@ -292,10 +294,11 @@ export function AddPantryItemModal(): React.ReactElement | null {
                 )}
               </Pressable>
             </ScrollView>
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -388,7 +391,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   categoryChipSelected: {
-    backgroundColor: Colors.accentLight,
+    backgroundColor: Colors.background.primary,
     borderColor: Colors.accent,
   },
   categoryChipText: {

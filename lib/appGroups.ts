@@ -9,6 +9,18 @@
 import ShareExtensionBridge from '@/modules/share-extension-bridge';
 
 // ---------------------------------------------------------------------------
+// Native Module Availability
+// ---------------------------------------------------------------------------
+
+/**
+ * ShareExtensionBridge is null when:
+ * - Running in iOS Simulator without extension support
+ * - Native module not properly linked
+ * - Running on Android (not yet implemented)
+ */
+const isBridgeAvailable = ShareExtensionBridge !== null;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -43,6 +55,7 @@ const KEYS = {
 export async function setCachedCookbooks(
   cookbooks: CachedCookbook[],
 ): Promise<void> {
+  if (!isBridgeAvailable) return;
   await ShareExtensionBridge.setItem(
     KEYS.cachedCookbooks,
     JSON.stringify(cookbooks),
@@ -50,6 +63,7 @@ export async function setCachedCookbooks(
 }
 
 export async function getCachedCookbooks(): Promise<CachedCookbook[]> {
+  if (!isBridgeAvailable) return [];
   const raw = await ShareExtensionBridge.getItem(KEYS.cachedCookbooks);
   if (!raw) return [];
   try {
@@ -64,6 +78,7 @@ export async function getCachedCookbooks(): Promise<CachedCookbook[]> {
 // ---------------------------------------------------------------------------
 
 export async function getPendingImports(): Promise<PendingShareImport[]> {
+  if (!isBridgeAvailable) return [];
   const raw = await ShareExtensionBridge.getItem(KEYS.pendingImports);
   if (!raw) return [];
   try {
@@ -76,6 +91,7 @@ export async function getPendingImports(): Promise<PendingShareImport[]> {
 export async function addPendingImport(
   data: Omit<PendingShareImport, 'id' | 'createdAt'>,
 ): Promise<void> {
+  if (!isBridgeAvailable) return;
   const existing = await getPendingImports();
   const entry: PendingShareImport = {
     ...data,
@@ -90,5 +106,6 @@ export async function addPendingImport(
 }
 
 export async function clearPendingImports(): Promise<void> {
+  if (!isBridgeAvailable) return;
   await ShareExtensionBridge.removeItem(KEYS.pendingImports);
 }

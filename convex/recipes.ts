@@ -71,6 +71,78 @@ export const saveUrl = mutation({
 });
 
 /**
+ * Ensure a recipe exists in the recipes table (from discover feed data).
+ * Creates the recipe if it doesn't exist by URL, but does NOT save it to the user's collection.
+ * Used when viewing a discover recipe detail without explicitly saving it.
+ */
+export const ensureFromDiscover = mutation({
+  args: {
+    url: v.string(),
+    title: v.string(),
+    description: v.optional(v.string()),
+    cuisine: v.optional(v.string()),
+    difficulty: v.optional(v.union(v.string(), v.number())),
+    imageUrl: v.optional(v.string()),
+    servings: v.optional(v.number()),
+    prepTimeMinutes: v.optional(v.number()),
+    cookTimeMinutes: v.optional(v.number()),
+    totalTimeMinutes: v.optional(v.number()),
+    calories: v.optional(v.number()),
+    proteinGrams: v.optional(v.number()),
+    carbsGrams: v.optional(v.number()),
+    fatGrams: v.optional(v.number()),
+    dietaryTags: v.optional(v.array(v.string())),
+    keywords: v.optional(v.array(v.string())),
+    equipment: v.optional(v.array(v.string())),
+    creatorName: v.optional(v.string()),
+    creatorProfileUrl: v.optional(v.string()),
+    ingredients: v.array(ingredientSchema),
+    instructions: v.array(instructionSchema),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Unauthorized');
+
+    // Check if recipe already exists by URL
+    const existing = await ctx.db
+      .query('recipes')
+      .withIndex('by_url', (q) => q.eq('url', args.url))
+      .unique();
+
+    if (existing) return existing._id;
+
+    // Create the recipe
+    return ctx.db.insert('recipes', {
+      url: args.url,
+      createdAt: Date.now(),
+      title: args.title,
+      description: args.description,
+      cuisine: args.cuisine,
+      difficulty: args.difficulty,
+      imageUrl: args.imageUrl,
+      servings: args.servings,
+      prepTimeMinutes: args.prepTimeMinutes,
+      cookTimeMinutes: args.cookTimeMinutes,
+      totalTimeMinutes: args.totalTimeMinutes,
+      calories: args.calories,
+      proteinGrams: args.proteinGrams,
+      carbsGrams: args.carbsGrams,
+      fatGrams: args.fatGrams,
+      dietaryTags: args.dietaryTags,
+      keywords: args.keywords,
+      equipment: args.equipment,
+      creatorName: args.creatorName,
+      creatorProfileUrl: args.creatorProfileUrl,
+      ingredients: args.ingredients,
+      instructions: args.instructions,
+      methodUsed: 'website',
+      ratingCount: 0,
+      ratingSum: 0,
+    });
+  },
+});
+
+/**
  * Get a recipe by URL (for deduplication check).
  */
 export const getByUrl = query({

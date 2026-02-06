@@ -11,6 +11,7 @@ import type { Doc, Id } from '@/convex/_generated/dataModel';
 import { FlashList } from '@shopify/flash-list';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
@@ -94,6 +95,7 @@ function toRecipeCard(recipe: DiscoverRecipe): Recipe {
 
 // --- Discover Content Component ---
 function DiscoverContent() {
+  const router = useRouter();
   const [isPopulating, setIsPopulating] = useState(false);
   const [populateError, setPopulateError] = useState<string | null>(null);
   const [hasAttemptedPopulate, setHasAttemptedPopulate] = useState(false);
@@ -105,6 +107,7 @@ function DiscoverContent() {
   const [showCookbookModal, setShowCookbookModal] = useState(false);
   const [pendingRecipe, setPendingRecipe] = useState<Recipe | null>(null);
   const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const currentUser = useQuery(api.users.current);
   const unviewedRecipes = useQuery(api.discoverFeed.getUnviewedRecipes, {
@@ -115,6 +118,7 @@ function DiscoverContent() {
   const recordView = useMutation(api.discoverFeed.recordView);
   const saveRecipe = useMutation(api.savedRecipes.saveRecipe);
   const addRecipeToCookbook = useMutation(api.cookbooks.addRecipe);
+  const ensureFromDiscover = useMutation(api.recipes.ensureFromDiscover);
   const populateFromBackend = useAction(api.discoverFeedActions.populateFromBackend);
 
   const dietaryRestrictions = currentUser?.dietaryRestrictions ?? [];
@@ -210,6 +214,35 @@ function DiscoverContent() {
   const handleSwipeRight = async (recipe: Recipe) => {
     setPendingRecipe(recipe);
     setShowCookbookModal(true);
+  };
+
+  const handleCardPress = async (recipe: Recipe) => {
+    try {
+      const recipeId = await ensureFromDiscover({
+        url: recipe.url,
+        title: recipe.title,
+        description: recipe.description,
+        imageUrl: recipe.imageUrl,
+        cuisine: recipe.cuisine,
+        difficulty: recipe.difficulty,
+        servings: recipe.servings,
+        prepTimeMinutes: recipe.prepTimeMinutes,
+        cookTimeMinutes: recipe.cookTimeMinutes,
+        totalTimeMinutes: recipe.totalTimeMinutes,
+        calories: recipe.calories,
+        proteinGrams: recipe.proteinGrams,
+        carbsGrams: recipe.carbsGrams,
+        fatGrams: recipe.fatGrams,
+        dietaryTags: recipe.dietaryTags,
+        keywords: recipe.keywords,
+        creatorName: recipe.creatorName,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+      });
+      router.push(`/recipe/${recipeId}`);
+    } catch (err) {
+      console.error('Failed to open recipe:', err);
+    }
   };
 
   const handleCookbookSelect = async (cookbookId: Id<'cookbooks'>) => {
@@ -309,6 +342,43 @@ function DiscoverContent() {
     setPendingRecipe(null);
   };
 
+  const handleRecipePress = async (recipe: Recipe) => {
+    if (isNavigating) return;
+    setIsNavigating(true);
+
+    try {
+      const recipeId = await saveRecipe({
+        url: recipe.url,
+        title: recipe.title,
+        description: recipe.description,
+        imageUrl: recipe.imageUrl,
+        cuisine: recipe.cuisine,
+        difficulty: recipe.difficulty,
+        servings: recipe.servings,
+        prepTimeMinutes: recipe.prepTimeMinutes,
+        cookTimeMinutes: recipe.cookTimeMinutes,
+        totalTimeMinutes: recipe.totalTimeMinutes,
+        calories: recipe.calories,
+        proteinGrams: recipe.proteinGrams,
+        carbsGrams: recipe.carbsGrams,
+        fatGrams: recipe.fatGrams,
+        dietaryTags: recipe.dietaryTags,
+        keywords: recipe.keywords,
+        creatorName: recipe.creatorName,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+      });
+
+      if (recipeId) {
+        router.push(`/recipe/${recipeId}`);
+      }
+    } catch (err) {
+      console.error('Failed to save recipe for viewing:', err);
+    } finally {
+      setIsNavigating(false);
+    }
+  };
+
   if (unviewedRecipes === undefined || currentUser === undefined) {
     return (
       <View style={styles.centerContainer}>
@@ -359,6 +429,7 @@ function DiscoverContent() {
         recipes={recipes}
         onSwipeLeft={handleSwipeLeft}
         onSwipeRight={handleSwipeRight}
+        onPress={handleRecipePress}
       />
       <CookbookSelectionModal
         visible={showCookbookModal}

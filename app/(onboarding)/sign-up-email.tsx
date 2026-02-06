@@ -107,8 +107,10 @@ export default function SignUpEmailScreen() {
       setMode('form');
       setCode('');
       setError('');
-    } else {
+    } else if (router.canGoBack()) {
       router.back();
+    } else {
+      router.replace('/(onboarding)/sign-up');
     }
   };
 

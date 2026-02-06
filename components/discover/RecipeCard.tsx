@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Icon } from '@/components/ui/Icon';
@@ -8,7 +8,6 @@ import { memo } from 'react';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 32;
 const CARD_HEIGHT = CARD_WIDTH * 1.4;
-const MAX_STARS = 5;
 
 /**
  * Ingredient type matching the recipes schema
@@ -81,6 +80,7 @@ type Recipe = {
 
 type RecipeCardProps = {
   recipe: Recipe;
+  onPress?: () => void;
 };
 
 function parseDifficulty(difficulty?: string): number {
@@ -115,14 +115,19 @@ const DifficultyStars = memo(function DifficultyStars({
   );
 });
 
-export const RecipeCard = memo(function RecipeCard({ recipe }: RecipeCardProps) {
+export const RecipeCard = memo(function RecipeCard({ recipe, onPress }: RecipeCardProps) {
   const totalTime = recipe.totalTimeMinutes ??
     (recipe.prepTimeMinutes ?? 0) + (recipe.cookTimeMinutes ?? 0);
 
   const difficultyValue = parseDifficulty(recipe.difficulty);
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={styles.card}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${recipe.title} recipe`}
+    >
       <Image
         source={{ uri: recipe.imageUrl }}
         style={styles.image}
@@ -186,7 +191,7 @@ export const RecipeCard = memo(function RecipeCard({ recipe }: RecipeCardProps) 
           <DifficultyStars difficulty={difficultyValue} />
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 });
 

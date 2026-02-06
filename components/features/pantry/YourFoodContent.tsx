@@ -261,8 +261,10 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     marginVertical: Spacing.sm,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.accentLight,
+    backgroundColor: Colors.background.primary,
     borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.accent,
   },
   generateButtonText: {
     ...Typography.label,

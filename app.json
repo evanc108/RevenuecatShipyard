@@ -9,7 +9,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cookwithnom.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
@@ -24,23 +26,86 @@
       "intentFilters": [
         {
           "action": "android.intent.action.SEND",
-          "category": ["android.intent.category.DEFAULT"],
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
           "data": [
-            { "mimeType": "text/plain" }
+            {
+              "mimeType": "text/plain"
+            }
           ]
         },
         {
           "action": "android.intent.action.VIEW",
-          "category": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"],
+          "category": [
+            "android.intent.category.DEFAULT",
+            "android.intent.category.BROWSABLE"
+          ],
           "data": [
-            { "scheme": "https", "host": "*.tiktok.com" },
-            { "scheme": "https", "host": "vm.tiktok.com" },
-            { "scheme": "https", "host": "*.instagram.com" },
-            { "scheme": "https", "host": "*.youtube.com" },
-            { "scheme": "https", "host": "youtu.be" }
+            {
+              "scheme": "https",
+              "host": "*.tiktok.com"
+            },
+            {
+              "scheme": "https",
+              "host": "vm.tiktok.com"
+            },
+            {
+              "scheme": "https",
+              "host": "*.instagram.com"
+            },
+            {
+              "scheme": "https",
+              "host": "*.youtube.com"
+            },
+            {
+              "scheme": "https",
+              "host": "youtu.be"
+            }
+          ]
+        },
+        {
+          "action": "android.intent.action.SEND",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        },
+        {
+          "action": "android.intent.action.VIEW",
+          "category": [
+            "android.intent.category.DEFAULT",
+            "android.intent.category.BROWSABLE"
+          ],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "*.tiktok.com"
+            },
+            {
+              "scheme": "https",
+              "host": "vm.tiktok.com"
+            },
+            {
+              "scheme": "https",
+              "host": "*.instagram.com"
+            },
+            {
+              "scheme": "https",
+              "host": "*.youtube.com"
+            },
+            {
+              "scheme": "https",
+              "host": "youtu.be"
+            }
           ]
         }
-      ]
+      ],
+      "package": "com.cookwithnom.app"
     },
     "web": {
       "output": "static",

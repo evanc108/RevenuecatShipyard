@@ -7,6 +7,7 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -127,194 +128,196 @@ export function CreateCookbookModal({
   if (!isRendered) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-        pointerEvents="box-none"
-      >
-        {/* Animated Backdrop */}
-        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        </Animated.View>
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
+          pointerEvents="box-none"
+        >
+          {/* Animated Backdrop */}
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+          </Animated.View>
 
-        {/* Animated Modal Content */}
-        <Animated.View style={[styles.modalContent, { transform: [{ translateY: modalTranslateY }] }]}>
-          {/* Handle bar */}
-          <View style={styles.handleContainer}>
-            <View style={styles.handle} />
-          </View>
-
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{isEditMode ? 'Edit Cookbook' : 'New Cookbook'}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              onPress={handleClose}
-              hitSlop={12}
-              disabled={isLoading}
-            >
-              <Icon
-                name="close"
-                size={24}
-                color={isLoading ? Colors.text.disabled : Colors.text.secondary}
-              />
-            </Pressable>
-          </View>
-
-          {/* Form */}
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            bounces={false}
-          >
-            {/* Name Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Name</Text>
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                placeholder="My Recipes"
-                placeholderTextColor={Colors.text.tertiary}
-                value={name}
-                onChangeText={setName}
-                maxLength={50}
-                returnKeyType="next"
-                editable={!isLoading}
-                autoCapitalize="words"
-              />
+          {/* Animated Modal Content */}
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: modalTranslateY }] }]}>
+            {/* Handle bar */}
+            <View style={styles.handleContainer}>
+              <View style={styles.handle} />
             </View>
 
-            {/* Description Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                Description <Text style={styles.optionalLabel}>(optional)</Text>
-              </Text>
-              <TextInput
-                style={[styles.input, styles.descriptionInput]}
-                placeholder="A collection of my favorite dishes"
-                placeholderTextColor={Colors.text.tertiary}
-                value={description}
-                onChangeText={setDescription}
-                maxLength={150}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                editable={!isLoading}
-              />
-            </View>
-
-            {/* Cover Image */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                Cover Image <Text style={styles.optionalLabel}>(optional)</Text>
-              </Text>
-
-              {imageUri ? (
-                <View style={styles.imagePreviewContainer}>
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.imagePreview}
-                    contentFit="cover"
-                  />
-                  <View style={styles.imageActions}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Change image"
-                      style={styles.imageActionButton}
-                      onPress={handlePickImage}
-                      disabled={isLoading}
-                    >
-                      <Icon name="image-outline" size={16} color={Colors.text.secondary} />
-                      <Text style={styles.imageActionText}>Change</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Remove image"
-                      style={styles.imageActionButton}
-                      onPress={handleRemoveImage}
-                      disabled={isLoading}
-                    >
-                      <Icon name="trash-outline" size={16} color={Colors.semantic.error} />
-                      <Text style={[styles.imageActionText, styles.imageActionTextDanger]}>
-                        Remove
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Add cover image"
-                  style={styles.imagePickerButton}
-                  onPress={handlePickImage}
-                  disabled={isLoading}
-                >
-                  <Icon name="camera-outline" size={22} color={Colors.text.tertiary} />
-                  <Text style={styles.imagePickerText}>Add a cover photo</Text>
-                </Pressable>
-              )}
-            </View>
-
-          </ScrollView>
-
-          {/* Action buttons */}
-          <View style={[styles.submitContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
-            <View style={isEditMode && onDelete ? styles.buttonRow : undefined}>
-              {/* Delete button (edit mode only) */}
-              {isEditMode && onDelete ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete cookbook"
-                  style={[styles.deleteButton, isLoading && styles.deleteButtonDisabled]}
-                  onPress={handleDelete}
-                  disabled={isLoading}
-                >
-                  <Icon
-                    name="trash-outline"
-                    size={18}
-                    color={isLoading ? Colors.text.disabled : Colors.semantic.error}
-                  />
-                  <Text
-                    style={[styles.deleteButtonText, isLoading && styles.deleteButtonTextDisabled]}
-                  >
-                    Delete
-                  </Text>
-                </Pressable>
-              ) : null}
-
-              {/* Submit button */}
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>{isEditMode ? 'Edit Cookbook' : 'New Cookbook'}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={isEditMode ? 'Save changes' : 'Create cookbook'}
-                accessibilityState={{ disabled: !isValid || isLoading }}
-                style={[
-                  styles.submitButton,
-                  isEditMode && onDelete ? styles.submitButtonFlex : undefined,
-                  (!isValid || isLoading) && styles.submitButtonDisabled,
-                ]}
-                onPress={handleSubmit}
-                disabled={!isValid || isLoading}
+                accessibilityLabel="Close"
+                onPress={handleClose}
+                hitSlop={12}
+                disabled={isLoading}
               >
-                <Text
-                  style={[
-                    styles.submitButtonText,
-                    (!isValid || isLoading) && styles.submitButtonTextDisabled,
-                  ]}
-                >
-                  {isLoading
-                    ? (isEditMode ? 'Saving...' : 'Creating...')
-                    : (isEditMode ? 'Save Changes' : 'Create Cookbook')}
-                </Text>
+                <Icon
+                  name="close"
+                  size={24}
+                  color={isLoading ? Colors.text.disabled : Colors.text.secondary}
+                />
               </Pressable>
             </View>
-          </View>
-        </Animated.View>
-      </KeyboardAvoidingView>
-    </View>
+
+            {/* Form */}
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+            >
+              {/* Name Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Name</Text>
+                <TextInput
+                  ref={inputRef}
+                  style={styles.input}
+                  placeholder="My Recipes"
+                  placeholderTextColor={Colors.text.tertiary}
+                  value={name}
+                  onChangeText={setName}
+                  maxLength={50}
+                  returnKeyType="next"
+                  editable={!isLoading}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              {/* Description Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Description <Text style={styles.optionalLabel}>(optional)</Text>
+                </Text>
+                <TextInput
+                  style={[styles.input, styles.descriptionInput]}
+                  placeholder="A collection of my favorite dishes"
+                  placeholderTextColor={Colors.text.tertiary}
+                  value={description}
+                  onChangeText={setDescription}
+                  maxLength={150}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!isLoading}
+                />
+              </View>
+
+              {/* Cover Image */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Cover Image <Text style={styles.optionalLabel}>(optional)</Text>
+                </Text>
+
+                {imageUri ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.imagePreview}
+                      contentFit="cover"
+                    />
+                    <View style={styles.imageActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Change image"
+                        style={styles.imageActionButton}
+                        onPress={handlePickImage}
+                        disabled={isLoading}
+                      >
+                        <Icon name="image-outline" size={16} color={Colors.text.secondary} />
+                        <Text style={styles.imageActionText}>Change</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove image"
+                        style={styles.imageActionButton}
+                        onPress={handleRemoveImage}
+                        disabled={isLoading}
+                      >
+                        <Icon name="trash-outline" size={16} color={Colors.semantic.error} />
+                        <Text style={[styles.imageActionText, styles.imageActionTextDanger]}>
+                          Remove
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Add cover image"
+                    style={styles.imagePickerButton}
+                    onPress={handlePickImage}
+                    disabled={isLoading}
+                  >
+                    <Icon name="camera-outline" size={22} color={Colors.text.tertiary} />
+                    <Text style={styles.imagePickerText}>Add a cover photo</Text>
+                  </Pressable>
+                )}
+              </View>
+
+            </ScrollView>
+
+            {/* Action buttons */}
+            <View style={[styles.submitContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+              <View style={isEditMode && onDelete ? styles.buttonRow : undefined}>
+                {/* Delete button (edit mode only) */}
+                {isEditMode && onDelete ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete cookbook"
+                    style={[styles.deleteButton, isLoading && styles.deleteButtonDisabled]}
+                    onPress={handleDelete}
+                    disabled={isLoading}
+                  >
+                    <Icon
+                      name="trash-outline"
+                      size={18}
+                      color={isLoading ? Colors.text.disabled : Colors.semantic.error}
+                    />
+                    <Text
+                      style={[styles.deleteButtonText, isLoading && styles.deleteButtonTextDisabled]}
+                    >
+                      Delete
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {/* Submit button */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={isEditMode ? 'Save changes' : 'Create cookbook'}
+                  accessibilityState={{ disabled: !isValid || isLoading }}
+                  style={[
+                    styles.submitButton,
+                    isEditMode && onDelete ? styles.submitButtonFlex : undefined,
+                    (!isValid || isLoading) && styles.submitButtonDisabled,
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={!isValid || isLoading}
+                >
+                  <Text
+                    style={[
+                      styles.submitButtonText,
+                      (!isValid || isLoading) && styles.submitButtonTextDisabled,
+                    ]}
+                  >
+                    {isLoading
+                      ? (isEditMode ? 'Saving...' : 'Creating...')
+                      : (isEditMode ? 'Save Changes' : 'Create Cookbook')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    maxHeight: '75%',
+    maxHeight: '90%',
   },
   handleContainer: {
     alignItems: 'center',

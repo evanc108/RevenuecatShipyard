@@ -11,9 +11,12 @@ import {
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSSO, useSignIn } from '@clerk/clerk-expo';
+import { useSSO, useSignIn, useAuth } from '@clerk/clerk-expo';
 import { useCallback, useState, useMemo } from 'react';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
@@ -27,6 +30,7 @@ export default function AuthScreen() {
   const copy = ONBOARDING_COPY.signUp;
   const { startSSOFlow } = useSSO();
   const { signIn, setActive: setSignInActive, isLoaded: isSignInLoaded } = useSignIn();
+  const { signOut, isSignedIn } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<AuthMode>('signUp');
@@ -47,27 +51,47 @@ export default function AuthScreen() {
         setIsLoading(provider);
         setError('');
 
-        const { createdSessionId, setActive } = await startSSOFlow({
+        // Clear any existing session before starting OAuth
+        if (isSignedIn) {
+          await signOut();
+        }
+
+        const { createdSessionId, signIn: ssoSignIn, signUp: ssoSignUp, setActive } = await startSSOFlow({
           strategy,
           redirectUrl,
         });
 
+        // Handle completed sign-up (new user via SSO) - redirect to onboarding
+        // Check this FIRST since createdSessionId can be set for new users too
+        if (ssoSignUp?.status === 'complete' && ssoSignUp.createdSessionId && setActive) {
+          await setActive({ session: ssoSignUp.createdSessionId });
+          router.replace('/(onboarding)/profile-setup');
+          return;
+        }
+
+        // Handle completed sign-in (existing user via SSO)
+        if (ssoSignIn?.status === 'complete' && ssoSignIn.createdSessionId && setActive) {
+          await setActive({ session: ssoSignIn.createdSessionId });
+          router.replace('/(tabs)');
+          return;
+        }
+
+        // Handle direct session creation (fallback - AuthGuard will redirect if needed)
         if (createdSessionId && setActive) {
           await setActive({ session: createdSessionId });
-          // Navigate based on mode - sign in goes to tabs, sign up goes to onboarding
-          if (mode === 'signIn') {
-            router.replace('/(tabs)');
-          } else {
-            router.replace('/(onboarding)/profile-setup');
-          }
+          router.replace('/(tabs)');
+          return;
         }
+
+        // If we get here, something unexpected happened
+        setError('Sign in was not completed. Please try again.');
       } catch (err: unknown) {
         setError(getClerkErrorMessage(err, copy.errorFallback));
       } finally {
         setIsLoading(null);
       }
     },
-    [startSSOFlow, copy.errorFallback, router, mode, redirectUrl],
+    [startSSOFlow, copy.errorFallback, router, redirectUrl, isSignedIn, signOut],
   );
 
   const handleEmailSignIn = async () => {
@@ -114,7 +138,13 @@ export default function AuthScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(onboarding)/welcome');
+            }
+          }}
           hitSlop={8}
           style={styles.backButton}
         >

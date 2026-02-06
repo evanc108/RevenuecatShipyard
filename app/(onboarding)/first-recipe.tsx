@@ -124,7 +124,13 @@ export default function FirstRecipeScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Go back"
-        onPress={() => router.back()}
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(onboarding)/dietary');
+          }
+        }}
         hitSlop={8}
         style={styles.backButton}
       >
