@@ -47,7 +47,7 @@ function MealRecipeCardComponent({
         />
       ) : (
         <View style={[styles.image, styles.imagePlaceholder]}>
-          <Icon name="utensils" size={22} color={Colors.text.tertiary} />
+          <Icon name="utensils" size={22} color="rgba(255,255,255,0.7)" />
         </View>
       )}
       <View style={styles.info}>
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   imagePlaceholder: {
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: '#FF9500',
     alignItems: 'center',
     justifyContent: 'center',
   },
