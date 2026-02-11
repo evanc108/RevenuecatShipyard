@@ -648,8 +648,8 @@ export default function DiscoverScreen() {
   }, [successOverlayOpacity, successIconScale, successIconTranslateY]);
 
   const handleFindPeople = useCallback(() => {
-    setActiveTab('discover');
-  }, []);
+    router.push('/suggested-users');
+  }, [router]);
 
   const handleTabChange = useCallback((tab: TabKey) => {
     setActiveTab(tab);
