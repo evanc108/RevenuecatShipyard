@@ -19,19 +19,7 @@ type RecentCookCardProps = {
 
 const CARD_HEIGHT = 130;
 
-const PASTEL_FALLBACKS: readonly string[] = [
-  '#FFE8D6',
-  '#D6E8FF',
-  '#E0D6FF',
-  '#D6FFE8',
-  '#FFF5D6',
-  '#FFD6E0',
-] as const;
-
-function getPastelForTitle(title: string): string {
-  const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return PASTEL_FALLBACKS[hash % PASTEL_FALLBACKS.length] ?? PASTEL_FALLBACKS[0];
-}
+const FALLBACK_BG = '#FF9500';
 
 function DifficultyStars({ difficulty }: { difficulty: number }): React.ReactElement {
   return (
@@ -62,7 +50,7 @@ export const RecentCookCard = memo(function RecentCookCard({
   actionLoading,
 }: RecentCookCardProps): React.ReactElement {
   const buttonLabel = actionLabel ?? COPY.cookbookDetail.cook;
-  const fallbackBg = getPastelForTitle(title);
+  const fallbackBg = FALLBACK_BG;
 
   return (
     <Pressable
@@ -82,7 +70,7 @@ export const RecentCookCard = memo(function RecentCookCard({
             cachePolicy="memory-disk"
           />
         ) : (
-          <Icon name="restaurant-outline" size={24} color={Colors.text.tertiary} />
+          <Icon name="restaurant-outline" size={24} color="rgba(255,255,255,0.7)" />
         )}
       </View>
 

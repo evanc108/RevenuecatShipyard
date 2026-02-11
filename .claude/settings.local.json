@@ -42,7 +42,8 @@
       "Bash(curl:*)",
       "Bash(npx expo uninstall:*)",
       "Bash(npm uninstall:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(pod install)"
     ]
   }
 }

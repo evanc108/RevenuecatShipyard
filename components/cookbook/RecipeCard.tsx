@@ -17,21 +17,7 @@ type RecipeCardProps = {
   compact?: boolean; // true for grid view (smaller text)
 };
 
-const PASTEL_FALLBACKS: readonly string[] = [
-  '#FFE8D6',
-  '#D6E8FF',
-  '#E0D6FF',
-  '#D6FFE8',
-  '#FFF5D6',
-  '#FFD6E0',
-  '#D6F0E0',
-  '#FFE0D6',
-] as const;
-
-function getPastelForTitle(title: string): string {
-  const hash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return PASTEL_FALLBACKS[hash % PASTEL_FALLBACKS.length] ?? PASTEL_FALLBACKS[0];
-}
+const FALLBACK_BG = '#FF9500';
 
 const MAX_STARS = 5;
 
@@ -77,7 +63,7 @@ export const RecipeCard = memo(function RecipeCard({
   onMorePress,
   compact = false,
 }: RecipeCardProps): React.ReactElement {
-  const fallbackBg = getPastelForTitle(title);
+  const fallbackBg = FALLBACK_BG;
   const hasImage = Boolean(imageUrl);
   const starSize = compact ? 15 : 18;
   const starStrokeWidth = compact ? 2 : 2;
@@ -102,7 +88,7 @@ export const RecipeCard = memo(function RecipeCard({
             cachePolicy="memory-disk"
           />
         ) : (
-          <Icon name="restaurant-outline" size={40} color={Colors.text.tertiary} />
+          <Icon name="restaurant-outline" size={40} color="rgba(255,255,255,0.7)" />
         )}
       </View>
 

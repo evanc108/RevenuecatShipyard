@@ -46,16 +46,7 @@ const NAV_BUTTON_SIZE = 40;
 const NAV_ICON_STROKE = 2.5;
 const FLOATING_BAR_HEIGHT = 56;
 
-const PASTEL_COLORS: readonly string[] = [
-	'#E0D6FF',
-	'#FFD6E0',
-	'#D6E8FF',
-	'#D6FFE8',
-	'#FFE8D6',
-	'#FFF5D6',
-	'#D6F0E0',
-	'#FFE0D6'
-] as const;
+const RECIPE_FALLBACK_BG = '#FF9500';
 
 const CATEGORY_COLORS = {
 	protein: '#FFE0E0',
@@ -79,12 +70,6 @@ const DIFFICULTY_MAP: Record<string, number> = {
 
 // --- Helper Functions ---
 
-function getPastelForTitle(title: string): string {
-	const hash = title
-		.split('')
-		.reduce((acc, char) => acc + char.charCodeAt(0), 0);
-	return PASTEL_COLORS[hash % PASTEL_COLORS.length] ?? PASTEL_COLORS[0];
-}
 
 function parseDifficulty(difficulty?: string | number): number {
 	if (difficulty === undefined || difficulty === null) return 0;
@@ -733,16 +718,14 @@ export default function RecipeDetailScreen() {
 							style={[
 								styles.heroFallback,
 								{
-									backgroundColor: getPastelForTitle(
-										recipe.title
-									)
+									backgroundColor: RECIPE_FALLBACK_BG
 								}
 							]}
 						>
 							<Icon
 								name="utensils"
 								size={48}
-								color={Colors.text.tertiary}
+								color="rgba(255,255,255,0.7)"
 							/>
 						</View>
 					)}

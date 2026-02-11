@@ -128,13 +128,19 @@ export const RecipeCard = memo(function RecipeCard({ recipe, onPress }: RecipeCa
       accessibilityRole="button"
       accessibilityLabel={`View ${recipe.title} recipe`}
     >
-      <Image
-        source={{ uri: recipe.imageUrl }}
-        style={styles.image}
-        contentFit="cover"
-        transition={200}
-        cachePolicy="memory-disk"
-      />
+      {recipe.imageUrl ? (
+        <Image
+          source={{ uri: recipe.imageUrl }}
+          style={styles.image}
+          contentFit="cover"
+          transition={200}
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <View style={styles.imageFallback}>
+          <Icon name="utensils" size={48} color="rgba(255,255,255,0.7)" />
+        </View>
+      )}
 
       {/* Bottom gradient for text readability */}
       <LinearGradient
@@ -205,6 +211,12 @@ const styles = StyleSheet.create({
   },
   image: {
     ...StyleSheet.absoluteFillObject,
+  },
+  imageFallback: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FF9500',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gradient: {
     position: 'absolute',
