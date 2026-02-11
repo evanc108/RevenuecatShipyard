@@ -21,10 +21,10 @@ const copy = COPY.recipeDetail.mealPlanPicker;
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 const MEAL_TYPES: { key: MealType; label: string; icon: string }[] = [
-  { key: 'breakfast', label: copy.breakfast, icon: 'sunny' },
-  { key: 'lunch', label: copy.lunch, icon: 'restaurant' },
+  { key: 'breakfast', label: copy.breakfast, icon: 'sun' },
+  { key: 'lunch', label: copy.lunch, icon: 'utensils' },
   { key: 'dinner', label: copy.dinner, icon: 'moon' },
-  { key: 'snack', label: copy.snack, icon: 'cafe' },
+  { key: 'snack', label: copy.snack, icon: 'cookie' },
 ];
 
 function formatDate(date: Date): string {
@@ -36,7 +36,6 @@ function formatDate(date: Date): string {
 
 function getDayLabel(date: Date, index: number): string {
   if (index === 0) return copy.today;
-  if (index === 1) return copy.tomorrow;
   return date.toLocaleDateString('en-US', { weekday: 'short' });
 }
 
@@ -60,6 +59,7 @@ type MealPlanPickerModalProps = {
   recipeId: Id<'recipes'> | null;
   recipeTitle: string;
   onClose: () => void;
+  onSuccess?: () => void;
 };
 
 export function MealPlanPickerModal({
@@ -67,6 +67,7 @@ export function MealPlanPickerModal({
   recipeId,
   recipeTitle,
   onClose,
+  onSuccess,
 }: MealPlanPickerModalProps): React.ReactElement | null {
   const insets = useSafeAreaInsets();
 
@@ -110,10 +111,11 @@ export function MealPlanPickerModal({
       });
 
       onClose();
+      onSuccess?.();
     } finally {
       setIsLoading(false);
     }
-  }, [recipeId, isLoading, days, selectedDayIndex, selectedMealType, addMealPlanEntry, onClose]);
+  }, [recipeId, isLoading, days, selectedDayIndex, selectedMealType, addMealPlanEntry, onClose, onSuccess]);
 
   if (!isRendered || !recipeId) return null;
 
@@ -159,7 +161,7 @@ export function MealPlanPickerModal({
 
         {/* Recipe Preview */}
         <View style={styles.recipePreview}>
-          <Icon name="restaurant" size={20} color={Colors.accent} />
+          <Icon name="utensils" size={18} color={Colors.text.secondary} />
           <Text style={styles.recipeTitle} numberOfLines={1}>
             {recipeTitle}
           </Text>
@@ -300,15 +302,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
     marginBottom: Spacing.lg,
   },
   recipeTitle: {
     ...Typography.body,
-    color: Colors.accent,
+    color: Colors.text.primary,
     fontWeight: '600',
     flex: 1,
   },

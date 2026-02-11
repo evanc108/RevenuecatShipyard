@@ -583,11 +583,12 @@ export default function RecipeDetailScreen() {
 			try {
 				await addToCookbookMutation({ cookbookId, recipeId });
 				setIsSaveModalVisible(false);
+				playGroceryOverlay(copy.savedToCookbook);
 			} finally {
 				setIsSavingToCookbook(false);
 			}
 		},
-		[recipeId, addToCookbookMutation, isSavingToCookbook]
+		[recipeId, addToCookbookMutation, isSavingToCookbook, playGroceryOverlay]
 	);
 
 	// --- Early Returns ---
@@ -1402,6 +1403,22 @@ export default function RecipeDetailScreen() {
 				</Pressable>
 
 				<View style={styles.headerRight}>
+					{isInCookbook === false ? (
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={copy.addToCookbook}
+							style={styles.headerCartButton}
+							onPress={() => setIsSaveModalVisible(true)}
+							hitSlop={8}
+						>
+							<Icon
+								name="plus"
+								size={20}
+								color={Colors.text.inverse}
+								strokeWidth={NAV_ICON_STROKE}
+							/>
+						</Pressable>
+					) : null}
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel={isInGroceryList ? copy.addedToCart : copy.addToCart}
@@ -1457,6 +1474,7 @@ export default function RecipeDetailScreen() {
 				recipeId={recipeId}
 				recipeTitle={recipe?.title ?? ''}
 				onClose={() => setIsMealPlanVisible(false)}
+				onSuccess={() => playGroceryOverlay(copy.addedToMealPlan)}
 			/>
 
 			{/* Paywall Modal */}

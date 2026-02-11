@@ -420,6 +420,9 @@ export const COPY = {
     addedToCart: 'Added!',
     groceryAdded: 'Ingredients Added to Grocery List',
     groceryRemoved: 'Ingredients Removed from Grocery List',
+    savedToCookbook: 'Recipe Saved to Cookbook',
+    addedToMealPlan: 'Added to Meal Plan',
+    addToCookbook: 'Save to Cookbook',
     mealPlanPicker: {
       title: 'Add to Meal Plan',
       selectDay: 'Select Day',
@@ -429,7 +432,6 @@ export const COPY = {
       dinner: 'Dinner',
       snack: 'Snack',
       today: 'Today',
-      tomorrow: 'Tomorrow',
       confirm: 'Add to Plan',
       adding: 'Adding...',
     },
