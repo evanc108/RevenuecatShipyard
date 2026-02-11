@@ -34,15 +34,23 @@ export function SwipeableCardStack({
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
   const cardOpacity = useSharedValue(1);
+  // Track when we're transitioning between cards to prevent visual glitches
+  const isTransitioning = useSharedValue(false);
   const isSwipingRef = useRef(false);
 
   // Restore card opacity after React re-renders with the new card
   useLayoutEffect(() => {
     if (isSwipingRef.current) {
-      cardOpacity.value = 1;
       isSwipingRef.current = false;
+      // Wait for next frame to ensure native view has updated with new content
+      // This prevents the old card from briefly flashing before the new card appears
+      requestAnimationFrame(() => {
+        cardOpacity.value = 1;
+        // End transition after the new card is visible
+        isTransitioning.value = false;
+      });
     }
-  }, [currentIndex, cardOpacity]);
+  }, [currentIndex, cardOpacity, isTransitioning]);
 
   const currentRecipe = recipes[currentIndex];
   const nextRecipe = recipes[currentIndex + 1];
@@ -76,6 +84,9 @@ export function SwipeableCardStack({
       translateX.value = withTiming(targetX, { duration: 300 }, (finished) => {
         'worklet';
         if (finished) {
+          // Start transition - this keeps the next card at full scale/opacity
+          // while we reset the current card position
+          isTransitioning.value = true;
           // Hide card before resetting position to prevent flash
           cardOpacity.value = 0;
           translateX.value = 0;
@@ -88,7 +99,7 @@ export function SwipeableCardStack({
       });
       translateY.value = withTiming(-50, { duration: 300 });
     },
-    [translateX, translateY, rotation, cardOpacity, setSwipingFlag, handleSwipeComplete]
+    [translateX, translateY, rotation, cardOpacity, isTransitioning, setSwipingFlag, handleSwipeComplete]
   );
 
   const handlePress = useCallback(() => {
@@ -135,6 +146,14 @@ export function SwipeableCardStack({
   }));
 
   const nextCardAnimatedStyle = useAnimatedStyle(() => {
+    // During transition, keep next card at full scale/opacity to prevent flash
+    if (isTransitioning.value) {
+      return {
+        transform: [{ scale: 1 }],
+        opacity: 1,
+      };
+    }
+
     const scale = interpolate(
       Math.abs(translateX.value),
       [0, SCREEN_WIDTH / 2],

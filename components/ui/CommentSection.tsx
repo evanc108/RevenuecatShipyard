@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery } from 'convex/react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
@@ -114,6 +115,7 @@ export const CommentSection = memo(function CommentSection({
   onClose,
   currentUserId,
 }: CommentSectionProps) {
+  const insets = useSafeAreaInsets();
   const [commentText, setCommentText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
@@ -238,7 +240,7 @@ export const CommentSection = memo(function CommentSection({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
             <TextInput
               style={styles.input}
               placeholder={COPY.comments.placeholder}
@@ -372,7 +374,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xl,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
     gap: Spacing.sm,
