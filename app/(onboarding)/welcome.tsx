@@ -1,53 +1,56 @@
-import { Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
-import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
-import { Colors, Spacing } from '@/constants/theme';
-
-// Illustration: Work illustrations by Storyset (https://storyset.com/work)
+import { Colors, FontFamily, Spacing, Typography } from '@/constants/theme';
+import { PageIndicator } from '@/components/onboarding/PageIndicator';
+import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const copy = ONBOARDING_COPY.welcome;
-  const insets = useSafeAreaInsets();
+
+  const handleNext = () => {
+    router.push('/(onboarding)/info');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Animated.View
-        entering={FadeInDown.delay(0).duration(400)}
-        style={styles.headlineContainer}
+        entering={FadeInDown.delay(100).duration(500)}
+        style={styles.indicatorContainer}
       >
-        <Text style={styles.headline}>{copy.headline}</Text>
+        <PageIndicator current={1} total={2} />
       </Animated.View>
 
-      <Animated.View
-        entering={FadeInDown.delay(100).duration(400)}
-        style={styles.illustrationContainer}
-      >
-        <Image
-          source={require('@/assets/images/welcome-icon.png')}
-          style={styles.illustration}
-          contentFit="contain"
-        />
-      </Animated.View>
-
-      <Animated.View
-        entering={FadeInUp.delay(200).duration(400)}
-        style={styles.bottomBar}
-      >
+      <View style={styles.content}>
         <Animated.View
-          style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
+          entering={FadeInDown.delay(200).duration(500)}
+          style={styles.imageContainer}
         >
-          <PageIndicator current={1} />
+          <Image
+            source={require('@/assets/images/welcome-icon.png')}
+            style={styles.illustration}
+            contentFit="contain"
+          />
         </Animated.View>
-        <PageTurnButton
-          label="Next >"
-          onPress={() => router.push('/(onboarding)/info')}
-        />
+
+        <Animated.View
+          entering={FadeInDown.delay(350).duration(500)}
+          style={styles.textContainer}
+        >
+          <Text style={styles.headline}>{copy.headline}</Text>
+          <Text style={styles.subhead}>{copy.subhead}</Text>
+        </Animated.View>
+      </View>
+
+      <Animated.View
+        entering={FadeInUp.delay(400).duration(500)}
+        style={styles.bottomSection}
+      >
+        <PageTurnButton label="Next >" onPress={handleNext} />
       </Animated.View>
     </SafeAreaView>
   );
@@ -58,33 +61,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
-  headlineContainer: {
+  indicatorContainer: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.md,
   },
-  headline: {
-    fontSize: 36,
-    fontWeight: '400',
-    color: Colors.text.primary,
-    letterSpacing: -0.5,
-    lineHeight: 50,
-  },
-  illustrationContainer: {
+  content: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  imageContainer: {
+    marginBottom: Spacing.xl,
   },
   illustration: {
-    width: 360,
-    height: 360,
+    width: 320,
+    height: 320,
   },
-  bottomBar: {
+  textContainer: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headline: {
+    fontSize: 40,
+    fontFamily: FontFamily.bold,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    letterSpacing: -0.5,
+    lineHeight: 48,
+    textAlign: 'center',
+  },
+  subhead: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    fontSize: 16,
+    lineHeight: 24,
+    maxWidth: 280,
+  },
+  bottomSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingLeft: Spacing.xl,
-  },
-  bottomLeft: {
     justifyContent: 'flex-end',
   },
 });

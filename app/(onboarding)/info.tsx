@@ -1,71 +1,80 @@
+import { Text, StyleSheet, View, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Icon } from '@/components/ui/Icon';
+import { NAV_BUTTON_SIZE } from '@/constants/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { ONBOARDING_COPY } from '@/constants/onboarding';
+import { Colors, FontFamily, Spacing, Typography } from '@/constants/theme';
 import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
-import { ONBOARDING_COPY } from '@/constants/onboarding';
-import { Colors, NAV_BUTTON_SIZE, Spacing, Typography } from '@/constants/theme';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text } from 'react-native';
-import { Icon } from '@/components/ui/Icon';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Illustration: Information illustrations by Storyset (https://storyset.com/information)
 
 export default function InfoScreen() {
   const router = useRouter();
   const copy = ONBOARDING_COPY.info;
-  const insets = useSafeAreaInsets();
+
+  const handleBack = () => {
+    router.back();
+  };
+
+  const handleNext = () => {
+    router.push('/(onboarding)/sign-up');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace('/(onboarding)/welcome');
-          }
-        }}
-        hitSlop={8}
-        style={styles.backButton}
-      >
-        <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
-      </Pressable>
-
       <Animated.View
-        entering={FadeInDown.delay(0).duration(400)}
-        style={styles.headlineContainer}
+        entering={FadeInDown.delay(100).duration(500)}
+        style={styles.indicatorContainer}
       >
-        <Text style={styles.headline}>{copy.headline}</Text>
-        <Text style={styles.subhead}>{copy.subhead}</Text>
+        <PageIndicator current={2} total={2} />
       </Animated.View>
 
-      <Animated.View
-        entering={FadeInDown.delay(100).duration(400)}
-        style={styles.illustrationContainer}
-      >
-        <Image
-          source={require('@/assets/images/info-icon.png')}
-          style={styles.illustration}
-          contentFit="contain"
-        />
-      </Animated.View>
-
-      <Animated.View
-        entering={FadeInUp.delay(200).duration(400)}
-        style={styles.bottomBar}
-      >
+      <View style={styles.content}>
         <Animated.View
-          style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
+          entering={FadeInDown.delay(200).duration(500)}
+          style={styles.imageContainer}
         >
-          <PageIndicator current={2} />
+          <Image
+            source={require('@/assets/images/info-icon.png')}
+            style={styles.illustration}
+            contentFit="contain"
+          />
         </Animated.View>
-        <PageTurnButton
-          label="Next >"
-          onPress={() => router.push('/(onboarding)/sign-up')}
-        />
+
+        <Animated.View
+          entering={FadeInDown.delay(350).duration(500)}
+          style={styles.textContainer}
+        >
+          <Text style={styles.headline}>{copy.headline}</Text>
+
+          <View style={styles.featureList}>
+            {copy.features.map((feature, index) => (
+              <View key={index} style={styles.featureRow}>
+                <View style={styles.bullet} />
+                <Text style={styles.featureText}>{feature}</Text>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+      </View>
+
+      <Animated.View
+        entering={FadeInUp.delay(400).duration(500)}
+        style={styles.bottomSection}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={handleBack}
+          hitSlop={8}
+          style={styles.backButton}
+        >
+          <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
+        </Pressable>
+
+        <PageTurnButton label="Next >" onPress={handleNext} />
       </Animated.View>
     </SafeAreaView>
   );
@@ -76,6 +85,61 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
+  indicatorContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  imageContainer: {
+    marginBottom: Spacing.xl,
+  },
+  illustration: {
+    width: 240,
+    height: 240,
+  },
+  textContainer: {
+    alignItems: 'center',
+    gap: Spacing.lg,
+  },
+  headline: {
+    fontSize: 36,
+    fontFamily: FontFamily.bold,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    letterSpacing: -0.5,
+    lineHeight: 44,
+    textAlign: 'center',
+  },
+  featureList: {
+    gap: Spacing.md,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  bullet: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+  },
+  featureText: {
+    ...Typography.body,
+    color: Colors.text.secondary,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  bottomSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
   backButton: {
     width: NAV_BUTTON_SIZE,
     height: NAV_BUTTON_SIZE,
@@ -84,42 +148,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: Spacing.md,
-    marginTop: Spacing.md,
-  },
-  headlineContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    gap: Spacing.md,
-  },
-  headline: {
-    fontSize: 36,
-    fontWeight: '400',
-    color: Colors.text.primary,
-    letterSpacing: -0.5,
-    lineHeight: 50,
-  },
-  subhead: {
-    ...Typography.body,
-    color: Colors.text.secondary,
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  illustrationContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  illustration: {
-    width: 280,
-    height: 280,
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingLeft: Spacing.xl,
-  },
-  bottomLeft: {
-    justifyContent: 'flex-end',
+    marginBottom: Spacing.xl,
   },
 });
