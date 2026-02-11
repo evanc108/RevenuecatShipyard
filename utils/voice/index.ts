@@ -12,6 +12,8 @@ export {
   precacheCommonResponses,
   // Audio session synchronization
   onAudioSessionReleased,
+  // Instant feedback constant
+  ONE_MOMENT_RESPONSE,
 } from './textToSpeech';
 
 export {

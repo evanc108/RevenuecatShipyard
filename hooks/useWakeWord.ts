@@ -130,11 +130,21 @@ export function useWakeWord({
     };
   }, []);
 
+  // Track previous enabled state for detecting transitions
+  const prevEnabledRef = useRef(enabled);
+  // Ref to hold startWakeWordListening for use in effects (avoids circular dependency)
+  const startWakeWordListeningRef = useRef<(() => Promise<void>) | null>(null);
+
   // Stop listening IMMEDIATELY when disabled (e.g., when TTS starts)
+  // And restart when enabled becomes true again
   useEffect(() => {
+    const wasEnabled = prevEnabledRef.current;
+    prevEnabledRef.current = enabled;
+
     if (!enabled) {
       // Immediately stop any ongoing recording cycle
       shouldContinueRef.current = false;
+      isProcessingRef.current = false; // Reset mutex to prevent stuck state
 
       // Clear any pending timeouts
       if (timeoutRef.current) {
@@ -148,13 +158,33 @@ export function useWakeWord({
         recordingRef.current = null;
       }
 
-      if (isWakeWordListening) {
-        setIsWakeWordListening(false);
-        setIsRecording(false);
-        isListeningRef.current = false;
-      }
+      // ALWAYS reset refs when disabled (not just when React state is true)
+      // This prevents stuck state from ref/state mismatch
+      setIsWakeWordListening(false);
+      setIsRecording(false);
+      isListeningRef.current = false;
+
+      console.log('[WakeWord] Disabled - all refs reset');
+    } else if (!wasEnabled && enabled) {
+      // Enabled just became true - auto-restart after a short delay
+      // This handles the case where TTS stops and we need to resume listening
+      console.log('[WakeWord] Enabled changed to true - will auto-restart');
+
+      // Reset any stuck refs before restarting
+      isListeningRef.current = false;
+      isProcessingRef.current = false;
+
+      // Small delay to ensure audio session is ready
+      const restartTimer = setTimeout(() => {
+        if (enabledRef.current && !isListeningRef.current && startWakeWordListeningRef.current) {
+          console.log('[WakeWord] Auto-restarting after enabled became true');
+          startWakeWordListeningRef.current();
+        }
+      }, 300);
+
+      return () => clearTimeout(restartTimer);
     }
-  }, [enabled, isWakeWordListening]);
+  }, [enabled]);
 
   const checkForWakeWord = (transcript: string): boolean => {
     const normalizedTranscript = transcript.toLowerCase().trim();
@@ -430,8 +460,28 @@ export function useWakeWord({
   };
 
   const startWakeWordListening = useCallback(async () => {
-    if (isListeningRef.current || !enabledRef.current) {
+    console.log('[WakeWord] startWakeWordListening called', {
+      isListeningRef: isListeningRef.current,
+      isProcessingRef: isProcessingRef.current,
+      enabledRef: enabledRef.current,
+    });
+
+    // If not enabled, don't start
+    if (!enabledRef.current) {
+      console.log('[WakeWord] Not starting - not enabled');
       return;
+    }
+
+    // If already listening, don't start again (but log for debugging)
+    if (isListeningRef.current) {
+      console.log('[WakeWord] Already listening - skipping start');
+      return;
+    }
+
+    // Reset processing mutex in case it's stuck
+    if (isProcessingRef.current) {
+      console.log('[WakeWord] Resetting stuck processing mutex');
+      isProcessingRef.current = false;
     }
 
     // Check if API key is configured
@@ -452,14 +502,24 @@ export function useWakeWord({
     shouldContinueRef.current = true;
     setIsWakeWordListening(true);
 
-    console.log('[WakeWord] Starting wake word listening');
+    console.log('[WakeWord] Started wake word listening');
     recordAndCheck();
   }, [recordAndCheck]); // enabledRef.current is used instead of enabled prop
 
+  // Keep the ref in sync with the callback
+  useEffect(() => {
+    startWakeWordListeningRef.current = startWakeWordListening;
+  }, [startWakeWordListening]);
+
   const stopWakeWordListening = useCallback(async () => {
-    console.log('[WakeWord] Stopping wake word listening');
+    console.log('[WakeWord] Stopping wake word listening', {
+      wasListening: isListeningRef.current,
+      wasProcessing: isProcessingRef.current,
+    });
+
     shouldContinueRef.current = false;
     isListeningRef.current = false;
+    isProcessingRef.current = false; // Reset mutex to prevent stuck state
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -469,6 +529,8 @@ export function useWakeWord({
     await cleanupRecording();
     setIsRecording(false);
     setIsWakeWordListening(false);
+
+    console.log('[WakeWord] Stopped - all refs reset');
 
     // Minimal delay - audio session cleanup is handled in cleanupRecording
     await new Promise((resolve) => setTimeout(resolve, 30));

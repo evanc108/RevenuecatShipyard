@@ -16,6 +16,8 @@ import {
   stopSpeaking,
   detectIntent,
   isTranscriptionAvailable,
+  isCached,
+  ONE_MOMENT_RESPONSE,
 } from '@/utils/voice';
 import {
   VOICE_HELP_TEXT,
@@ -205,6 +207,26 @@ export function useVoiceAssistant({
       const response = await handleCommand(intentResult);
 
       if (response.text) {
+        // Check if response is cached - if not, play instant feedback first
+        const responseIsCached = isCached(response.text);
+
+        if (!responseIsCached) {
+          // Uncached response - give instant "One moment" feedback while we fetch audio
+          // This provides immediate user feedback so they know we heard them
+          console.log('[Voice] Response not cached, playing "One moment" first');
+          setVoiceState('speaking');
+          await speak(ONE_MOMENT_RESPONSE, {
+            onDone: () => {
+              // Intentionally empty - we'll continue to the main response
+            },
+            onError: () => {
+              // Continue anyway
+            },
+          });
+          // Small pause between feedback and response
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
         setVoiceState('speaking');
         await speak(response.text, {
           onDone: () => {
@@ -299,6 +321,124 @@ export function useVoiceAssistant({
           };
         }
 
+        case 'INGREDIENT_QUERY': {
+          const queryName = params?.ingredientName ?? '';
+          if (!queryName) {
+            return { text: "I didn't catch which ingredient you're asking about." };
+          }
+
+          // Search for matching ingredient (fuzzy match)
+          const matchingIngredient = recipe.ingredients.find((ing) => {
+            const ingName = ing.name.toLowerCase();
+            const query = queryName.toLowerCase();
+            // Exact match or contains
+            return ingName.includes(query) || query.includes(ingName);
+          });
+
+          if (matchingIngredient) {
+            const amount = `${matchingIngredient.quantity} ${matchingIngredient.unit}`.trim();
+            return {
+              text: `You need ${amount} of ${matchingIngredient.name}.`,
+            };
+          }
+
+          // No match found - try partial matches
+          const partialMatches = recipe.ingredients.filter((ing) => {
+            const ingName = ing.name.toLowerCase();
+            const query = queryName.toLowerCase();
+            // Check if any word matches
+            const queryWords = query.split(/\s+/);
+            const ingWords = ingName.split(/\s+/);
+            return queryWords.some((qw) =>
+              ingWords.some((iw) => iw.includes(qw) || qw.includes(iw))
+            );
+          });
+
+          if (partialMatches.length === 1 && partialMatches[0]) {
+            const match = partialMatches[0];
+            const amount = `${match.quantity} ${match.unit}`.trim();
+            return {
+              text: `You need ${amount} of ${match.name}.`,
+            };
+          } else if (partialMatches.length > 1) {
+            const names = partialMatches.map((m) => m.name).join(', ');
+            return {
+              text: `I found several ingredients that might match: ${names}. Which one do you mean?`,
+            };
+          }
+
+          return {
+            text: `I couldn't find ${queryName} in this recipe's ingredients. Try saying "read ingredients" to hear the full list.`,
+          };
+        }
+
+        case 'TEMPERATURE_QUERY': {
+          // Look for temperature/heat info in current step and nearby steps
+          const currentInstruction = recipe.instructions[currentStep]?.text ?? '';
+
+          // Patterns to extract temperature info
+          const tempPatterns = [
+            // Degrees: "350°F", "180°C", "400 degrees"
+            /(\d+)\s*°?\s*([FCfc]|degrees?\s*(?:fahrenheit|celsius)?)/i,
+            // Heat levels: "medium heat", "low heat", "high heat", "medium-high"
+            /(?:over|on|at|use)?\s*(low|medium-low|medium|medium-high|high)\s*heat/i,
+            // Oven: "preheat to 350", "bake at 400"
+            /(?:preheat|bake|roast|cook)\s*(?:oven\s*)?(?:to|at)\s*(\d+)/i,
+            // Simmer/boil
+            /(simmer|boil|gentle\s+boil|rolling\s+boil)/i,
+          ];
+
+          // Check current step first
+          for (const pattern of tempPatterns) {
+            const match = currentInstruction.match(pattern);
+            if (match) {
+              // Found temperature info in current step
+              if (match[0].match(/\d+/)) {
+                // Has a number (degrees)
+                const degrees = match[0].match(/\d+/)?.[0];
+                const unit = match[0].match(/[FCfc]|fahrenheit|celsius/i)?.[0] ?? '';
+                const unitDisplay = unit.toLowerCase().startsWith('c') ? '°C' : '°F';
+                return {
+                  text: `This step says ${degrees}${unitDisplay}.`,
+                };
+              } else {
+                // Heat level like "medium heat"
+                return {
+                  text: `This step says to use ${match[0].toLowerCase().trim()}.`,
+                };
+              }
+            }
+          }
+
+          // Check all instructions for temperature info
+          for (let i = 0; i < recipe.instructions.length; i++) {
+            const instruction = recipe.instructions[i]?.text ?? '';
+            for (const pattern of tempPatterns) {
+              const match = instruction.match(pattern);
+              if (match) {
+                const stepNum = i + 1;
+                if (match[0].match(/\d+/)) {
+                  const degrees = match[0].match(/\d+/)?.[0];
+                  const unit = match[0].match(/[FCfc]|fahrenheit|celsius/i)?.[0] ?? '';
+                  const unitDisplay = unit.toLowerCase().startsWith('c') ? '°C' : '°F';
+                  return {
+                    text: `Step ${stepNum} mentions ${degrees}${unitDisplay}.`,
+                  };
+                } else {
+                  return {
+                    text: `Step ${stepNum} says to use ${match[0].toLowerCase().trim()}.`,
+                  };
+                }
+              }
+            }
+          }
+
+          // No temperature info found
+          return {
+            text: "I couldn't find specific temperature information in this recipe. Check the current step for cooking instructions.",
+          };
+        }
+
         case 'SET_TIMER': {
           const minutes = params?.timerMinutes ?? 0;
           const seconds = params?.timerSeconds ?? 0;
@@ -360,6 +500,23 @@ export function useVoiceAssistant({
     setVoiceState('speaking');
     try {
       console.log('[Voice] speakText starting...');
+
+      // Check if text is cached - if not, play "One moment" first for instant feedback
+      const textIsCached = isCached(text);
+      if (!textIsCached && !skipCache) {
+        console.log('[Voice] Text not cached, playing "One moment" first');
+        await speak(ONE_MOMENT_RESPONSE, {
+          onDone: () => {
+            // Continue to main audio
+          },
+          onError: () => {
+            // Continue anyway
+          },
+        });
+        // Small pause between feedback and response
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
       await speak(text, {
         skipCache, // Skip cache for short confirmations like "Yes?"
         onStart: () => {

@@ -76,6 +76,41 @@ export const INTENT_PATTERNS: Array<{
 
   // Information commands
   {
+    intent: 'INGREDIENT_QUERY',
+    patterns: [
+      // "How much X do I use/need?"
+      /how\s+much\s+(.+?)\s+(?:do\s+i\s+(?:use|need)|should\s+i\s+(?:use|add))/i,
+      // "How many X do I need?"
+      /how\s+many\s+(.+?)\s+(?:do\s+i\s+(?:use|need)|should\s+i\s+(?:use|add))/i,
+      // "What amount of X?"
+      /what\s+(?:amount|quantity)\s+of\s+(.+)/i,
+      // "How much X?" (simple form)
+      /how\s+much\s+(.+?)(?:\?|$)/i,
+    ],
+    priority: 8, // Higher priority than READ_INGREDIENTS
+  },
+  {
+    intent: 'TEMPERATURE_QUERY',
+    patterns: [
+      // "What heat do I set it to?"
+      /what\s+heat\s+(?:do\s+i\s+(?:set|use)|should\s+i\s+(?:set|use))/i,
+      /what\s+heat/i,
+      // "What temperature?"
+      /what\s+(?:temperature|temp)\s*(?:do\s+i\s+(?:set|use)|should\s+i\s+(?:set|use))?/i,
+      // "How hot should it be?"
+      /how\s+hot\s+(?:should|do)/i,
+      // "What setting for the oven/stove?"
+      /what\s+(?:oven|stove|burner)\s*(?:setting|temperature|temp|heat)/i,
+      // "How high/low should the heat be?"
+      /how\s+(?:high|low)\s+(?:should\s+)?(?:the\s+)?(?:heat|temperature|temp)/i,
+      // "What level of heat?"
+      /(?:what|which)\s+(?:level|setting)\s+(?:of\s+)?heat/i,
+      // "Medium heat?" / "High heat?" etc.
+      /(?:should\s+i\s+use\s+)?(?:low|medium|medium-high|high)\s+heat\??/i,
+    ],
+    priority: 8, // Same as INGREDIENT_QUERY
+  },
+  {
     intent: 'READ_INGREDIENTS',
     patterns: [
       /(?:what\s+(?:are\s+)?(?:the\s+)?)?ingredients/i,

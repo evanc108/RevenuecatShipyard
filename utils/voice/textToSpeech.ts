@@ -260,10 +260,14 @@ export async function precacheTexts(
   return { cached, failed };
 }
 
+// Instant feedback response - exported for use in voice assistant
+export const ONE_MOMENT_RESPONSE = 'One moment.';
+
 // Common responses to pre-cache on init
 // Must match exact strings used in FALLBACK_RESPONSES and wake word handler
 const COMMON_RESPONSES = [
   'Yes?', // Wake word confirmation - ONLY response for "Hey Nom"
+  ONE_MOMENT_RESPONSE, // Instant feedback while processing
   "Sorry, I didn't catch that. Try saying 'next step' or 'repeat'.", // notUnderstood
   "You're already at the first step.", // firstStep
   "That's the last step! Your dish should be ready.", // lastStep
@@ -680,11 +684,13 @@ export function onAudioSessionReleased(callback: (() => void) | null): void {
  * Internal: Notify that audio session is released
  */
 function notifyAudioSessionReleased(): void {
-  if (onAudioSessionReleasedCallback) {
+  // Capture callback reference NOW to avoid race condition with React effect cleanup
+  const callback = onAudioSessionReleasedCallback;
+  if (callback) {
     console.log('[TTS] Notifying audio session released');
     // Use setTimeout to ensure this runs after current call stack
     setTimeout(() => {
-      onAudioSessionReleasedCallback?.();
+      callback();
     }, 0);
   }
 }

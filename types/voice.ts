@@ -17,6 +17,8 @@ export type VoiceIntent =
   | 'READ_INGREDIENTS'
   | 'READ_CURRENT_STEP'
   | 'WHAT_STEP'
+  | 'INGREDIENT_QUERY'
+  | 'TEMPERATURE_QUERY'
   | 'SET_TIMER'
   | 'CHECK_TIMER'
   | 'STOP_TIMER'
@@ -33,6 +35,7 @@ export type IntentResult = {
     timerSeconds?: number;
     stepNumber?: number;
     query?: string;
+    ingredientName?: string;
   };
   rawTranscript: string;
 };

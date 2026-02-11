@@ -60,6 +60,12 @@ function extractParams(
       }
     }
 
+    case 'INGREDIENT_QUERY': {
+      // Extract ingredient name from capture group
+      const ingredientName = (match[1] ?? '').trim().toLowerCase();
+      return { ingredientName };
+    }
+
     default:
       return undefined;
   }

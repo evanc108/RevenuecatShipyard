@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import Purchases from 'react-native-purchases';
 import type { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 
+// TODO: Set to false before release
+/** Bypass paywall for testing - set to false to restore normal behavior */
+const DEV_BYPASS_PAYWALL = true;
+
 /** Maximum saved recipes for free users */
 export const FREE_RECIPE_LIMIT = 10;
 
@@ -29,12 +33,18 @@ type SubscriptionState = {
 };
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
-  isPro: false,
-  isLoading: true,
+  isPro: DEV_BYPASS_PAYWALL,
+  isLoading: DEV_BYPASS_PAYWALL ? false : true,
   currentPackage: null,
   priceString: '$4.99/mo',
 
   checkSubscription: async () => {
+    // Skip RevenueCat calls when bypassing paywall
+    if (DEV_BYPASS_PAYWALL) {
+      set({ isPro: true, isLoading: false });
+      return;
+    }
+
     try {
       set({ isLoading: true });
       const customerInfo = await Purchases.getCustomerInfo();
@@ -79,6 +89,7 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   updateFromCustomerInfo: (info: CustomerInfo) => {
+    if (DEV_BYPASS_PAYWALL) return;
     const isPro = info.entitlements.active[PRO_ENTITLEMENT] !== undefined;
     set({ isPro });
   },
