@@ -1,23 +1,18 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Redirect } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+import { View, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
-import { PlaceholderAsset } from '@/components/onboarding/PlaceholderAsset';
-import { Colors, Typography } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 
 /**
- * Splash screen that shows briefly, then redirects.
- * AuthGuard in _layout.tsx handles all routing logic - we just redirect to welcome
- * and let AuthGuard decide where to actually go based on auth state.
+ * Splash screen shown while auth state resolves.
+ * AuthGuard in _layout.tsx handles all routing — this screen never redirects itself.
  */
 export default function SplashScreen() {
-  const { isLoaded } = useAuth();
-
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.9);
 
@@ -26,11 +21,6 @@ export default function SplashScreen() {
     scale.value = withTiming(1, { duration: 400 });
   }, []);
 
-  // Once Clerk is loaded, redirect to welcome - AuthGuard will handle actual routing
-  if (isLoaded) {
-    return <Redirect href="/(onboarding)/welcome" />;
-  }
-
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
@@ -38,9 +28,12 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.logoContainer, animatedStyle]}>
-        <PlaceholderAsset width={100} height={100} label="Logo" borderRadius={20} />
-        <Text style={styles.appName}>Nom</Text>
+      <Animated.View style={animatedStyle}>
+        <Image
+          source={require('@/assets/images/app_icon.png')}
+          style={styles.icon}
+          contentFit="contain"
+        />
       </Animated.View>
     </View>
   );
@@ -53,12 +46,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoContainer: {
-    alignItems: 'center',
-    gap: 16,
-  },
-  appName: {
-    ...Typography.h2,
-    color: Colors.text.primary,
+  icon: {
+    width: 150,
+    height: 150,
   },
 });

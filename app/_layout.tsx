@@ -140,10 +140,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     const inAuthGroup = firstSegment === '(auth)';
     const inTabsGroup = firstSegment === '(tabs)';
     const inOnboardingGroup = firstSegment === '(onboarding)';
+    const onIndexScreen = !firstSegment || firstSegment === 'index';
 
     if (!isSignedIn) {
-      // Not signed in — only block access to (tabs)
-      if (inTabsGroup) {
+      // Not signed in — redirect from tabs or index to welcome
+      if (inTabsGroup || onIndexScreen) {
         if (!hasNavigated.current) {
           hasNavigated.current = true;
           router.replace('/(onboarding)/welcome');
@@ -155,8 +156,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       // Signed in — use Convex for onboarding status
       const hasOnboarded = convexUser?.hasCompletedOnboarding ?? false;
 
-      if (inAuthGroup) {
-        // Redirect away from auth screens
+      if (inAuthGroup || onIndexScreen) {
+        // Redirect away from auth screens and index splash
         if (!hasNavigated.current) {
           hasNavigated.current = true;
           if (hasOnboarded) {

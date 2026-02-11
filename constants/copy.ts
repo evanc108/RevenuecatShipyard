@@ -191,6 +191,10 @@ export const COPY = {
       noRecipesDesc: 'Import or create a recipe first',
       selectRecipeFirst: 'Select a recipe to rate',
     },
+    success: {
+      title: 'Recipe Importing!',
+      subtitle: 'Check your Cookbooks tab to see progress',
+    },
     back: 'Back',
     cancel: 'Cancel',
   },

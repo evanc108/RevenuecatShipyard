@@ -7,12 +7,15 @@ returns extracted recipe data directly.
 import asyncio
 import json
 import logging
+import secrets
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 from fastapi.responses import StreamingResponse
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, HttpUrl
 
+from app.config import get_settings
 from app.schemas import Recipe
 from app.services.extraction_pipeline import ExtractionPipeline
 from app.services.recipe_populator import RecipePopulator
@@ -20,6 +23,31 @@ from app.services.recipe_populator import RecipePopulator
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["extraction"])
+
+# API key security
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(
+    header_key: str | None = Security(_api_key_header),
+    query_key: str | None = Query(None, alias="key", include_in_schema=False),
+) -> str:
+    """Verify the API key from header or query param.
+
+    Checks X-API-Key header first, falls back to ?key= query param.
+    Query param fallback is needed for SSE/EventSource which can't set headers.
+    """
+    settings = get_settings()
+    if not settings.api_key:
+        # No key configured — allow all (dev mode)
+        return ""
+    provided_key = header_key or query_key
+    if not provided_key or not secrets.compare_digest(provided_key, settings.api_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid or missing API key",
+        )
+    return provided_key
 
 
 class ExtractRequest(BaseModel):
@@ -153,6 +181,7 @@ async def extraction_event_generator(url: str) -> AsyncGenerator[str, None]:
 )
 async def extract_recipe_stream(
     url: str = Query(..., description="URL to extract recipe from"),
+    _key: str = Depends(verify_api_key),
 ) -> StreamingResponse:
     """Extract recipe with streaming progress updates.
 
@@ -197,7 +226,7 @@ async def extract_recipe_stream(
     summary="Extract recipe from video URL",
     description="Extracts structured recipe data from a video URL using tiered fallback.",
 )
-async def extract_recipe(request: ExtractRequest) -> ExtractResponse:
+async def extract_recipe(request: ExtractRequest, _key: str = Depends(verify_api_key)) -> ExtractResponse:
     """Extract recipe from a video URL.
 
     Uses a tiered fallback pipeline:
@@ -296,7 +325,7 @@ class PopulateResponse(BaseModel):
     summary="Populate discover recipes",
     description="Fetches recipes from TheMealDB and enriches them with OpenAI for the discover feed.",
 )
-async def populate_discover_recipes(request: PopulateRequest) -> PopulateResponse:
+async def populate_discover_recipes(request: PopulateRequest, _key: str = Depends(verify_api_key)) -> PopulateResponse:
     """Populate discover recipes from TheMealDB.
 
     Fetches random recipes from TheMealDB API, then processes each

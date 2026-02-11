@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Convex Configuration (for posting recipes)
     convex_url: str = ""
 
+    # API Key for authenticating client requests
+    api_key: str = ""
+
     # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8000

@@ -61,17 +61,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS configuration for Expo/React Native
+    # CORS configuration
+    # Mobile apps don't send Origin headers, so CORS is mainly for web clients.
+    # API key auth is the primary security layer.
+    allowed_origins = [
+        "http://localhost:8081",  # Expo dev
+        "http://localhost:19006",  # Expo web
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:8081",  # Expo dev
-            "http://localhost:19006",  # Expo web
-            "exp://localhost:19000",  # Expo Go
-        ],
-        allow_credentials=True,
+        allow_origins=allowed_origins if settings.debug else ["*"],
+        allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["*"],
+        allow_headers=["X-API-Key", "Content-Type"],
     )
 
     # Register routes
