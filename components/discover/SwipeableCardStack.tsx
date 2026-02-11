@@ -54,7 +54,6 @@ export function SwipeableCardStack({
 
   const currentRecipe = recipes[currentIndex];
   const nextRecipe = recipes[currentIndex + 1];
-  const isFirstCard = currentIndex === 0;
 
   const handleSwipeComplete = useCallback(
     (direction: 'left' | 'right') => {
@@ -172,14 +171,6 @@ export function SwipeableCardStack({
     };
   });
 
-  const hintOverlayStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      Math.abs(translateX.value),
-      [0, 50],
-      [1, 0],
-      Extrapolation.CLAMP
-    ),
-  }));
 
   if (currentIndex >= recipes.length) {
     return (
@@ -212,13 +203,11 @@ export function SwipeableCardStack({
         )}
       </View>
 
-      {/* Subtle swipe hint - only on first card */}
-      {isFirstCard && (
-        <Animated.View style={[styles.hintContainer, hintOverlayStyle]}>
-          <Text style={styles.hintText}>← Skip</Text>
-          <Text style={styles.hintText}>Save →</Text>
-        </Animated.View>
-      )}
+      {/* Subtle swipe hint */}
+      <View style={styles.hintContainer}>
+        <Text style={styles.hintText}>← Skip</Text>
+        <Text style={styles.hintText}>Save →</Text>
+      </View>
     </View>
   );
 }
