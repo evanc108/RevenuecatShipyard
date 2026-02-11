@@ -1,10 +1,10 @@
 import { ReactNode, useEffect } from 'react';
 import {
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  View,
   type ScrollViewProps,
   type ViewStyle,
 } from 'react-native';
@@ -67,7 +67,10 @@ export function KeyboardAwareScrollView({
   }));
 
   return (
-    <View style={styles.flex}>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         style={[styles.scrollView, scrollViewStyle]}
         contentContainerStyle={[
@@ -87,7 +90,7 @@ export function KeyboardAwareScrollView({
           {bottomBar}
         </Animated.View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
