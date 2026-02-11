@@ -4,30 +4,24 @@
  * Provides:
  * - triggerImport(url) for programmatic imports
  * - Listens to useShareHandler for incoming intents
- * - Shows ShareCookbookSheet when URL is pending
- * - Starts background extraction on submit
+ * - Opens AddModal with URL pre-filled for cookbook selection + import
+ * - Picks up pending share extension imports on foreground
  */
 
-import { ShareCookbookSheet } from '@/components/cookbook/ShareCookbookSheet';
-import type { Id } from '@/convex/_generated/dataModel';
-import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { useAddModal } from '@/context/AddModalContext';
 import { usePendingShareImports } from '@/hooks/usePendingShareImports';
 import { useShareHandler } from '@/hooks/useShareHandler';
-import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 import {
   createContext,
   ReactNode,
   useCallback,
   useContext,
   useEffect,
-  useState,
 } from 'react';
 
 type ShareIntentContextType = {
-  /** Trigger an import with a URL - shows cookbook selection sheet */
+  /** Trigger an import with a URL - opens AddModal with URL pre-filled */
   triggerImport: (url: string) => void;
-  /** Whether the share sheet is currently visible */
-  isSheetVisible: boolean;
 };
 
 const ShareIntentContext = createContext<ShareIntentContextType | null>(null);
@@ -39,60 +33,38 @@ type ShareIntentProviderProps = {
 export function ShareIntentProvider({
   children,
 }: ShareIntentProviderProps): React.ReactElement {
-  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const { pendingUrl, clearPendingUrl } = useShareHandler();
-  const { startExtraction } = useBackgroundExtraction();
-  const addUpload = usePendingUploadsStore((s) => s.addUpload);
+  const { openModal } = useAddModal();
 
-  // Pick up pending imports written by the share extension
-  usePendingShareImports();
-
-  // Handle incoming URLs from share handler
-  useEffect(() => {
-    if (pendingUrl) {
-      // Direct import for shared URLs - bypass modal
-      const uploadId = addUpload(pendingUrl, undefined, 'Cookbook'); // Add to general/default
-      startExtraction(uploadId);
-      clearPendingUrl();
-    }
-  }, [pendingUrl, clearPendingUrl, addUpload, startExtraction]);
-
-  const triggerImport = useCallback((url: string) => {
-    // When triggering manually (e.g. from clipboard), show sheet to let user choose
-    setSheetUrl(url);
-  }, []);
-
-  const handleSheetClose = useCallback(() => {
-    setSheetUrl(null);
-  }, []);
-
-  const handleSheetSubmit = useCallback(
-    (cookbookId: Id<'cookbooks'>, cookbookName: string) => {
-      if (!sheetUrl) return;
-
-      // Add to pending uploads store
-      const uploadId = addUpload(sheetUrl, cookbookId, cookbookName);
-
-      // Start background extraction
-      startExtraction(uploadId);
-
-      // Close the sheet
-      setSheetUrl(null);
+  // When a pending import URL is read from App Groups, open AddModal
+  const handlePendingUrl = useCallback(
+    (url: string) => {
+      openModal({ initialUrl: url });
     },
-    [sheetUrl, addUpload, startExtraction]
+    [openModal]
   );
 
-  const isSheetVisible = sheetUrl !== null;
+  // Pick up pending imports written by the share extension
+  usePendingShareImports(handlePendingUrl);
+
+  // Handle incoming URLs from share handler (deep links)
+  useEffect(() => {
+    if (pendingUrl) {
+      openModal({ initialUrl: pendingUrl });
+      clearPendingUrl();
+    }
+  }, [pendingUrl, clearPendingUrl, openModal]);
+
+  const triggerImport = useCallback(
+    (url: string) => {
+      openModal({ initialUrl: url });
+    },
+    [openModal]
+  );
 
   return (
-    <ShareIntentContext.Provider value={{ triggerImport, isSheetVisible }}>
+    <ShareIntentContext.Provider value={{ triggerImport }}>
       {children}
-      <ShareCookbookSheet
-        visible={isSheetVisible}
-        url={sheetUrl}
-        onClose={handleSheetClose}
-        onSubmit={handleSheetSubmit}
-      />
     </ShareIntentContext.Provider>
   );
 }

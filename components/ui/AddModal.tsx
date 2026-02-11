@@ -85,7 +85,7 @@ function getRecipeCardColor(title: string): string {
 
 export function AddModal(): React.ReactElement {
 	const insets = useSafeAreaInsets();
-	const { isVisible, initialCookbookId, closeModal } = useAddModal();
+	const { isVisible, initialCookbookId, initialUrl, closeModal } = useAddModal();
 
 	// Smooth keyboard animation using Reanimated
 	const keyboard = useAnimatedKeyboard();
@@ -157,12 +157,17 @@ export function AddModal(): React.ReactElement {
 
 	const inputRef = useRef<TextInput>(null);
 
-	// Pre-select cookbook when modal opens with initialCookbookId
+	// Pre-select cookbook or pre-fill URL when modal opens
 	const prevVisibleRef = useRef(false);
-	if (isVisible && !prevVisibleRef.current && initialCookbookId) {
-		setSelectedCookbookId(initialCookbookId);
-		setCurrentView('import');
-		// Note: Auto-focus removed to prevent keyboard from appearing during modal slide animation
+	if (isVisible && !prevVisibleRef.current) {
+		if (initialCookbookId) {
+			setSelectedCookbookId(initialCookbookId);
+			setCurrentView('import');
+		}
+		if (initialUrl) {
+			setUrl(initialUrl);
+			// Stay on 'main' view — user selects cookbook and taps import
+		}
 	}
 	prevVisibleRef.current = isVisible;
 

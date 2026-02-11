@@ -1,29 +1,20 @@
 /**
  * Reads pending share-extension imports when the app comes to foreground
- * and feeds them into the existing extraction pipeline.
+ * and surfaces them via a callback for in-app UI handling.
  *
- * If a pending import has `newCookbookName`, the cookbook is created first
- * via Convex mutation, then the URL is added to the upload store and
- * extraction is started.
+ * The callback receives the URL from the most recent pending import.
+ * The caller (ShareIntentProvider) opens the AddModal with the URL
+ * pre-filled so the user can select a cookbook and import.
  *
  * Mount inside ShareIntentProvider.
  */
 
-import { useMutation } from 'convex/react';
 import { useCallback, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
-import { api } from '@/convex/_generated/api';
-import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
 import { clearPendingImports, getPendingImports } from '@/lib/appGroups';
-import type { PendingShareImport } from '@/lib/appGroups';
-import type { Id } from '@/convex/_generated/dataModel';
-import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
 
-export function usePendingShareImports(): void {
-  const { startExtraction } = useBackgroundExtraction();
-  const addUpload = usePendingUploadsStore((s) => s.addUpload);
-  const createCookbook = useMutation(api.cookbooks.create);
+export function usePendingShareImports(onUrlReady: (url: string) => void): void {
   const isProcessingRef = useRef(false);
 
   const processImports = useCallback(async () => {
@@ -34,8 +25,10 @@ export function usePendingShareImports(): void {
       const imports = await getPendingImports();
       if (imports.length === 0) return;
 
-      for (const item of imports) {
-        await processSingleImport(item);
+      // Surface the most recent pending import URL for in-app handling
+      const lastImport = imports[imports.length - 1];
+      if (lastImport) {
+        onUrlReady(lastImport.url);
       }
 
       await clearPendingImports();
@@ -44,28 +37,7 @@ export function usePendingShareImports(): void {
     } finally {
       isProcessingRef.current = false;
     }
-  }, [addUpload, startExtraction, createCookbook]);
-
-  async function processSingleImport(item: PendingShareImport): Promise<void> {
-    let cookbookId: Id<'cookbooks'> | undefined;
-    let cookbookName: string | undefined;
-
-    if (item.newCookbookName) {
-      // Create the cookbook first
-      try {
-        cookbookId = await createCookbook({ name: item.newCookbookName });
-        cookbookName = item.newCookbookName;
-      } catch {
-        // Continue without cookbook — recipe still gets imported
-      }
-    } else if (item.cookbookId) {
-      cookbookId = item.cookbookId as Id<'cookbooks'>;
-      cookbookName = undefined; // The store will figure it out
-    }
-
-    const uploadId = addUpload(item.url, cookbookId, cookbookName);
-    startExtraction(uploadId);
-  }
+  }, [onUrlReady]);
 
   // Process on mount
   useEffect(() => {

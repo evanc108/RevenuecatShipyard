@@ -233,8 +233,8 @@ export default function RootLayout() {
             <GluestackUIProvider mode="dark">
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <AuthGuard>
-                  <ShareIntentProvider>
-                    <AddModalProvider>
+                  <AddModalProvider>
+                    <ShareIntentProvider>
                       <Stack screenOptions={{ headerShown: false }}>
                         <Stack.Screen name="index" />
                         <Stack.Screen name="(onboarding)" />
@@ -244,11 +244,11 @@ export default function RootLayout() {
                         <Stack.Screen name="recipe/[id]" />
                         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
                       </Stack>
-                      <AddModal />
-                      <AddPantryItemModal />
-                      <GenerateMealPlanModal />
-                    </AddModalProvider>
-                  </ShareIntentProvider>
+                    </ShareIntentProvider>
+                    <AddModal />
+                    <AddPantryItemModal />
+                    <GenerateMealPlanModal />
+                  </AddModalProvider>
                 </AuthGuard>
                 <StatusBar style="auto" />
               </ThemeProvider>
