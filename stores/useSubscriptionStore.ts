@@ -76,13 +76,19 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
 		try {
 			const { customerInfo } =
 				await Purchases.purchasePackage(currentPackage);
+
+			// DEBUG: Remove after fixing entitlement issue
+			console.log('[RC] All entitlements:', JSON.stringify(customerInfo.entitlements.all));
+			console.log('[RC] Active entitlements:', JSON.stringify(customerInfo.entitlements.active));
+			console.log('[RC] Active subscriptions:', JSON.stringify(customerInfo.activeSubscriptions));
+
 			const isPro =
 				customerInfo.entitlements.active[PRO_ENTITLEMENT] !== undefined;
 			set({ isPro });
 			return { success: isPro, error: isPro ? undefined : 'Purchase did not activate subscription.' };
-		} catch (e) {
+		} catch (e: unknown) {
 			const isCancelled =
-				e instanceof Error && e.message.toLowerCase().includes('cancel');
+				typeof e === 'object' && e !== null && 'userCancelled' in e && (e as { userCancelled: boolean }).userCancelled;
 			return {
 				success: false,
 				error: isCancelled ? undefined : 'Purchase failed. Please try again.',
