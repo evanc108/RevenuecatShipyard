@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   Pressable,
   ScrollView,
@@ -18,7 +19,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import ShareExtensionBridge from '@/modules/share-extension-bridge';
@@ -66,7 +66,7 @@ const COPY = {
   orChooseExisting: 'or choose existing',
   noCookbooks: 'No cookbooks yet. Create your first one above!',
   successTitle: 'Recipe Saved!',
-  successSubtitle: 'Check the app for your new recipe.',
+  successSubtitle: 'Open the app to see your new recipe.',
   noUrl: 'No URL found to import.',
 } as const;
 
@@ -102,6 +102,134 @@ type ShareExtensionProps = {
 };
 
 type ScreenState = 'selecting' | 'success';
+
+// ---------------------------------------------------------------------------
+// Animated Success Screen
+// ---------------------------------------------------------------------------
+
+function SuccessScreen({ onClose }: { onClose: () => void }): React.ReactElement {
+  const circleScale = useRef(new Animated.Value(0)).current;
+  const checkOpacity = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslateY = useRef(new Animated.Value(12)).current;
+  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const subtitleTranslateY = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    // 0ms: circle scales in
+    Animated.spring(circleScale, {
+      toValue: 1,
+      tension: 60,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+
+    // 300ms: checkmark fades in
+    setTimeout(() => {
+      Animated.timing(checkOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }, 300);
+
+    // 500ms: title fades + slides up
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 500);
+
+    // 700ms: subtitle fades + slides up
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(subtitleOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(subtitleTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 700);
+
+    // 3s: auto-close
+    const autoCloseTimer = setTimeout(() => {
+      onClose();
+    }, 3000);
+
+    return () => clearTimeout(autoCloseTimer);
+  }, [
+    circleScale,
+    checkOpacity,
+    titleOpacity,
+    titleTranslateY,
+    subtitleOpacity,
+    subtitleTranslateY,
+    onClose,
+  ]);
+
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <Pressable
+          style={styles.successCloseButton}
+          onPress={onClose}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <Text style={styles.closeButton}>{'\u2715'}</Text>
+        </Pressable>
+        <View style={styles.successContainer}>
+          {/* Animated checkmark circle */}
+          <Animated.View
+            style={[
+              styles.checkCircle,
+              { transform: [{ scale: circleScale }] },
+            ]}
+          >
+            <Animated.Text style={[styles.checkIcon, { opacity: checkOpacity }]}>
+              {'\u2713'}
+            </Animated.Text>
+          </Animated.View>
+
+          {/* Animated title */}
+          <Animated.Text
+            style={[
+              styles.successTitle,
+              { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] },
+            ]}
+          >
+            {COPY.successTitle}
+          </Animated.Text>
+
+          {/* Animated subtitle */}
+          <Animated.Text
+            style={[
+              styles.successSubtitle,
+              { opacity: subtitleOpacity, transform: [{ translateY: subtitleTranslateY }] },
+            ]}
+          >
+            {COPY.successSubtitle}
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -185,31 +313,7 @@ export function ShareExtensionRoot(props: ShareExtensionProps): React.ReactEleme
   const domain = resolvedUrl ? getDomain(resolvedUrl) : '';
 
   if (state === 'success') {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-          {/* Close button */}
-          <Pressable
-            style={styles.successCloseButton}
-            onPress={handleClose}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-          >
-            <Text style={styles.closeButton}>{'\u2715'}</Text>
-          </Pressable>
-          <View style={styles.successContainer}>
-            <ExpoImage
-              source={require('@/assets/images/loading_icon.svg')}
-              style={styles.successImage}
-              contentFit="contain"
-            />
-            <Text style={styles.successTitle}>{COPY.successTitle}</Text>
-            <Text style={styles.successSubtitle}>{COPY.successSubtitle}</Text>
-          </View>
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
+    return <SuccessScreen onClose={handleClose} />;
   }
 
   return (
@@ -704,22 +808,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: S.xl,
   },
-  successImage: {
-    width: 180,
-    height: 180,
+  checkCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: C.success,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: S.xl,
   },
+  checkIcon: {
+    fontSize: 38,
+    color: C.textInverse,
+    fontWeight: '700',
+    lineHeight: 42,
+  },
   successTitle: {
-    fontSize: 80,
-    lineHeight: 96,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: '700',
     color: C.textPrimary,
-    marginBottom: S.md,
+    marginBottom: S.sm,
     textAlign: 'center',
   },
   successSubtitle: {
-    fontSize: 45,
-    lineHeight: 56,
+    fontSize: 16,
+    lineHeight: 22,
     color: C.textSecondary,
     textAlign: 'center',
   },

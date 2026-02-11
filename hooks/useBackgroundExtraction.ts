@@ -21,6 +21,9 @@ type SSEEvent = { data?: string | null };
 /** Backend API base URL */
 const API_BASE_URL = process.env.EXPO_PUBLIC_EXTRACTION_API_URL ?? 'http://localhost:8000';
 
+/** API key for backend auth */
+const API_KEY = process.env.EXPO_PUBLIC_EXTRACTION_API_KEY ?? '';
+
 /** SSE event data shapes */
 type SSEProgressEvent = {
   type: 'progress';
@@ -199,7 +202,7 @@ export function useBackgroundExtraction(): UseBackgroundExtractionResult {
       updateProgress(uploadId, 0.1, 'Connecting...');
 
       const encodedUrl = encodeURIComponent(url);
-      const streamUrl = `${API_BASE_URL}/api/v1/extract/stream?url=${encodedUrl}`;
+      const streamUrl = `${API_BASE_URL}/api/v1/extract/stream?url=${encodedUrl}${API_KEY ? `&key=${API_KEY}` : ''}`;
 
       const eventSource = new EventSource(streamUrl);
       eventSourcesRef.current.set(uploadId, eventSource);

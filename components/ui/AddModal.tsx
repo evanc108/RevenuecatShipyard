@@ -49,7 +49,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DROPDOWN_OPTION_HEIGHT = 44;
 const DROPDOWN_VISIBLE_COUNT = 2;
 
-type ModalView = 'main' | 'import' | 'share';
+type ModalView = 'main' | 'import' | 'share' | 'success';
 
 // Layout animation for container expansion - no text animation
 const EXPAND_ANIMATION = {
@@ -325,8 +325,11 @@ export function AddModal(): React.ReactElement {
 			return;
 		}
 
-		// Close modal immediately - progress shown in UploadProgressIndicator
-		closeModal();
+		// Show success confirmation, then auto-close
+		setCurrentView('success');
+		setTimeout(() => {
+			closeModal();
+		}, 1800);
 	};
 
 	const handleSharePost = async () => {
@@ -850,6 +853,16 @@ export function AddModal(): React.ReactElement {
 		</>
 	);
 
+	const renderSuccessView = () => (
+		<View style={styles.successContainer}>
+			<View style={styles.successIconContainer}>
+				<Icon name="checkmark-circle" size={48} color={Colors.accent} />
+			</View>
+			<Text style={styles.successTitle}>{copy.success.title}</Text>
+			<Text style={styles.successSubtitle}>{copy.success.subtitle}</Text>
+		</View>
+	);
+
 	const getModalTitle = () => {
 		switch (currentView) {
 			case 'import':
@@ -895,8 +908,8 @@ export function AddModal(): React.ReactElement {
 							<View style={styles.handle} />
 						</View>
 
-						{/* Header - only show for sub-views */}
-						{currentView !== 'main' && (
+						{/* Header - only show for sub-views (not success) */}
+						{currentView !== 'main' && currentView !== 'success' && (
 							<View style={styles.header}>
 								<Pressable
 									onPress={handleBack}
@@ -958,6 +971,8 @@ export function AddModal(): React.ReactElement {
 								{currentView === 'import' && renderImportView()}
 								{currentView === 'share' &&
 									renderSharePostView()}
+								{currentView === 'success' &&
+									renderSuccessView()}
 							</Animated.View>
 						</ScrollView>
 
@@ -1709,5 +1724,30 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: Spacing.md
+	},
+	successContainer: {
+		alignItems: 'center',
+		paddingVertical: Spacing.xl,
+		paddingHorizontal: Spacing.lg
+	},
+	successIconContainer: {
+		width: 80,
+		height: 80,
+		borderRadius: 40,
+		backgroundColor: Colors.accent + '15',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginBottom: Spacing.lg
+	},
+	successTitle: {
+		...Typography.h2,
+		color: Colors.text.primary,
+		textAlign: 'center',
+		marginBottom: Spacing.sm
+	},
+	successSubtitle: {
+		...Typography.body,
+		color: Colors.text.secondary,
+		textAlign: 'center'
 	}
 });
