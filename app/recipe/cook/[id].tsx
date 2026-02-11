@@ -1,9 +1,11 @@
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { Colors, FontFamily, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { COOK_MODE_COPY } from '@/constants/voiceCommands';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { useWakeWord } from '@/hooks/useWakeWord';
 import { getIngredientImageUrl } from '@/utils/ingredientImage';
@@ -413,11 +415,13 @@ export default function CookModeScreen() {
   const swipeThreshold = screenWidth * 0.25;
 
   const recipe = useQuery(api.recipes.get, recipeId ? { id: recipeId } : 'skip');
+  const { isPro } = useSubscription();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
   const [precacheProgress, setPrecacheProgress] = useState<{ cached: number; total: number } | null>(null);
-  const heyNomEnabled = true; // Hey Nom is always enabled
+  const heyNomEnabled = isPro; // Hey Nom only enabled for pro users
   const precacheStartedRef = useRef(false);
 
   const translateX = useSharedValue(0);
@@ -641,6 +645,10 @@ export default function CookModeScreen() {
   }, [canGoPrev, screenWidth, translateX, cardScale, currentStep]);
 
   const handleVoiceToggle = useCallback(async () => {
+    if (!isPro) {
+      setShowPaywall(true);
+      return;
+    }
     // If speaking (check both React state AND TTS module state), stop it first
     if (isSpeakingState || isTTSPlaying) {
       await stopSpeakingNow();
@@ -668,9 +676,13 @@ export default function CookModeScreen() {
     }
     // Toggle listening with single tap
     await toggleListening();
-  }, [isSpeakingState, isTTSPlaying, stopSpeakingNow, hasPermission, requestPermission, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
+  }, [isPro, isSpeakingState, isTTSPlaying, stopSpeakingNow, hasPermission, requestPermission, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
 
   const handleReadStep = useCallback(async () => {
+    if (!isPro) {
+      setShowPaywall(true);
+      return;
+    }
     // Toggle: if speaking, stop; otherwise start speaking
     // Use isTTSPlaying for accurate detection (not just React state)
     if (isSpeakingState || isTTSPlaying) {
@@ -703,9 +715,13 @@ export default function CookModeScreen() {
 
     // Start speaking the current step
     await speakCurrentStep();
-  }, [isSpeakingState, isTTSPlaying, stopSpeakingNow, speakCurrentStep, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
+  }, [isPro, isSpeakingState, isTTSPlaying, stopSpeakingNow, speakCurrentStep, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
 
   const handleReadIngredients = useCallback(async () => {
+    if (!isPro) {
+      setShowPaywall(true);
+      return;
+    }
     // Toggle: if speaking, stop; otherwise start speaking
     // Check both React state AND TTS module state for accuracy
     if (isSpeakingState || isTTSPlaying) {
@@ -738,7 +754,7 @@ export default function CookModeScreen() {
 
     // Start speaking ingredients (don't close modal - let user close it)
     await speakIngredients();
-  }, [isSpeakingState, isTTSPlaying, stopSpeakingNow, speakIngredients, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
+  }, [isPro, isSpeakingState, isTTSPlaying, stopSpeakingNow, speakIngredients, voiceState, toggleListening, isWakeWordRecording, isWakeWordListening, stopWakeWordListening, heyNomEnabled, isListening, startWakeWordListening]);
 
   // Helper functions for pan gesture (to avoid animation inside animation)
   const incrementStep = useCallback(() => {
@@ -888,11 +904,18 @@ export default function CookModeScreen() {
             </Pressable>
 
             {/* Voice button */}
-            <VoiceButton
-              voiceState={voiceState}
-              onPress={handleVoiceToggle}
-              size={72}
-            />
+            <View>
+              <VoiceButton
+                voiceState={isPro ? voiceState : 'idle'}
+                onPress={handleVoiceToggle}
+                size={72}
+              />
+              {!isPro && (
+                <View style={styles.voiceLockBadge}>
+                  <Icon name="lock" size={14} color={Colors.text.inverse} />
+                </View>
+              )}
+            </View>
 
             <Pressable
               accessibilityRole="button"
@@ -912,13 +935,15 @@ export default function CookModeScreen() {
 
           {/* Voice status */}
           <Text style={styles.voiceStatus}>
-            {voiceState === 'listening'
-              ? copy.listening
-              : voiceState === 'processing'
-                ? copy.processing
-                : voiceState === 'speaking'
-                  ? copy.speaking
-                  : 'Say "Hey Nom" or Tap Mic'}
+            {!isPro
+              ? 'Upgrade to Pro for voice features'
+              : voiceState === 'listening'
+                ? copy.listening
+                : voiceState === 'processing'
+                  ? copy.processing
+                  : voiceState === 'speaking'
+                    ? copy.speaking
+                    : 'Say "Hey Nom" or Tap Mic'}
           </Text>
 
           {/* Action buttons */}
@@ -935,15 +960,17 @@ export default function CookModeScreen() {
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isTTSPlaying ? 'Stop reading' : 'Read current step'}
+              accessibilityLabel={!isPro ? 'Pro feature: Read current step' : isTTSPlaying ? 'Stop reading' : 'Read current step'}
               style={[
                 styles.actionButton,
-                isTTSPlaying && styles.actionButtonActive,
+                isTTSPlaying && isPro && styles.actionButtonActive,
               ]}
               onPress={handleReadStep}
             >
               {isLoadingTTS ? (
                 <Loading size="button" />
+              ) : !isPro ? (
+                <Icon name="lock" size={16} color={Colors.accent} />
               ) : (
                 <Icon
                   name={isTTSPlaying ? 'close' : 'volume-2'}
@@ -954,10 +981,10 @@ export default function CookModeScreen() {
               <Text
                 style={[
                   styles.actionButtonText,
-                  isTTSPlaying && styles.actionButtonTextActive,
+                  isTTSPlaying && isPro && styles.actionButtonTextActive,
                 ]}
               >
-                {isLoadingTTS ? 'Loading...' : isTTSPlaying ? 'Stop' : 'Read Step'}
+                {!isPro ? 'Read Step (Pro)' : isLoadingTTS ? 'Loading...' : isTTSPlaying ? 'Stop' : 'Read Step'}
               </Text>
             </Pressable>
           </View>
@@ -973,6 +1000,13 @@ export default function CookModeScreen() {
           isLoading={isLoadingTTS}
           maxHeight={screenHeight * 0.8}
           bottomInset={insets.bottom}
+        />
+
+        {/* Paywall Modal */}
+        <PaywallModal
+          visible={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          feature="cook"
         />
       </View>
     </View>
@@ -1166,6 +1200,19 @@ const styles = StyleSheet.create({
   voiceButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  voiceLockBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background.primary,
   },
   voicePulse: {
     position: 'absolute',

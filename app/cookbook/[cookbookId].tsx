@@ -77,6 +77,7 @@ type CookbookRecipe = {
 	calories?: number;
 	createdAt: number;
 	addedAt: number;
+	userRating?: number | null;
 };
 
 // --- Constants ---
@@ -195,7 +196,7 @@ const StackedRecipeCard = memo(function StackedRecipeCard({
 					title={recipe.title}
 					imageUrl={recipe.imageUrl}
 					totalTimeMinutes={recipe.totalTimeMinutes ?? 0}
-					difficulty={parseDifficulty(recipe.difficulty)}
+					difficulty={recipe.userRating ?? 0}
 					cuisine={recipe.cuisine}
 					onPress={onPress}
 					onMorePress={onMorePress}
@@ -1227,9 +1228,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 												totalTimeMinutes={
 													recipe.totalTimeMinutes ?? 0
 												}
-												difficulty={parseDifficulty(
-													recipe.difficulty
-												)}
+												difficulty={recipe.userRating ?? 0}
 												cuisine={recipe.cuisine}
 												onPress={() =>
 													handleRecipePress(

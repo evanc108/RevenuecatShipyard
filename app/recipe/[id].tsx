@@ -77,6 +77,14 @@ const DIFFICULTY_MAP: Record<string, number> = {
 	expert: 5
 };
 
+const DIFFICULTY_LABELS: Record<number, string> = {
+	1: 'Easy',
+	2: 'Medium',
+	3: 'Intermediate',
+	4: 'Hard',
+	5: 'Expert',
+};
+
 // --- Helper Functions ---
 
 function getPastelForTitle(title: string): string {
@@ -88,8 +96,10 @@ function getPastelForTitle(title: string): string {
 
 function parseDifficulty(difficulty?: string | number): number {
 	if (difficulty === undefined || difficulty === null) return 0;
-	if (typeof difficulty === 'number')
+	if (typeof difficulty === 'number') {
+		if (difficulty <= 0) return 0;
 		return Math.min(5, Math.max(1, Math.round(difficulty)));
+	}
 	const mapped = DIFFICULTY_MAP[difficulty.toLowerCase()];
 	if (mapped !== undefined) return mapped;
 	const num = parseInt(difficulty, 10);
@@ -528,9 +538,9 @@ export default function RecipeDetailScreen() {
 	const adjustedServings = Math.round(originalServings * servingsMultiplier);
 
 	const adjustServings = (delta: number) => {
-		const next = servingsMultiplier + delta;
-		if (next >= 0.25 && next <= 10) {
-			setServingsMultiplier(next);
+		const newServings = adjustedServings + delta;
+		if (newServings >= 1 && newServings <= originalServings * 10) {
+			setServingsMultiplier(newServings / originalServings);
 		}
 	};
 
@@ -692,11 +702,11 @@ export default function RecipeDetailScreen() {
 			</View>
 		);
 	}
-	if (difficultyLevel > 0) {
+	if (difficultyLevel > 0 && DIFFICULTY_LABELS[difficultyLevel]) {
 		quickInfoItems.push(
-			<View key="difficulty">
-				<DifficultyStars difficulty={difficultyLevel} />
-			</View>
+			<Text key="difficulty" style={styles.quickInfoTextBlack}>
+				{DIFFICULTY_LABELS[difficultyLevel]}
+			</Text>
 		);
 	}
 	if (recipe.cuisine) {
@@ -880,11 +890,11 @@ export default function RecipeDetailScreen() {
 									accessibilityLabel="Decrease servings"
 									style={[
 										styles.servingsButton,
-										servingsMultiplier <= 0.25 &&
+										adjustedServings <= 1 &&
 											styles.servingsButtonDisabled
 									]}
-									onPress={() => adjustServings(-0.5)}
-									disabled={servingsMultiplier <= 0.25}
+									onPress={() => adjustServings(-1)}
+									disabled={adjustedServings <= 1}
 								>
 									<Icon
 										name="minus"
@@ -894,7 +904,7 @@ export default function RecipeDetailScreen() {
 								</Pressable>
 								<View style={styles.servingsDisplay}>
 									<Text style={styles.servingsCount}>
-										{adjustedServings}
+										{adjustedServings} {copy.servings.label.toLowerCase()}
 									</Text>
 									{servingsMultiplier !== 1 ? (
 										<Text style={styles.servingsOriginal}>
@@ -909,11 +919,11 @@ export default function RecipeDetailScreen() {
 									accessibilityLabel="Increase servings"
 									style={[
 										styles.servingsButton,
-										servingsMultiplier >= 10 &&
+										adjustedServings >= originalServings * 10 &&
 											styles.servingsButtonDisabled
 									]}
-									onPress={() => adjustServings(0.5)}
-									disabled={servingsMultiplier >= 10}
+									onPress={() => adjustServings(1)}
+									disabled={adjustedServings >= originalServings * 10}
 								>
 									<Icon
 										name="plus"

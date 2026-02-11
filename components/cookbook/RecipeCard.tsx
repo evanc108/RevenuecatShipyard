@@ -10,7 +10,7 @@ type RecipeCardProps = {
   title: string;
   imageUrl?: string;
   totalTimeMinutes: number;
-  difficulty: number; // 1-5
+  difficulty?: number; // 1-5, omit or 0 to hide stars
   cuisine?: string;
   onPress: () => void;
   onMorePress?: () => void;
@@ -71,7 +71,7 @@ export const RecipeCard = memo(function RecipeCard({
   title,
   imageUrl,
   totalTimeMinutes,
-  difficulty,
+  difficulty = 0,
   cuisine,
   onPress,
   onMorePress,
@@ -79,6 +79,7 @@ export const RecipeCard = memo(function RecipeCard({
 }: RecipeCardProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(title);
   const hasImage = Boolean(imageUrl);
+  const showStars = difficulty > 0;
   const starSize = compact ? 15 : 18;
   const starStrokeWidth = compact ? 2 : 2;
   const metaIconSize = compact ? 14 : 16;
@@ -87,7 +88,7 @@ export const RecipeCard = memo(function RecipeCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${totalTimeMinutes} ${COPY.cookbookDetail.minuteShort}, difficulty ${difficulty} of ${MAX_STARS}`}
+      accessibilityLabel={`${title}, ${totalTimeMinutes} ${COPY.cookbookDetail.minuteShort}${showStars ? `, rating ${difficulty} of ${MAX_STARS}` : ''}`}
       style={styles.card}
       onPress={onPress}
     >
@@ -174,12 +175,14 @@ export const RecipeCard = memo(function RecipeCard({
           ) : null}
         </View>
 
-        <DifficultyStars
-          difficulty={difficulty}
-          onImage={hasImage}
-          starSize={starSize}
-          strokeWidth={starStrokeWidth}
-        />
+        {showStars ? (
+          <DifficultyStars
+            difficulty={difficulty}
+            onImage={hasImage}
+            starSize={starSize}
+            strokeWidth={starStrokeWidth}
+          />
+        ) : null}
       </View>
     </Pressable>
   );

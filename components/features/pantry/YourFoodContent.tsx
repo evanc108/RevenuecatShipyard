@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, SectionList } from 'react-native';
+import * as Progress from 'react-native-progress';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -34,6 +35,9 @@ function YourFoodContentComponent(): React.ReactElement {
   const pantryItems = useQuery(api.pantry.getItems);
   const removeItem = useMutation(api.pantry.removeItem);
   const openGenerateModal = useMealPlanGenerationStore((s) => s.openGenerateModal);
+  const generationStatus = useMealPlanGenerationStore((s) => s.status);
+  const openReviewSheet = useMealPlanGenerationStore((s) => s.openReviewSheet);
+  const dismissFloatingProgress = useMealPlanGenerationStore((s) => s.dismissFloatingProgress);
   const openAddModal = usePantryItemModalStore((s) => s.openAddModal);
   const openEditModal = usePantryItemModalStore((s) => s.openEditModal);
 
@@ -170,6 +174,58 @@ function YourFoodContentComponent(): React.ReactElement {
         </Text>
       </Pressable>
 
+      {/* Generation Progress Banner */}
+      {generationStatus !== 'idle' ? (
+        <Pressable
+          style={[
+            styles.progressBanner,
+            generationStatus === 'success' && styles.progressBannerSuccess,
+            generationStatus === 'error' && styles.progressBannerError,
+          ]}
+          onPress={generationStatus === 'success' ? openReviewSheet : undefined}
+          disabled={generationStatus !== 'success'}
+          accessibilityRole="button"
+          accessibilityLabel={
+            generationStatus === 'success'
+              ? 'View generated recipes'
+              : generationStatus === 'error'
+                ? 'Generation failed'
+                : 'Generating recipes'
+          }
+        >
+          <View style={styles.progressIconContainer}>
+            {generationStatus === 'success' ? (
+              <Icon name="checkmark-circle" size={20} color={Colors.semantic.success} />
+            ) : generationStatus === 'error' ? (
+              <Icon name="alert-circle" size={20} color={Colors.semantic.error} />
+            ) : (
+              <Progress.Circle
+                size={20}
+                indeterminate
+                color={Colors.accent}
+                borderWidth={2}
+              />
+            )}
+          </View>
+          <Text style={styles.progressText} numberOfLines={1}>
+            {generationStatus === 'success'
+              ? 'Recipes ready! Tap to view'
+              : generationStatus === 'error'
+                ? 'Generation failed'
+                : 'Generating recipes...'}
+          </Text>
+          <Pressable
+            style={styles.progressDismiss}
+            onPress={dismissFloatingProgress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          >
+            <Icon name="close" size={14} color={Colors.text.tertiary} />
+          </Pressable>
+        </Pressable>
+      ) : null}
+
       <SectionList
         sections={sections}
         renderItem={renderItem}
@@ -269,6 +325,47 @@ const styles = StyleSheet.create({
   generateButtonText: {
     ...Typography.label,
     color: Colors.accent,
+  },
+  progressBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.background.primary,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  progressBannerSuccess: {
+    borderColor: Colors.semantic.success,
+  },
+  progressBannerError: {
+    borderColor: Colors.semantic.error,
+  },
+  progressIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressText: {
+    ...Typography.label,
+    fontSize: 14,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  progressDismiss: {
+    padding: 2,
+    backgroundColor: Colors.background.secondary,
+    borderRadius: Radius.full,
   },
   listContent: {
     paddingHorizontal: Spacing.md,

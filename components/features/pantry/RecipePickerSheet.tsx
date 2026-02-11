@@ -9,7 +9,6 @@ import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
-import { parseDifficulty } from '@/utils/parseDifficulty';
 import { useQuery } from 'convex/react';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -302,6 +301,7 @@ type RecipeGridItem = {
   cuisine?: string;
   totalTimeMinutes?: number;
   difficulty?: string | number;
+  userRating?: number | null;
 };
 
 type RecipeGridProps = {
@@ -358,7 +358,7 @@ function RecipeGrid({
               title={item.title}
               imageUrl={item.imageUrl}
               totalTimeMinutes={item.totalTimeMinutes ?? 0}
-              difficulty={parseDifficulty(item.difficulty)}
+              difficulty={item.userRating ?? 0}
               cuisine={item.cuisine}
               onPress={() => onSelect(item._id)}
             />

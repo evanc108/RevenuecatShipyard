@@ -236,6 +236,11 @@ export const getRecipes = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
     const cookbook = await ctx.db.get(args.cookbookId);
     if (!cookbook) return [];
 
@@ -248,6 +253,18 @@ export const getRecipes = query({
       cookbookRecipes.map(async (cr) => {
         const recipe = await ctx.db.get(cr.recipeId);
         if (!recipe) return null;
+
+        // Look up user's personal rating
+        let userRating: number | null = null;
+        if (user) {
+          const rating = await ctx.db
+            .query('ratings')
+            .withIndex('by_user_recipe', (q) =>
+              q.eq('userId', user._id).eq('recipeId', recipe._id)
+            )
+            .unique();
+          userRating = rating?.value ?? null;
+        }
 
         return {
           _id: recipe._id,
@@ -263,6 +280,7 @@ export const getRecipes = query({
           calories: recipe.calories,
           createdAt: recipe.createdAt,
           addedAt: cr.addedAt,
+          userRating,
         };
       })
     );

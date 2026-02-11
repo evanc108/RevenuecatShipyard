@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Icon } from '@/components/ui/Icon';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { COPY } from '@/constants/copy';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useMealPlanGenerationStore } from '@/stores/useMealPlanGenerationStore';
 
 const copy = COPY.pantry.generate;
@@ -25,6 +27,8 @@ const copy = COPY.pantry.generate;
 export function GenerateMealPlanModal(): React.ReactElement | null {
   const insets = useSafeAreaInsets();
   const vibeInputRef = useRef<TextInput>(null);
+  const { isPro } = useSubscription();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const isVisible = useMealPlanGenerationStore((s) => s.isGenerateModalVisible);
   const status = useMealPlanGenerationStore((s) => s.status);
@@ -63,6 +67,11 @@ export function GenerateMealPlanModal(): React.ReactElement | null {
     if (status === 'generating') return;
     if (!pantryItems || pantryItems.length === 0) return;
 
+    if (!isPro) {
+      setShowPaywall(true);
+      return;
+    }
+
     // Capture values before closing modal (since closeGenerateModalKeepLoading doesn't reset them)
     const currentVibe = vibe.trim();
     const currentCuisine = cuisine.trim();
@@ -92,6 +101,7 @@ export function GenerateMealPlanModal(): React.ReactElement | null {
   }, [
     status,
     pantryItems,
+    isPro,
     vibe,
     cuisine,
     generateMealPlan,
@@ -235,6 +245,12 @@ export function GenerateMealPlanModal(): React.ReactElement | null {
           </Animated.View>
         </KeyboardAvoidingView>
       </View>
+
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="mealPlan"
+      />
     </Modal>
   );
 }

@@ -31,6 +31,8 @@ const CATEGORY_ORDER: string[] = [
   'other',
 ];
 
+const CATEGORY_SET = new Set(CATEGORY_ORDER);
+
 type GrocerySource = {
   recipeId: Id<'recipes'>;
   recipeName: string;
@@ -189,7 +191,8 @@ function GroceriesContentComponent(): React.ReactElement {
 
     const grouped: Record<string, EnrichedGroceryItem[]> = {};
     for (const item of groceryList) {
-      const category = item.category ?? 'other';
+      const raw = item.category ?? 'other';
+      const category = CATEGORY_SET.has(raw) ? raw : 'other';
       if (!grouped[category]) {
         grouped[category] = [];
       }

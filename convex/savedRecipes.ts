@@ -154,11 +154,20 @@ export const listSavedRecipes = query({
         const recipe = await ctx.db.get(saved.recipeId);
         if (!recipe) return null;
 
+        // Look up user's personal rating
+        const rating = await ctx.db
+          .query('ratings')
+          .withIndex('by_user_recipe', (q) =>
+            q.eq('userId', user._id).eq('recipeId', recipe._id)
+          )
+          .unique();
+
         return {
           ...recipe,
           savedAt: saved.savedAt,
           notes: saved.notes,
           userSavedRecipeId: saved._id,
+          userRating: rating?.value ?? null,
         };
       })
     );

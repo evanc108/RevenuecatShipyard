@@ -7,6 +7,7 @@ import {
   TextInput,
   Animated,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from 'convex/react';
@@ -214,11 +215,12 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
   if (!isRendered || !selectedRecipe) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-      </Animated.View>
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill}>
+        {/* Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
 
       {/* Sheet */}
       <Animated.View
@@ -379,7 +381,8 @@ export function ScheduleOptionsSheet(): React.ReactElement | null {
           )}
         </Pressable>
       </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 

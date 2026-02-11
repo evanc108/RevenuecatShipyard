@@ -5,16 +5,19 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
 import { PostGridItem } from '@/components/ui/PostGridItem';
+import { PaywallModal } from '@/components/ui/PaywallModal';
 import { PostOptionsSheet } from '@/components/ui/PostOptionsSheet';
 import { ProfilePostCard } from '@/components/ui/ProfilePostCard';
 import { ProfileStats } from '@/components/ui/ProfileStats';
 import type { ViewMode } from '@/components/ui/ViewModeToggle';
 import { COPY } from '@/constants/copy';
-import { Colors, NAV_BUTTON_SIZE, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, FontFamily, NAV_BUTTON_SIZE, Radius, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@clerk/clerk-expo';
 import { useMutation, useQuery } from 'convex/react';
+import Purchases from 'react-native-purchases';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -61,12 +64,22 @@ const TABS: { key: ProfileTab; icon: IconName; label: string }[] = [
 function SlideOutDrawer({
   visible,
   onClose,
+  isPro,
   onEditProfile,
+  onManageSubscription,
+  onGetPro,
+  onTerms,
+  onPrivacy,
   onSignOut,
 }: {
   visible: boolean;
   onClose: () => void;
+  isPro: boolean;
   onEditProfile: () => void;
+  onManageSubscription: () => void;
+  onGetPro: () => void;
+  onTerms: () => void;
+  onPrivacy: () => void;
   onSignOut: () => void;
 }): React.ReactElement | null {
   const slideAnim = useRef(new Animated.Value(DRAWER_WIDTH)).current;
@@ -148,6 +161,55 @@ function SlideOutDrawer({
               <Text style={styles.drawerItemText}>Edit Profile</Text>
             </Pressable>
 
+            <Pressable
+              accessibilityRole="button"
+              style={styles.drawerItem}
+              onPress={() => {
+                onClose();
+                setTimeout(isPro ? onManageSubscription : onGetPro, 280);
+              }}
+            >
+              <Icon
+                name={isPro ? 'credit-card' : 'star'}
+                size={22}
+                color={isPro ? Colors.text.primary : Colors.accent}
+              />
+              <Text
+                style={[
+                  styles.drawerItemText,
+                  !isPro && { color: Colors.accent },
+                ]}
+              >
+                {isPro ? 'Manage Subscription' : 'Get Pro'}
+              </Text>
+            </Pressable>
+
+            <View style={styles.drawerDivider} />
+
+            <Pressable
+              accessibilityRole="button"
+              style={styles.drawerItem}
+              onPress={() => {
+                onClose();
+                setTimeout(onTerms, 280);
+              }}
+            >
+              <Icon name="file-text" size={22} color={Colors.text.primary} />
+              <Text style={styles.drawerItemText}>Terms of Service</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              style={styles.drawerItem}
+              onPress={() => {
+                onClose();
+                setTimeout(onPrivacy, 280);
+              }}
+            >
+              <Icon name="shield" size={22} color={Colors.text.primary} />
+              <Text style={styles.drawerItemText}>Privacy Policy</Text>
+            </Pressable>
+
             <View style={styles.drawerDivider} />
 
             <Pressable
@@ -215,6 +277,7 @@ export default function ProfileScreen(): React.ReactElement {
   const { signOut } = useAuth();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
+  const { isPro } = useSubscription();
   const user = useQuery(api.users.current);
   const stats = useQuery(
     api.follows.stats,
@@ -235,6 +298,7 @@ export default function ProfileScreen(): React.ReactElement {
   const [selectedCookbook, setSelectedCookbook] = useState<{ id: Id<'cookbooks'>; name: string } | null>(null);
   const [postOptionsVisible, setPostOptionsVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<{ id: Id<'posts'>; recipeId: Id<'recipes'>; recipeTitle: string } | null>(null);
+  const [paywallVisible, setPaywallVisible] = useState(false);
 
   // Calculate card widths
   const cookbookCardWidth = (screenWidth - Spacing.lg * 2 - COOKBOOK_CARD_GAP) / VISIBLE_COOKBOOK_CARDS;
@@ -392,6 +456,15 @@ export default function ProfileScreen(): React.ReactElement {
             </Pressable>
           </View>
           <Text style={styles.fullName}>{fullName}</Text>
+
+          <View style={[styles.subscriptionBadge, isPro && styles.subscriptionBadgePro]}>
+            {isPro ? (
+              <Icon name="star" size={14} color={Colors.text.inverse} />
+            ) : null}
+            <Text style={[styles.subscriptionBadgeText, isPro && styles.subscriptionBadgeTextPro]}>
+              {isPro ? COPY.subscription.proMember : 'Free'}
+            </Text>
+          </View>
 
           {stats ? (
             <ProfileStats
@@ -631,7 +704,12 @@ export default function ProfileScreen(): React.ReactElement {
       <SlideOutDrawer
         visible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        isPro={isPro}
         onEditProfile={() => router.push('/edit-profile')}
+        onManageSubscription={() => Purchases.showManageSubscriptions()}
+        onGetPro={() => setPaywallVisible(true)}
+        onTerms={() => router.push('/(onboarding)/terms')}
+        onPrivacy={() => router.push('/(onboarding)/privacy')}
         onSignOut={() => signOut()}
       />
 
@@ -662,6 +740,12 @@ export default function ProfileScreen(): React.ReactElement {
           setPostOptionsVisible(false);
           setSelectedPost(null);
         }}
+      />
+
+      <PaywallModal
+        visible={paywallVisible}
+        onClose={() => setPaywallVisible(false)}
+        feature="recipeLimit"
       />
     </SafeAreaView>
   );
@@ -753,7 +837,28 @@ const styles = StyleSheet.create({
     ...Typography.h3,
     color: Colors.text.primary,
     marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  subscriptionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.background.tertiary,
     marginBottom: Spacing.md,
+  },
+  subscriptionBadgePro: {
+    backgroundColor: Colors.accent,
+  },
+  subscriptionBadgeText: {
+    ...Typography.caption,
+    fontFamily: FontFamily.semibold,
+    color: Colors.text.secondary,
+  },
+  subscriptionBadgeTextPro: {
+    color: Colors.text.inverse,
   },
   // Drawer styles
   drawerOverlayAbsolute: {

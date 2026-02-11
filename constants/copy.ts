@@ -508,5 +508,7 @@ export const COPY = {
     restore: 'Restore Purchases',
     purchase: 'Subscribe Now',
     proMember: 'Pro Member',
+    successTitle: 'Welcome to Pro!',
+    successSubtitle: 'You now have access to all features',
   },
 } as const;

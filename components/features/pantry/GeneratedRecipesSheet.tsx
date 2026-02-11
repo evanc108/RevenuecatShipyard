@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/Icon';
@@ -66,88 +67,90 @@ export function GeneratedRecipesSheet(): React.ReactElement | null {
   const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-      </Animated.View>
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={StyleSheet.absoluteFill}>
+        {/* Backdrop */}
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        </Animated.View>
 
-      {/* Sheet */}
-      <Animated.View
-        style={[
-          styles.sheetContainer,
-          {
-            transform: [{ translateY: modalTranslateY }],
-            paddingTop: insets.top,
-          },
-        ]}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>{copy.title}</Text>
-            <Text style={styles.subtitle}>{copy.subtitle(totalRecipes)}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={copy.done}
-            onPress={handleClose}
-            style={styles.doneButton}
-          >
-            <Text style={styles.doneButtonText}>{copy.done}</Text>
-          </Pressable>
-        </View>
-
-        {/* Content */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: insets.bottom + Spacing.xl },
+        {/* Sheet */}
+        <Animated.View
+          style={[
+            styles.sheetContainer,
+            {
+              transform: [{ translateY: modalTranslateY }],
+              paddingTop: insets.top,
+            },
           ]}
-          showsVerticalScrollIndicator={false}
         >
-          {mealTypes.map((mealType) => {
-            const recipes = generatedRecipes[mealType];
-            if (!recipes || recipes.length === 0) return null;
+          {/* Header */}
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>{copy.title}</Text>
+              <Text style={styles.subtitle}>{copy.subtitle(totalRecipes)}</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={copy.done}
+              onPress={handleClose}
+              style={styles.doneButton}
+            >
+              <Text style={styles.doneButtonText}>{copy.done}</Text>
+            </Pressable>
+          </View>
 
-            return (
-              <View key={mealType} style={styles.section}>
-                {/* Section Header */}
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionIconContainer}>
-                    <Icon
-                      name={MEAL_TYPE_ICONS[mealType]}
-                      size={20}
-                      color={Colors.accent}
-                    />
+          {/* Content */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: insets.bottom + Spacing.xl },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {mealTypes.map((mealType) => {
+              const recipes = generatedRecipes[mealType];
+              if (!recipes || recipes.length === 0) return null;
+
+              return (
+                <View key={mealType} style={styles.section}>
+                  {/* Section Header */}
+                  <View style={styles.sectionHeader}>
+                    <View style={styles.sectionIconContainer}>
+                      <Icon
+                        name={MEAL_TYPE_ICONS[mealType]}
+                        size={20}
+                        color={Colors.accent}
+                      />
+                    </View>
+                    <Text style={styles.sectionTitle}>
+                      {copy.mealTypes[mealType]}
+                    </Text>
                   </View>
-                  <Text style={styles.sectionTitle}>
-                    {copy.mealTypes[mealType]}
-                  </Text>
-                </View>
 
-                {/* Horizontal Recipe Cards */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.cardsContainer}
-                >
-                  {recipes.map((recipe) => (
-                    <GeneratedRecipeCard
-                      key={recipe.id}
-                      recipe={recipe}
-                      mealType={mealType}
-                      onAddToMealPlan={handleAddToMealPlan}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            );
-          })}
-        </ScrollView>
-      </Animated.View>
-    </View>
+                  {/* Horizontal Recipe Cards */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.cardsContainer}
+                  >
+                    {recipes.map((recipe) => (
+                      <GeneratedRecipeCard
+                        key={recipe.id}
+                        recipe={recipe}
+                        mealType={mealType}
+                        onAddToMealPlan={handleAddToMealPlan}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 

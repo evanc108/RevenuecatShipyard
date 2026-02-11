@@ -83,6 +83,9 @@ import {
   MicOff,
   Volume2,
   Loader,
+  FileText,
+  Shield,
+  CreditCard,
 } from 'lucide-react-native';
 import type { OpaqueColorValue, StyleProp, ViewStyle } from 'react-native';
 
@@ -223,6 +226,10 @@ const ICON_MAP = {
   'volume-2': Volume2,
   volume: Volume2,
   loader: Loader,
+  'file-text': FileText,
+  document: FileText,
+  shield: Shield,
+  'credit-card': CreditCard,
 } as const;
 
 export type IconName = keyof typeof ICON_MAP;
