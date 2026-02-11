@@ -3,19 +3,23 @@ import {
   requestMicrophonePermission,
   transcribeAudio,
 } from '@/utils/voice';
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import {
+  useAudioRecorder,
+  setAudioModeAsync,
+  IOSOutputFormat,
+  AudioQuality,
+} from 'expo-audio';
+import type { RecordingOptions } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 // Audio mode for playback after recording (full volume)
 const PLAYBACK_AUDIO_MODE = {
-  allowsRecordingIOS: false,
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: false,
-  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-  shouldDuckAndroid: false,
-  interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-  playThroughEarpieceAndroid: false,
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: false,
+  interruptionMode: 'doNotMix' as const,
+  shouldRouteThroughEarpiece: false,
 };
 
 // Wake word variations - Whisper often mishears "Nom" in various ways
@@ -44,6 +48,7 @@ const PAUSE_AFTER_IRRELEVANT_MS = 100; // Very short pause after rejecting non-w
 const MIN_AUDIO_FILE_SIZE = 5000; // Lower threshold to catch quieter speech
 const MAX_WAKE_WORD_LENGTH = 30; // Slightly longer to catch variations
 const MIN_AUDIO_LEVEL_DB = -40; // More sensitive to catch quieter speech
+const WAKE_WORD_AUTO_RESTART_DELAY_MS = 300; // Delay before auto-restart after re-enable
 
 // Words/patterns that clearly indicate NOT a wake word - skip immediately
 const REJECT_PATTERNS = [
@@ -66,30 +71,26 @@ type UseWakeWordReturn = {
   error: string | null;
 };
 
-function getRecordingOptions(): Audio.RecordingOptions {
-  return {
-    isMeteringEnabled: true, // Enable audio level metering
-    android: {
-      extension: '.wav',
-      outputFormat: Audio.AndroidOutputFormat.DEFAULT,
-      audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      bitRate: 128000,
-    },
-    ios: {
-      extension: '.wav',
-      audioQuality: Audio.IOSAudioQuality.HIGH,
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      bitRate: 128000,
-      linearPCMBitDepth: 16,
-      linearPCMIsBigEndian: false,
-      linearPCMIsFloat: false,
-    },
-    web: {},
-  };
-}
+// Recording options for wake word - WAV 16kHz mono with metering
+const WAKE_WORD_RECORDING_OPTIONS: RecordingOptions = {
+  extension: '.wav',
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 128000,
+  isMeteringEnabled: true,
+  android: {
+    outputFormat: 'default',
+    audioEncoder: 'default',
+  },
+  ios: {
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: AudioQuality.HIGH,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {},
+};
 
 export function useWakeWord({
   onWakeWordDetected,
@@ -99,7 +100,10 @@ export function useWakeWord({
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(WAKE_WORD_RECORDING_OPTIONS);
+  const recorderRef = useRef(recorder); // Ref for access in async callbacks
+  recorderRef.current = recorder;
+
   const isListeningRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldContinueRef = useRef(false);
@@ -130,11 +134,21 @@ export function useWakeWord({
     };
   }, []);
 
+  // Track previous enabled state for detecting transitions
+  const prevEnabledRef = useRef(enabled);
+  // Ref to hold startWakeWordListening for use in effects (avoids circular dependency)
+  const startWakeWordListeningRef = useRef<(() => Promise<void>) | null>(null);
+
   // Stop listening IMMEDIATELY when disabled (e.g., when TTS starts)
+  // And restart when enabled becomes true again
   useEffect(() => {
+    const wasEnabled = prevEnabledRef.current;
+    prevEnabledRef.current = enabled;
+
     if (!enabled) {
       // Immediately stop any ongoing recording cycle
       shouldContinueRef.current = false;
+      isProcessingRef.current = false; // Reset mutex to prevent stuck state
 
       // Clear any pending timeouts
       if (timeoutRef.current) {
@@ -143,18 +157,38 @@ export function useWakeWord({
       }
 
       // Stop recording if in progress
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => {});
-        recordingRef.current = null;
+      try {
+        if (recorderRef.current.isRecording) {
+          recorderRef.current.stop().catch(() => {});
+        }
+      } catch {
+        // Ignore errors
       }
 
-      if (isWakeWordListening) {
-        setIsWakeWordListening(false);
-        setIsRecording(false);
-        isListeningRef.current = false;
-      }
+      // ALWAYS reset refs when disabled (not just when React state is true)
+      // This prevents stuck state from ref/state mismatch
+      setIsWakeWordListening(false);
+      setIsRecording(false);
+      isListeningRef.current = false;
+
+    } else if (!wasEnabled && enabled) {
+      // Enabled just became true - auto-restart after a short delay
+      // This handles the case where TTS stops and we need to resume listening
+
+      // Reset any stuck refs before restarting
+      isListeningRef.current = false;
+      isProcessingRef.current = false;
+
+      // Small delay to ensure audio session is ready
+      const restartTimer = setTimeout(() => {
+        if (enabledRef.current && !isListeningRef.current && startWakeWordListeningRef.current) {
+          startWakeWordListeningRef.current();
+        }
+      }, WAKE_WORD_AUTO_RESTART_DELAY_MS);
+
+      return () => clearTimeout(restartTimer);
     }
-  }, [enabled, isWakeWordListening]);
+  }, [enabled]);
 
   const checkForWakeWord = (transcript: string): boolean => {
     const normalizedTranscript = transcript.toLowerCase().trim();
@@ -188,21 +222,18 @@ export function useWakeWord({
 
     // Too short to be meaningful
     if (trimmed.length < 3) {
-      console.log('[WakeWord] Skipping: too short');
       return { skip: true, fastReject: true };
     }
 
     // Check reject patterns first (clearly not wake words)
     for (const pattern of REJECT_PATTERNS) {
       if (pattern.test(trimmed)) {
-        console.log('[WakeWord] Fast reject: matches reject pattern');
         return { skip: true, fastReject: true };
       }
     }
 
     // Too long to be a wake word
     if (trimmed.length > MAX_WAKE_WORD_LENGTH && !checkForWakeWord(trimmed)) {
-      console.log('[WakeWord] Skipping: too long for wake word');
       return { skip: true, fastReject: true };
     }
 
@@ -216,7 +247,6 @@ export function useWakeWord({
 
     // Mutex: prevent concurrent recording cycles
     if (isProcessingRef.current) {
-      console.log('[WakeWord] Already processing, skipping this cycle');
       return;
     }
     isProcessingRef.current = true;
@@ -229,24 +259,22 @@ export function useWakeWord({
       let audioModeSet = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-            shouldDuckAndroid: true,
+          await setAudioModeAsync({
+            allowsRecording: true,
+            playsInSilentMode: true,
+            shouldPlayInBackground: false,
+            interruptionMode: 'duckOthers',
           });
           // Wait for iOS audio session to fully switch
           await new Promise((resolve) => setTimeout(resolve, 100));
           audioModeSet = true;
           break;
-        } catch (audioModeError) {
-          console.log(`[WakeWord] Audio mode attempt ${attempt + 1} failed, retrying...`);
+        } catch (_audioModeError) {
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
       }
 
       if (!audioModeSet) {
-        console.error('[WakeWord] Failed to set audio mode after retries');
         setIsRecording(false);
         isProcessingRef.current = false;
         // Retry the whole cycle after a delay
@@ -256,26 +284,20 @@ export function useWakeWord({
         return;
       }
 
-      // Create recording with metering enabled
-      const { recording } = await Audio.Recording.createAsync(
-        getRecordingOptions(),
-        undefined,
-        100 // Update status every 100ms for metering
-      );
-      recordingRef.current = recording;
+      // Prepare and start recording using the hook-managed recorder
+      await recorderRef.current.prepareToRecordAsync();
+      recorderRef.current.record();
 
       // Track max audio level during recording
       let maxAudioLevel = -160; // Start with silence
-      const checkAudioLevel = async () => {
-        if (recordingRef.current) {
-          try {
-            const status = await recordingRef.current.getStatusAsync();
-            if (status.isRecording && status.metering !== undefined) {
-              maxAudioLevel = Math.max(maxAudioLevel, status.metering);
-            }
-          } catch {
-            // Ignore metering errors
+      const checkAudioLevel = () => {
+        try {
+          const status = recorderRef.current.getStatus();
+          if (status.isRecording && status.metering !== undefined) {
+            maxAudioLevel = Math.max(maxAudioLevel, status.metering);
           }
+        } catch {
+          // Ignore metering errors
         }
       };
 
@@ -303,42 +325,33 @@ export function useWakeWord({
 
       // Check if we should abort
       if (aborted || !shouldContinueRef.current || !enabledRef.current) {
-        console.log('[WakeWord] Aborting - disabled or should not continue');
         await cleanupRecording();
         setIsRecording(false);
         return;
       }
 
-      // Stop recording and get URI - guard against already stopped recording
-      if (!recordingRef.current) {
-        setIsRecording(false);
-        return;
-      }
+      // Stop recording and get URI
       try {
-        await recording.stopAndUnloadAsync();
-      } catch (stopError) {
-        console.log('[WakeWord] Recording already stopped');
+        await recorderRef.current.stop();
+      } catch {
+        // Recording may already be stopped
       }
-      const uri = recording.getURI();
-      recordingRef.current = null;
+      const uri = recorderRef.current.uri;
       setIsRecording(false);
 
       // Reset audio mode for speaker playback
-      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
       // Reduced delay - iOS speaker routing is faster
       await new Promise((resolve) => setTimeout(resolve, 80));
 
       // Skip API call if audio level is too low (silence/background noise)
       if (maxAudioLevel < MIN_AUDIO_LEVEL_DB) {
-        console.log(`[WakeWord] Audio too quiet (${maxAudioLevel.toFixed(1)}dB), skipping API call`);
         if (shouldContinueRef.current && enabledRef.current) {
           // Use longer pause when quiet to save resources
           timeoutRef.current = setTimeout(recordAndCheck, PAUSE_WHEN_QUIET_MS);
         }
         return;
       }
-
-      console.log(`[WakeWord] Audio level: ${maxAudioLevel.toFixed(1)}dB - processing...`);
 
       if (!uri) {
         throw new Error('No audio recorded');
@@ -349,7 +362,6 @@ export function useWakeWord({
         const response = await fetch(uri);
         const blob = await response.blob();
         if (blob.size < MIN_AUDIO_FILE_SIZE) {
-          console.log('[WakeWord] Audio too short/quiet, skipping API call');
           if (shouldContinueRef.current && enabledRef.current) {
             timeoutRef.current = setTimeout(recordAndCheck, PAUSE_BETWEEN_LISTENS_MS);
           }
@@ -361,11 +373,8 @@ export function useWakeWord({
 
       // Transcribe the audio
       const transcript = await transcribeAudio(uri);
-      console.log('[WakeWord] Transcript:', transcript);
 
-      // Check for wake word FIRST (before filtering)
       if (checkForWakeWord(transcript)) {
-        console.log('[WakeWord] Wake word detected! Stopping listener...');
         // Stop listening immediately
         shouldContinueRef.current = false;
         isListeningRef.current = false;
@@ -395,8 +404,7 @@ export function useWakeWord({
       if (shouldContinueRef.current && enabledRef.current) {
         timeoutRef.current = setTimeout(recordAndCheck, PAUSE_AFTER_IRRELEVANT_MS);
       }
-    } catch (err) {
-      console.error('[WakeWord] Error:', err);
+    } catch {
       await cleanupRecording();
       setIsRecording(false);
 
@@ -410,18 +418,17 @@ export function useWakeWord({
   }, [onWakeWordDetected]); // enabledRef.current is used instead of enabled prop
 
   const cleanupRecording = async () => {
-    if (recordingRef.current) {
-      try {
-        await recordingRef.current.stopAndUnloadAsync();
-      } catch {
-        // Ignore errors during cleanup
+    try {
+      if (recorderRef.current.isRecording) {
+        await recorderRef.current.stop();
       }
-      recordingRef.current = null;
+    } catch {
+      // Ignore errors during cleanup
     }
 
     // Reset audio mode for speaker playback
     try {
-      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
       // Minimal delay for cleanup
       await new Promise((resolve) => setTimeout(resolve, 50));
     } catch {
@@ -430,8 +437,12 @@ export function useWakeWord({
   };
 
   const startWakeWordListening = useCallback(async () => {
-    if (isListeningRef.current || !enabledRef.current) {
-      return;
+    if (!enabledRef.current) return;
+    if (isListeningRef.current) return;
+
+    // Reset processing mutex in case it's stuck
+    if (isProcessingRef.current) {
+      isProcessingRef.current = false;
     }
 
     // Check if API key is configured
@@ -451,15 +462,18 @@ export function useWakeWord({
     isListeningRef.current = true;
     shouldContinueRef.current = true;
     setIsWakeWordListening(true);
-
-    console.log('[WakeWord] Starting wake word listening');
     recordAndCheck();
   }, [recordAndCheck]); // enabledRef.current is used instead of enabled prop
 
+  // Keep the ref in sync with the callback
+  useEffect(() => {
+    startWakeWordListeningRef.current = startWakeWordListening;
+  }, [startWakeWordListening]);
+
   const stopWakeWordListening = useCallback(async () => {
-    console.log('[WakeWord] Stopping wake word listening');
     shouldContinueRef.current = false;
     isListeningRef.current = false;
+    isProcessingRef.current = false; // Reset mutex to prevent stuck state
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);

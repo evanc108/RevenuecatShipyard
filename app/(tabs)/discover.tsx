@@ -708,6 +708,21 @@ export default function DiscoverScreen() {
             </Pressable>
           </View>
 
+          {/* Right: Bell notification button */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            style={styles.bellButton}
+            hitSlop={8}
+            onPress={() => router.push('/notifications')}
+          >
+            <Icon name="bell" size={24} color={Colors.text.primary} strokeWidth={2} />
+            {notificationCount > 0 ? (
+              <View style={styles.notiBadge}>
+                <Text style={styles.notiCount}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
         {activeTab === 'feed' ? (
           <View style={styles.searchBarContainer}>
@@ -773,12 +788,39 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   headerLogo: {
-    width: 100,
-    height: 60,
+    width: 70,
+    height: 70,
+    marginTop: -10,
   },
-  tabRow: {
-    paddingLeft: Spacing.sm,
-    paddingTop: Spacing.xs,
+  bellButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notiBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 4,
+    backgroundColor: Colors.accent,
+    minWidth: 18,
+    height: 18,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notiCount: {
+    fontSize: 10,
+    fontFamily: FontFamily.bold,
+    fontWeight: '700' as const,
+    color: Colors.text.inverse,
+    lineHeight: 12,
+  },
+  tabRowCentered: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

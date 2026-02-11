@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+import { useAudioRecorder } from 'expo-audio';
 import type {
   VoiceState,
   IntentResult,
@@ -16,11 +17,20 @@ import {
   stopSpeaking,
   detectIntent,
   isTranscriptionAvailable,
+  isCached,
+  ONE_MOMENT_RESPONSE,
+  STT_RECORDING_OPTIONS,
 } from '@/utils/voice';
 import {
   VOICE_HELP_TEXT,
   FALLBACK_RESPONSES,
+  VOICE_RESPONSES,
 } from '@/constants/voiceCommands';
+
+/** Timing constants for voice assistant delays (ms) */
+const FEEDBACK_PAUSE_MS = 100; // Pause between "One moment" and main response
+const AUTO_LISTEN_DELAY_MS = 300; // Delay before auto-listen after speaking
+const ERROR_DISPLAY_MS = 1500; // How long to show error state
 
 type RecipeData = {
   title: string;
@@ -73,6 +83,11 @@ export function useVoiceAssistant({
   const [hasPermission, setHasPermission] = useState(false);
   const [isLoadingTTS, setIsLoadingTTS] = useState(false);
 
+  // Audio recorder for STT command recording
+  const sttRecorder = useAudioRecorder(STT_RECORDING_OPTIONS);
+  const sttRecorderRef = useRef(sttRecorder);
+  sttRecorderRef.current = sttRecorder;
+
   const isProcessingRef = useRef(false);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -99,7 +114,7 @@ export function useVoiceAssistant({
 
   const handleAppStateChange = useCallback((state: AppStateStatus) => {
     if (state !== 'active') {
-      cancelRecording();
+      cancelRecording(sttRecorderRef.current);
       stopSpeaking();
       setVoiceState('idle');
     }
@@ -140,14 +155,13 @@ export function useVoiceAssistant({
       setError(null);
       setVoiceState('listening');
 
-      await startRecording();
+      await startRecording(sttRecorderRef.current);
 
       // Auto-stop after 5 seconds of recording
       recordingTimeoutRef.current = setTimeout(async () => {
         await processRecording();
       }, 5000);
-    } catch (err) {
-      console.error('Start listening error:', err);
+    } catch {
       setError('Failed to start listening');
       setVoiceState('error');
     }
@@ -181,7 +195,7 @@ export function useVoiceAssistant({
     try {
       setVoiceState('processing');
 
-      const audioUri = await stopRecording();
+      const audioUri = await stopRecording(sttRecorderRef.current);
       if (!audioUri) {
         throw new Error('No audio recorded');
       }
@@ -197,21 +211,35 @@ export function useVoiceAssistant({
         return;
       }
 
-      console.log('Transcript:', transcript);
-
       const intentResult = detectIntent(transcript);
-      console.log('Intent:', intentResult.intent);
 
       const response = await handleCommand(intentResult);
 
       if (response.text) {
+        // Check if response is cached - if not, play instant feedback first
+        const responseIsCached = isCached(response.text);
+
+        if (!responseIsCached) {
+          // Uncached response - give instant "One moment" feedback while we fetch audio
+          setVoiceState('speaking');
+          await speak(ONE_MOMENT_RESPONSE, {
+            onDone: () => {
+              // Intentionally empty - we'll continue to the main response
+            },
+            onError: () => {
+              // Continue anyway
+            },
+          });
+          // Small pause between feedback and response
+          await new Promise((resolve) => setTimeout(resolve, FEEDBACK_PAUSE_MS));
+        }
+
         setVoiceState('speaking');
         await speak(response.text, {
           onDone: () => {
             setVoiceState('idle');
             if (autoListenRef.current && enabled) {
-              // Reduced delay for auto-listen
-              setTimeout(() => startListening(), 300);
+              setTimeout(() => startListening(), AUTO_LISTEN_DELAY_MS);
             }
           },
           onError: () => {
@@ -221,12 +249,11 @@ export function useVoiceAssistant({
       } else {
         setVoiceState('idle');
       }
-    } catch (err) {
-      console.error('Process recording error:', err);
+    } catch {
       setError('Failed to process voice command');
       setVoiceState('error');
 
-      setTimeout(() => setVoiceState('idle'), 1500);
+      setTimeout(() => setVoiceState('idle'), ERROR_DISPLAY_MS);
     } finally {
       isProcessingRef.current = false;
     }
@@ -249,7 +276,7 @@ export function useVoiceAssistant({
           const newStep = currentStep + 1;
           onStepChange(newStep);
           return {
-            text: `Step ${newStep + 1}: ${recipe.instructions[newStep]?.text ?? ''}`,
+            text: VOICE_RESPONSES.step(newStep + 1, recipe.instructions[newStep]?.text ?? ''),
             action: 'SET_STEP',
             payload: { step: newStep },
           };
@@ -262,7 +289,7 @@ export function useVoiceAssistant({
           const newStep = currentStep - 1;
           onStepChange(newStep);
           return {
-            text: `Going back. Step ${newStep + 1}: ${recipe.instructions[newStep]?.text ?? ''}`,
+            text: VOICE_RESPONSES.goingBack(newStep + 1, recipe.instructions[newStep]?.text ?? ''),
             action: 'SET_STEP',
             payload: { step: newStep },
           };
@@ -271,14 +298,14 @@ export function useVoiceAssistant({
         case 'REPEAT':
         case 'READ_CURRENT_STEP': {
           return {
-            text: `Step ${currentStep + 1}: ${recipe.instructions[currentStep]?.text ?? ''}`,
+            text: VOICE_RESPONSES.step(currentStep + 1, recipe.instructions[currentStep]?.text ?? ''),
           };
         }
 
         case 'RESTART': {
           onStepChange(0);
           return {
-            text: `Starting over. Step 1: ${recipe.instructions[0]?.text ?? ''}`,
+            text: VOICE_RESPONSES.startingOver(recipe.instructions[0]?.text ?? ''),
             action: 'SET_STEP',
             payload: { step: 0 },
           };
@@ -286,7 +313,7 @@ export function useVoiceAssistant({
 
         case 'WHAT_STEP': {
           return {
-            text: `You're on step ${currentStep + 1} of ${totalSteps}. ${recipe.instructions[currentStep]?.text ?? ''}`,
+            text: VOICE_RESPONSES.currentStep(currentStep + 1, totalSteps, recipe.instructions[currentStep]?.text ?? ''),
           };
         }
 
@@ -295,8 +322,105 @@ export function useVoiceAssistant({
             .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name}`)
             .join(', ');
           return {
-            text: `You'll need: ${ingredientsList}`,
+            text: VOICE_RESPONSES.ingredientsList(ingredientsList),
           };
+        }
+
+        case 'INGREDIENT_QUERY': {
+          const queryName = params?.ingredientName ?? '';
+          if (!queryName) {
+            return { text: VOICE_RESPONSES.ingredientNotHeard };
+          }
+
+          // Search for matching ingredient (fuzzy match)
+          const matchingIngredient = recipe.ingredients.find((ing) => {
+            const ingName = ing.name.toLowerCase();
+            const query = queryName.toLowerCase();
+            return ingName.includes(query) || query.includes(ingName);
+          });
+
+          if (matchingIngredient) {
+            const amount = `${matchingIngredient.quantity} ${matchingIngredient.unit}`.trim();
+            return {
+              text: VOICE_RESPONSES.ingredientAmount(amount, matchingIngredient.name),
+            };
+          }
+
+          // No match found - try partial matches
+          const partialMatches = recipe.ingredients.filter((ing) => {
+            const ingName = ing.name.toLowerCase();
+            const query = queryName.toLowerCase();
+            const queryWords = query.split(/\s+/);
+            const ingWords = ingName.split(/\s+/);
+            return queryWords.some((qw) =>
+              ingWords.some((iw) => iw.includes(qw) || qw.includes(iw))
+            );
+          });
+
+          if (partialMatches.length === 1 && partialMatches[0]) {
+            const match = partialMatches[0];
+            const amount = `${match.quantity} ${match.unit}`.trim();
+            return {
+              text: VOICE_RESPONSES.ingredientAmount(amount, match.name),
+            };
+          } else if (partialMatches.length > 1) {
+            const names = partialMatches.map((m) => m.name).join(', ');
+            return {
+              text: VOICE_RESPONSES.ingredientMultipleMatches(names),
+            };
+          }
+
+          return {
+            text: VOICE_RESPONSES.ingredientNotFound(queryName),
+          };
+        }
+
+        case 'TEMPERATURE_QUERY': {
+          // Look for temperature/heat info in current step and nearby steps
+          const currentInstruction = recipe.instructions[currentStep]?.text ?? '';
+
+          // Patterns to extract temperature info
+          const tempPatterns = [
+            /(\d+)\s*°?\s*([FCfc]|degrees?\s*(?:fahrenheit|celsius)?)/i,
+            /(?:over|on|at|use)?\s*(low|medium-low|medium|medium-high|high)\s*heat/i,
+            /(?:preheat|bake|roast|cook)\s*(?:oven\s*)?(?:to|at)\s*(\d+)/i,
+            /(simmer|boil|gentle\s+boil|rolling\s+boil)/i,
+          ];
+
+          const formatTempUnit = (raw: string): string =>
+            raw.toLowerCase().startsWith('c') ? '°C' : '°F';
+
+          // Check current step first
+          for (const pattern of tempPatterns) {
+            const match = currentInstruction.match(pattern);
+            if (match) {
+              if (match[0].match(/\d+/)) {
+                const degrees = match[0].match(/\d+/)?.[0] ?? '';
+                const unit = match[0].match(/[FCfc]|fahrenheit|celsius/i)?.[0] ?? '';
+                return { text: VOICE_RESPONSES.tempCurrentStep(degrees, formatTempUnit(unit)) };
+              }
+              return { text: VOICE_RESPONSES.tempCurrentStepHeat(match[0].toLowerCase().trim()) };
+            }
+          }
+
+          // Check all instructions for temperature info
+          for (let i = 0; i < recipe.instructions.length; i++) {
+            const instruction = recipe.instructions[i]?.text ?? '';
+            for (const pattern of tempPatterns) {
+              const match = instruction.match(pattern);
+              if (match) {
+                const stepNum = i + 1;
+                if (match[0].match(/\d+/)) {
+                  const degrees = match[0].match(/\d+/)?.[0] ?? '';
+                  const unit = match[0].match(/[FCfc]|fahrenheit|celsius/i)?.[0] ?? '';
+                  return { text: VOICE_RESPONSES.tempOtherStep(stepNum, degrees, formatTempUnit(unit)) };
+                }
+                return { text: VOICE_RESPONSES.tempOtherStepHeat(stepNum, match[0].toLowerCase().trim()) };
+              }
+            }
+          }
+
+          return { text: VOICE_RESPONSES.tempNotFound };
         }
 
         case 'SET_TIMER': {
@@ -311,20 +435,18 @@ export function useVoiceAssistant({
                 ? `${minutes} minute${minutes > 1 ? 's' : ''}`
                 : `${seconds} second${seconds > 1 ? 's' : ''}`;
             return {
-              text: `Setting a timer for ${timeText}.`,
+              text: VOICE_RESPONSES.timerSet(timeText),
               action: 'START_TIMER',
               payload: { seconds: totalSeconds },
             };
           }
-          return {
-            text: "I didn't catch the time. Try saying 'set timer for 5 minutes'.",
-          };
+          return { text: VOICE_RESPONSES.timerNotHeard };
         }
 
         case 'STOP_TIMER': {
           onTimerStop?.();
           return {
-            text: 'Timer stopped.',
+            text: VOICE_RESPONSES.timerStopped,
             action: 'STOP_TIMER',
           };
         }
@@ -336,9 +458,7 @@ export function useVoiceAssistant({
 
         case 'PAUSE': {
           autoListenRef.current = false;
-          return {
-            text: "Pausing voice assistant. Tap the microphone when you're ready to continue.",
-          };
+          return { text: VOICE_RESPONSES.paused };
         }
 
         case 'HELP': {
@@ -359,26 +479,35 @@ export function useVoiceAssistant({
     setIsLoadingTTS(true);
     setVoiceState('speaking');
     try {
-      console.log('[Voice] speakText starting...');
+      // Check if text is cached - if not, play "One moment" first for instant feedback
+      const textIsCached = isCached(text);
+      if (!textIsCached && !skipCache) {
+        await speak(ONE_MOMENT_RESPONSE, {
+          onDone: () => {
+            // Continue to main audio
+          },
+          onError: () => {
+            // Continue anyway
+          },
+        });
+        await new Promise((resolve) => setTimeout(resolve, FEEDBACK_PAUSE_MS));
+      }
+
       await speak(text, {
-        skipCache, // Skip cache for short confirmations like "Yes?"
+        skipCache,
         onStart: () => {
-          console.log('[Voice] speakText audio started playing');
           setIsLoadingTTS(false);
         },
         onDone: () => {
-          console.log('[Voice] speakText done');
           setIsLoadingTTS(false);
           setVoiceState('idle');
         },
-        onError: (error) => {
-          console.error('[Voice] speakText error:', error);
+        onError: () => {
           setIsLoadingTTS(false);
           setVoiceState('idle');
         },
       });
-    } catch (error) {
-      console.error('[Voice] speakText catch error:', error);
+    } catch {
       setIsLoadingTTS(false);
       setVoiceState('idle');
     }
@@ -391,15 +520,9 @@ export function useVoiceAssistant({
   }, []);
 
   const speakCurrentStep = useCallback(async () => {
-    // Use ref to get the most current step value (avoids stale closure)
     const step = currentStepRef.current;
-    console.log('[Voice] speakCurrentStep called, recipe:', !!recipe, 'step:', step);
-    if (!recipe || !recipe.instructions[step]) {
-      console.log('[Voice] No recipe or instruction to speak');
-      return;
-    }
-    const stepText = `Step ${step + 1}: ${recipe.instructions[step].text}`;
-    console.log('[Voice] Speaking step:', stepText.substring(0, 50));
+    if (!recipe || !recipe.instructions[step]) return;
+    const stepText = VOICE_RESPONSES.step(step + 1, recipe.instructions[step].text);
     await speakText(stepText);
   }, [recipe, speakText]);
 
@@ -408,7 +531,7 @@ export function useVoiceAssistant({
     const ingredientsList = recipe.ingredients
       .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name}`)
       .join('. ');
-    await speakText(`Ingredients: ${ingredientsList}`);
+    await speakText(VOICE_RESPONSES.ingredientsAudio(ingredientsList));
   }, [recipe, speakText]);
 
   return {

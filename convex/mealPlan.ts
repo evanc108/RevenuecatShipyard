@@ -85,6 +85,12 @@ export const addEntry = mutation({
       )
       .collect();
 
+    // Prevent duplicate: same recipe on same day + meal type
+    const duplicate = existing.find((e) => e.recipeId === args.recipeId);
+    if (duplicate) {
+      return duplicate._id;
+    }
+
     const maxOrder = existing.reduce(
       (max, e) => Math.max(max, e.sortOrder),
       -1

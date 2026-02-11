@@ -1,8 +1,8 @@
 import { CookbookSelectionModal } from '@/components/cookbook/CookbookSelectionModal';
+import { MealPlanPickerModal } from '@/components/cookbook/MealPlanPickerModal';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
 import { RateRecipeModal } from '@/components/ui/RateRecipeModal';
-import { useAddModal } from '@/context/AddModalContext';
 import { COPY } from '@/constants/copy';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
@@ -24,6 +24,14 @@ import {
   TextInput,
   View
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- Constants ---
@@ -393,7 +401,6 @@ export default function RecipeDetailScreen() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const router = useRouter();
 	const insets = useSafeAreaInsets();
-	const { openModal: openAddModal } = useAddModal();
 	const recipeId = id as Id<'recipes'>;
 
 	const recipe = useQuery(
@@ -411,6 +418,11 @@ export default function RecipeDetailScreen() {
 	);
 	const addToCookbookMutation = useMutation(api.cookbooks.addRecipe);
 	const addToGrocery = useMutation(api.groceryList.addFromRecipe);
+	const removeFromGrocery = useMutation(api.groceryList.removeRecipeSource);
+	const isInGroceryList = useQuery(
+		api.groceryList.isRecipeInGroceryList,
+		recipeId ? { recipeId } : 'skip'
+	);
 
 	const { isPro } = useSubscription();
 	const [paywallFeature, setPaywallFeature] = useState<PaywallFeature | null>(null);
@@ -419,8 +431,15 @@ export default function RecipeDetailScreen() {
 	const [isSaveModalVisible, setIsSaveModalVisible] = useState(false);
 	const [isSavingToCookbook, setIsSavingToCookbook] = useState(false);
 	const [isRateModalVisible, setIsRateModalVisible] = useState(false);
-	const [groceryAdded, setGroceryAdded] = useState(false);
+	const [isMealPlanVisible, setIsMealPlanVisible] = useState(false);
 	const [groceryLoading, setGroceryLoading] = useState(false);
+	const [showGroceryOverlay, setShowGroceryOverlay] = useState(false);
+	const [groceryOverlayText, setGroceryOverlayText] = useState('');
+
+	// Grocery confirmation overlay animation
+	const groceryOverlayOpacity = useSharedValue(0);
+	const groceryIconScale = useSharedValue(0);
+	const groceryIconTranslateY = useSharedValue(20);
 
 	// Review edit state
 	const [isEditing, setIsEditing] = useState(false);
@@ -442,19 +461,68 @@ export default function RecipeDetailScreen() {
 		}
 	}, [myPost]);
 
-	const handleAddToGrocery = useCallback(async () => {
-		if (groceryAdded || !recipeId) return;
+	// Grocery overlay animated styles
+	const groceryOverlayAnimatedStyle = useAnimatedStyle(() => ({
+		opacity: groceryOverlayOpacity.value
+	}));
+
+	const groceryIconAnimatedStyle = useAnimatedStyle(() => ({
+		transform: [
+			{ scale: groceryIconScale.value },
+			{ translateY: groceryIconTranslateY.value }
+		]
+	}));
+
+	const playGroceryOverlay = useCallback(
+		(text: string) => {
+			setGroceryOverlayText(text);
+			setShowGroceryOverlay(true);
+
+			groceryOverlayOpacity.value = withSequence(
+				withTiming(1, { duration: 200 }),
+				withDelay(1200, withTiming(0, { duration: 300 }))
+			);
+
+			groceryIconScale.value = withSequence(
+				withTiming(0, { duration: 0 }),
+				withTiming(1.2, { duration: 250 }),
+				withSpring(1, { damping: 10, stiffness: 200 }),
+				withDelay(700, withTiming(0, { duration: 200 }))
+			);
+
+			groceryIconTranslateY.value = withSequence(
+				withTiming(20, { duration: 0 }),
+				withSpring(0, { damping: 8, stiffness: 150 })
+			);
+
+			setTimeout(() => setShowGroceryOverlay(false), 1800);
+		},
+		[groceryOverlayOpacity, groceryIconScale, groceryIconTranslateY]
+	);
+
+	const handleGroceryToggle = useCallback(async () => {
+		if (groceryLoading || !recipeId) return;
 		setGroceryLoading(true);
 		try {
-			await addToGrocery({ recipeId, servingsMultiplier });
-			setGroceryAdded(true);
-			setTimeout(() => setGroceryAdded(false), 2000);
-		} catch (error) {
-			console.error('Failed to add to grocery list:', error);
+			if (isInGroceryList) {
+				await removeFromGrocery({ recipeId });
+				playGroceryOverlay(copy.groceryRemoved);
+			} else {
+				await addToGrocery({ recipeId, servingsMultiplier });
+				playGroceryOverlay(copy.groceryAdded);
+			}
 		} finally {
 			setGroceryLoading(false);
 		}
-	}, [recipeId, servingsMultiplier, addToGrocery, groceryAdded]);
+	}, [
+		recipeId,
+		servingsMultiplier,
+		addToGrocery,
+		removeFromGrocery,
+		isInGroceryList,
+		groceryLoading,
+		playGroceryOverlay
+	]);
 
 	const originalServings = recipe?.servings ?? 1;
 	const adjustedServings = Math.round(originalServings * servingsMultiplier);
@@ -515,11 +583,12 @@ export default function RecipeDetailScreen() {
 			try {
 				await addToCookbookMutation({ cookbookId, recipeId });
 				setIsSaveModalVisible(false);
+				playGroceryOverlay(copy.savedToCookbook);
 			} finally {
 				setIsSavingToCookbook(false);
 			}
 		},
-		[recipeId, addToCookbookMutation, isSavingToCookbook]
+		[recipeId, addToCookbookMutation, isSavingToCookbook, playGroceryOverlay]
 	);
 
 	// --- Early Returns ---
@@ -1296,7 +1365,7 @@ export default function RecipeDetailScreen() {
 								setPaywallFeature('mealPlan');
 								return;
 							}
-							// TODO: meal plan action
+							setIsMealPlanVisible(true);
 						}}
 					>
 						<Icon
@@ -1309,18 +1378,7 @@ export default function RecipeDetailScreen() {
 						</Text>
 					</Pressable>
 				)}
-				{/* Post button - only show if user hasn't posted */}
-				{!myPost ? (
-					<Pressable
-						accessibilityRole="button"
-						accessibilityLabel="Share post"
-						style={styles.floatingButtonPost}
-						onPress={() => openAddModal()}
-					>
-						<Icon name="plus" size={20} color={Colors.text.inverse} />
-					</Pressable>
-				) : null}
-			</View>
+				</View>
 
 			{/* Floating Header — overlays on top of hero image */}
 			<View
@@ -1345,22 +1403,38 @@ export default function RecipeDetailScreen() {
 				</Pressable>
 
 				<View style={styles.headerRight}>
+					{isInCookbook === false ? (
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel={copy.addToCookbook}
+							style={styles.headerCartButton}
+							onPress={() => setIsSaveModalVisible(true)}
+							hitSlop={8}
+						>
+							<Icon
+								name="plus"
+								size={20}
+								color={Colors.text.inverse}
+								strokeWidth={NAV_ICON_STROKE}
+							/>
+						</Pressable>
+					) : null}
 					<Pressable
 						accessibilityRole="button"
-						accessibilityLabel={groceryAdded ? copy.addedToCart : copy.addToCart}
+						accessibilityLabel={isInGroceryList ? copy.addedToCart : copy.addToCart}
 						style={[
 							styles.headerCartButton,
-							groceryAdded && styles.headerCartButtonAdded,
+							isInGroceryList === true && styles.headerCartButtonAdded,
 						]}
-						onPress={handleAddToGrocery}
-						disabled={groceryLoading || groceryAdded}
+						onPress={handleGroceryToggle}
+						disabled={groceryLoading}
 						hitSlop={8}
 					>
 						{groceryLoading ? (
 							<ActivityIndicator size="small" color={Colors.text.inverse} />
 						) : (
 							<Icon
-								name={groceryAdded ? 'check' : 'cart'}
+								name={isInGroceryList ? 'check' : 'cart'}
 								size={20}
 								color={Colors.text.inverse}
 								strokeWidth={NAV_ICON_STROKE}
@@ -1394,12 +1468,40 @@ export default function RecipeDetailScreen() {
 				onClose={() => setIsRateModalVisible(false)}
 			/>
 
+			{/* Meal Plan Picker */}
+			<MealPlanPickerModal
+				visible={isMealPlanVisible}
+				recipeId={recipeId}
+				recipeTitle={recipe?.title ?? ''}
+				onClose={() => setIsMealPlanVisible(false)}
+				onSuccess={() => playGroceryOverlay(copy.addedToMealPlan)}
+			/>
+
 			{/* Paywall Modal */}
 			<PaywallModal
 				visible={paywallFeature !== null}
 				onClose={() => setPaywallFeature(null)}
 				feature={paywallFeature ?? 'cook'}
 			/>
+
+			{/* Grocery confirmation overlay */}
+			{showGroceryOverlay ? (
+				<Animated.View
+					style={[styles.groceryOverlay, groceryOverlayAnimatedStyle]}
+					pointerEvents="none"
+				>
+					<Animated.View style={groceryIconAnimatedStyle}>
+						<Image
+							source={require('@/assets/images/loading_icon.svg')}
+							style={styles.groceryOverlayIcon}
+							contentFit="contain"
+						/>
+					</Animated.View>
+					<Text style={styles.groceryOverlayText}>
+						{groceryOverlayText}
+					</Text>
+				</Animated.View>
+			) : null}
 		</View>
 	);
 }
@@ -1843,13 +1945,25 @@ const styles = StyleSheet.create({
 		color: Colors.text.primary,
 		fontWeight: '700'
 	},
-	floatingButtonPost: {
-		width: FLOATING_BAR_HEIGHT,
-		height: FLOATING_BAR_HEIGHT,
+
+	// Grocery confirmation overlay
+	groceryOverlay: {
+		...StyleSheet.absoluteFillObject,
+		backgroundColor: '#FFFFFF',
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: Colors.accent,
-		borderRadius: Radius.full,
-		...Shadow.elevated
+		zIndex: 999
+	},
+	groceryOverlayIcon: {
+		width: 200,
+		height: 200
+	},
+	groceryOverlayText: {
+		...Typography.h3,
+		color: Colors.text.primary,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginTop: Spacing.md,
+		paddingHorizontal: Spacing.xl
 	},
 });

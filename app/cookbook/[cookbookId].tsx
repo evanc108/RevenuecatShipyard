@@ -647,6 +647,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 	const cardStep = screenWidth * 0.35;
 
 	const recipes: CookbookRecipe[] = cookbookRecipes ?? [];
+	const isOwner = cookbook?.isOwner ?? false;
 	// Wait for all visible data before rendering content
 	const isPageLoading =
 		cookbookRecipes === undefined ||
@@ -759,8 +760,8 @@ export default function CookbookDetailScreen(): React.ReactElement {
 		return result;
 	}, [recipes, searchQuery]);
 
-	// +1 for the add recipe card at the end
-	const totalCards = sortedRecipes.length + 1;
+	// +1 for the add recipe card at the end (owner only)
+	const totalCards = sortedRecipes.length + (isOwner ? 1 : 0);
 	const maxIndex = Math.max(totalCards - 1, 0);
 
 	// --- Pan Gesture ---
@@ -964,11 +965,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 									name="search"
 									size={18}
 									strokeWidth={2.5}
-									color={
-										isSearchActive
-											? Colors.text.primary
-											: Colors.text.inverse
-									}
+									color={Colors.text.inverse}
 								/>
 							</Pressable>
 
@@ -1008,21 +1005,23 @@ export default function CookbookDetailScreen(): React.ReactElement {
 							) : null}
 						</Animated.View>
 
-						<Animated.View style={plusButtonAnimatedStyle}>
-							<Pressable
-								accessibilityRole="button"
-								accessibilityLabel="Add recipe"
-								style={styles.plusButton}
-								onPress={handleAddRecipe}
-								hitSlop={8}
-							>
-								<Icon
-									name="add"
-									size={24}
-									color={Colors.text.inverse}
-								/>
-							</Pressable>
-						</Animated.View>
+						{isOwner ? (
+							<Animated.View style={plusButtonAnimatedStyle}>
+								<Pressable
+									accessibilityRole="button"
+									accessibilityLabel="Add recipe"
+									style={styles.plusButton}
+									onPress={handleAddRecipe}
+									hitSlop={8}
+								>
+									<Icon
+										name="add"
+										size={24}
+										color={Colors.text.inverse}
+									/>
+								</Pressable>
+							</Animated.View>
+						) : null}
 					</View>
 				</View>
 
@@ -1069,7 +1068,7 @@ export default function CookbookDetailScreen(): React.ReactElement {
 								/>
 							</View>
 						</View>
-					) : suggestedRecipes && suggestedRecipes.length > 0 ? (
+					) : isOwner && suggestedRecipes && suggestedRecipes.length > 0 ? (
 						<View style={styles.sectionContainer}>
 							<Text style={styles.sectionTitle}>
 								{COPY.cookbookDetail.suggestedRecipe}
@@ -1186,24 +1185,26 @@ export default function CookbookDetailScreen(): React.ReactElement {
 														recipe._id
 													)
 												}
-												onMorePress={() =>
+												onMorePress={isOwner ? () =>
 													handleRecipeMorePress(
 														recipe._id,
 														recipe.title
 													)
-												}
+												: undefined}
 											/>
 										))}
 
-										{/* Add Recipe card — always last */}
-										<AddRecipeStackedCard
-											index={sortedRecipes.length}
-											translateX={translateX}
-											cardWidth={cardWidth}
-											cardStep={cardStep}
-											screenWidth={screenWidth}
-											onPress={handleAddRecipe}
-										/>
+										{/* Add Recipe card — only for owner */}
+										{isOwner ? (
+											<AddRecipeStackedCard
+												index={sortedRecipes.length}
+												translateX={translateX}
+												cardWidth={cardWidth}
+												cardStep={cardStep}
+												screenWidth={screenWidth}
+												onPress={handleAddRecipe}
+											/>
+										) : null}
 									</Animated.View>
 								</GestureDetector>
 							</View>
@@ -1235,12 +1236,12 @@ export default function CookbookDetailScreen(): React.ReactElement {
 														recipe._id
 													)
 												}
-												onMorePress={() =>
+												onMorePress={isOwner ? () =>
 													handleRecipeMorePress(
 														recipe._id,
 														recipe.title
 													)
-												}
+												: undefined}
 												compact
 											/>
 										</View>
@@ -1248,8 +1249,8 @@ export default function CookbookDetailScreen(): React.ReactElement {
 								</View>
 							</ScrollView>
 						)
-					) : (
-						/* Empty: static add card fills to bottom */
+					) : isOwner ? (
+						/* Empty: static add card fills to bottom (owner only) */
 						<Pressable
 							accessibilityRole="button"
 							accessibilityLabel="Add new recipe"
@@ -1315,6 +1316,13 @@ export default function CookbookDetailScreen(): React.ReactElement {
 								</View>
 							</View>
 						</Pressable>
+					) : (
+						/* Empty state for non-owner */
+						<View style={styles.emptyContainer}>
+							<Text style={styles.emptyTitle}>
+								{COPY.cookbookDetail.emptyTitle}
+							</Text>
+						</View>
 					)}
 				</View>
 			)}
@@ -1406,7 +1414,7 @@ const styles = StyleSheet.create({
 		width: SEARCH_ICON_SIZE,
 		height: SEARCH_ICON_SIZE,
 		borderRadius: SEARCH_ICON_SIZE / 2,
-		backgroundColor: Colors.accent,
+		backgroundColor: Colors.text.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
 		...Shadow.surface
@@ -1415,7 +1423,7 @@ const styles = StyleSheet.create({
 	// Search
 	searchBar: {
 		height: SEARCH_ICON_SIZE,
-		backgroundColor: Colors.accent,
+		backgroundColor: Colors.text.primary,
 		borderRadius: SEARCH_ICON_SIZE / 2,
 		flexDirection: 'row-reverse',
 		alignItems: 'center',

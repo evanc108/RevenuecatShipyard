@@ -12,6 +12,8 @@ export {
   precacheCommonResponses,
   // Audio session synchronization
   onAudioSessionReleased,
+  // Instant feedback constant
+  ONE_MOMENT_RESPONSE,
 } from './textToSpeech';
 
 export {
@@ -22,6 +24,7 @@ export {
   cancelRecording,
   transcribeAudio,
   isTranscriptionAvailable,
+  STT_RECORDING_OPTIONS,
 } from './speechToText';
 
 export { detectIntent, isComplexQuery } from './intentDetection';

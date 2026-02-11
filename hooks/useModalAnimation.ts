@@ -71,19 +71,19 @@ export function useModalAnimation({
       backdropOpacity.setValue(0);
       modalTranslateY.setValue(SCREEN_HEIGHT);
 
-      // Animate in: first slide up modal, then fade in backdrop
-      Animated.spring(modalTranslateY, {
-        toValue: 0,
-        ...MODAL_ANIMATION.spring,
-        useNativeDriver: true,
-      }).start(() => {
-        // Fade in backdrop after modal is in position
+      // Animate in: slide up modal and fade in backdrop together
+      Animated.parallel([
+        Animated.spring(modalTranslateY, {
+          toValue: 0,
+          ...MODAL_ANIMATION.spring,
+          useNativeDriver: true,
+        }),
         Animated.timing(backdropOpacity, {
           toValue: 1,
-          duration: 150,
+          duration: MODAL_ANIMATION.duration,
           useNativeDriver: true,
-        }).start();
-      });
+        }),
+      ]).start();
     } else if (isRendered) {
       animateOut();
     }

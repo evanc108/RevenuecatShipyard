@@ -127,25 +127,27 @@ export const CookbookCard = memo(function CookbookCard({
         ) : null}
       </View>
 
-      {/* More button */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Cookbook options"
-        style={[
-          styles.moreIcon,
-          isCarousel
-            ? (isCompact ? styles.moreIconCarouselCompact : styles.moreIconCarousel)
-            : (isCompact && styles.moreIconGridCompact),
-        ]}
-        onPress={onMorePress}
-        hitSlop={12}
-      >
-        <Icon
-          name="apps"
-          size={isCarousel ? (isCompact ? 18 : 24) : (isCompact ? 18 : 20)}
-          color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
-        />
-      </Pressable>
+      {/* More button — only shown when handler is provided */}
+      {onMorePress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cookbook options"
+          style={[
+            styles.moreIcon,
+            isCarousel
+              ? (isCompact ? styles.moreIconCarouselCompact : styles.moreIconCarousel)
+              : (isCompact && styles.moreIconGridCompact),
+          ]}
+          onPress={onMorePress}
+          hitSlop={12}
+        >
+          <Icon
+            name="apps"
+            size={isCarousel ? (isCompact ? 18 : 24) : (isCompact ? 18 : 20)}
+            color={hasImage ? 'rgba(255,255,255,0.7)' : Colors.text.tertiary}
+          />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 });

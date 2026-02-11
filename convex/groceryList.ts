@@ -107,6 +107,34 @@ export const getCount = query({
 });
 
 /**
+ * Check if a recipe's ingredients are already in the grocery list.
+ * Returns true if at least one grocery item has this recipe as a source.
+ */
+export const isRecipeInGroceryList = query({
+  args: { recipeId: v.id('recipes') },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
+
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!user) return false;
+
+    const items = await ctx.db
+      .query('groceryItems')
+      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .collect();
+
+    return items.some((item) =>
+      item.sources.some((s) => s.recipeId === args.recipeId)
+    );
+  },
+});
+
+/**
  * Add ingredients from a recipe to the grocery list.
  * Aggregates with existing items by normalizedName.
  */

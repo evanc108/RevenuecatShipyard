@@ -37,7 +37,11 @@
       "Bash(GIT_EDITOR=\"true\" git:*)",
       "Bash(EDITOR=true git rebase:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl:*)",
+      "Bash(npx expo uninstall:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

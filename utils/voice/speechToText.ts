@@ -1,54 +1,55 @@
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import {
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+  getRecordingPermissionsAsync,
+  IOSOutputFormat,
+  AudioQuality,
+} from 'expo-audio';
+import type { AudioRecorder, RecordingOptions } from 'expo-audio';
 import { resetAudioMode } from './textToSpeech';
 
 // Audio mode for playback after recording (full volume)
 const PLAYBACK_AUDIO_MODE = {
-  allowsRecordingIOS: false,
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: false,
-  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-  shouldDuckAndroid: false,
-  interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-  playThroughEarpieceAndroid: false,
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: false,
+  interruptionMode: 'doNotMix' as const,
+  shouldRouteThroughEarpiece: false,
 };
 
 // Track audio mode state to avoid redundant switches
 let isInRecordingMode = false;
 
-// Lazy-load recording options to avoid issues with Expo Go
-function getRecordingOptions(): Audio.RecordingOptions {
-  return {
-    android: {
-      extension: '.wav',
-      outputFormat: Audio.AndroidOutputFormat.DEFAULT,
-      audioEncoder: Audio.AndroidAudioEncoder.DEFAULT,
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      bitRate: 128000,
-    },
-    ios: {
-      extension: '.wav',
-      audioQuality: Audio.IOSAudioQuality.HIGH,
-      sampleRate: 16000,
-      numberOfChannels: 1,
-      bitRate: 128000,
-      linearPCMBitDepth: 16,
-      linearPCMIsBigEndian: false,
-      linearPCMIsFloat: false,
-    },
-    web: {},
-  };
-}
-
-let recording: Audio.Recording | null = null;
+/**
+ * Recording options for STT - WAV 16kHz mono for Whisper API compatibility
+ * Exported so hooks can create their own AudioRecorder with these options
+ */
+export const STT_RECORDING_OPTIONS: RecordingOptions = {
+  extension: '.wav',
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 128000,
+  android: {
+    outputFormat: 'default',
+    audioEncoder: 'default',
+  },
+  ios: {
+    outputFormat: IOSOutputFormat.LINEARPCM,
+    audioQuality: AudioQuality.HIGH,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {},
+};
 
 /**
  * Request microphone permissions
  */
 export async function requestMicrophonePermission(): Promise<boolean> {
   try {
-    const { status } = await Audio.requestPermissionsAsync();
-    return status === 'granted';
+    const { granted } = await requestRecordingPermissionsAsync();
+    return granted;
   } catch (error) {
     console.warn('Failed to request microphone permission:', error);
     return false;
@@ -60,8 +61,8 @@ export async function requestMicrophonePermission(): Promise<boolean> {
  */
 export async function hasMicrophonePermission(): Promise<boolean> {
   try {
-    const { status } = await Audio.getPermissionsAsync();
-    return status === 'granted';
+    const { granted } = await getRecordingPermissionsAsync();
+    return granted;
   } catch (error) {
     console.warn('Failed to check microphone permission:', error);
     return false;
@@ -69,9 +70,9 @@ export async function hasMicrophonePermission(): Promise<boolean> {
 }
 
 /**
- * Start recording audio
+ * Start recording audio using a recorder instance from the calling hook
  */
-export async function startRecording(): Promise<void> {
+export async function startRecording(recorder: AudioRecorder): Promise<void> {
   try {
     // Ensure permissions
     const hasPermission = await requestMicrophonePermission();
@@ -84,11 +85,11 @@ export async function startRecording(): Promise<void> {
       // Reset TTS audio mode tracking since we're switching to recording
       resetAudioMode();
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'duckOthers',
       });
       isInRecordingMode = true;
       // Reduced delay - only needed for initial mode switch
@@ -96,11 +97,9 @@ export async function startRecording(): Promise<void> {
       console.log('[STT] Audio mode set for recording');
     }
 
-    // Create and start recording
-    const { recording: newRecording } = await Audio.Recording.createAsync(
-      getRecordingOptions()
-    );
-    recording = newRecording;
+    // Prepare and start recording
+    await recorder.prepareToRecordAsync();
+    recorder.record();
   } catch (error) {
     console.error('Failed to start recording:', error);
     isInRecordingMode = false;
@@ -111,27 +110,25 @@ export async function startRecording(): Promise<void> {
 /**
  * Stop recording and return the audio URI
  */
-export async function stopRecording(): Promise<string | null> {
-  if (!recording) {
+export async function stopRecording(recorder: AudioRecorder): Promise<string | null> {
+  if (!recorder.isRecording) {
     return null;
   }
 
   try {
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    recording = null;
+    await recorder.stop();
+    const uri = recorder.uri;
     isInRecordingMode = false;
 
     // Reset audio mode for playback - switch from PlayAndRecord to Playback category
-    await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+    await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
     // Reduced delay - iOS speaker routing is faster than previously thought
     await new Promise((resolve) => setTimeout(resolve, 80));
     console.log('[STT] Audio mode reset for speaker playback');
 
-    return uri;
+    return uri ?? null;
   } catch (error) {
     console.error('Failed to stop recording:', error);
-    recording = null;
     isInRecordingMode = false;
     throw error;
   }
@@ -140,18 +137,17 @@ export async function stopRecording(): Promise<string | null> {
 /**
  * Cancel recording without saving
  */
-export async function cancelRecording(): Promise<void> {
-  if (recording) {
+export async function cancelRecording(recorder: AudioRecorder): Promise<void> {
+  if (recorder.isRecording) {
     try {
-      await recording.stopAndUnloadAsync();
+      await recorder.stop();
       // Reset audio mode for playback
-      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
       // Reduced delay
       await new Promise((resolve) => setTimeout(resolve, 80));
     } catch {
       // Ignore errors during cancellation
     }
-    recording = null;
     isInRecordingMode = false;
   }
 }
