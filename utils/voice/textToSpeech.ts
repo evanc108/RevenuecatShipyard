@@ -1,6 +1,7 @@
 import * as Speech from 'expo-speech';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 
 type TTSOptions = {
   language?: string;
@@ -20,13 +21,11 @@ const DEFAULT_OPTIONS: TTSOptions = {
 
 // Audio mode for TTS playback
 const PLAYBACK_AUDIO_MODE = {
-  allowsRecordingIOS: false,
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: false,
-  interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-  shouldDuckAndroid: false,
-  interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-  playThroughEarpieceAndroid: false,
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: false,
+  interruptionMode: 'doNotMix' as const,
+  shouldRouteThroughEarpiece: false,
 };
 
 // --- TTS Audio Cache ---
@@ -291,7 +290,8 @@ export async function precacheCommonResponses(): Promise<void> {
 // --- State Management ---
 // Use mutex pattern to prevent race conditions
 let isSpeakingState = false;
-let currentSound: Audio.Sound | null = null;
+let currentPlayer: AudioPlayer | null = null;
+let currentSubscription: { remove: () => void } | null = null;
 let speakingMutex = false; // Prevent concurrent speak operations
 let audioModeConfigured = false; // Track if audio mode is already set
 let manuallyStoppedFlag = false; // Track if audio was manually stopped to prevent callback race
@@ -299,7 +299,7 @@ let currentSpeakPromiseResolve: (() => void) | null = null; // Track current spe
 let onAudioSessionReleasedCallback: (() => void) | null = null; // Callback when audio session is fully released
 
 /**
- * Speak text using OpenAI TTS API with expo-av playback
+ * Speak text using OpenAI TTS API with expo-audio playback
  * Falls back to expo-speech if OpenAI API is not available
  */
 export async function speak(
@@ -313,7 +313,7 @@ export async function speak(
 
   // Acquire mutex - if already speaking, stop and take over
   // This prevents race conditions where multiple speak calls overlap
-  const wasAlreadySpeaking = speakingMutex || isSpeakingState || currentSound !== null;
+  const wasAlreadySpeaking = speakingMutex || isSpeakingState || currentPlayer !== null;
   if (wasAlreadySpeaking) {
     console.log('[TTS] Already speaking, stopping previous before new audio');
   }
@@ -351,7 +351,7 @@ export async function speak(
 }
 
 /**
- * Speak using OpenAI TTS API - plays through expo-av for full audio control
+ * Speak using OpenAI TTS API - plays through expo-audio for full audio control
  * Includes caching for repeated content
  */
 async function speakWithOpenAI(
@@ -363,7 +363,7 @@ async function speakWithOpenAI(
 
   // Configure audio mode for playback (only if not already configured)
   if (!audioModeConfigured) {
-    await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+    await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
     audioModeConfigured = true;
     // Only delay on first audio mode switch - iOS needs time to route to speaker
     await new Promise((resolve) => setTimeout(resolve, 80));
@@ -389,41 +389,43 @@ async function speakWithOpenAI(
     audioUri = await fetchTTSAudio(text, apiKey, options.rate ?? 1.0);
   }
 
-  // Create and play sound with expo-av
+  // Create and play audio with expo-audio
   isSpeakingState = true;
   manuallyStoppedFlag = false; // Reset flag for new audio
   options.onStart?.();
 
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     // Store resolve so we can call it from stopSpeaking if manually stopped
     currentSpeakPromiseResolve = resolve;
 
-    Audio.Sound.createAsync(
-      { uri: audioUri },
-      { shouldPlay: true, volume: 1.0 }
-    ).then(({ sound }) => {
-      currentSound = sound;
-      console.log('[TTS] Playing audio...');
+    try {
+      const player = createAudioPlayer({ uri: audioUri });
+      currentPlayer = player;
+      player.volume = 1.0;
 
-      sound.setOnPlaybackStatusUpdate(async (status) => {
+      const subscription = player.addListener('playbackStatusUpdate', async (status) => {
         // Skip callback if audio was manually stopped - prevents race condition
         if (manuallyStoppedFlag) {
           return;
         }
 
-        if (status.isLoaded && status.didJustFinish) {
+        if (status.didJustFinish) {
           console.log('[TTS] Audio finished naturally');
           isSpeakingState = false;
           currentSpeakPromiseResolve = null;
-          const soundToUnload = currentSound;
-          currentSound = null;
+          const playerToRemove = currentPlayer;
+          currentPlayer = null;
 
-          // Unload sound
-          if (soundToUnload) {
+          // Remove event subscription
+          subscription.remove();
+          currentSubscription = null;
+
+          // Release player
+          if (playerToRemove) {
             try {
-              await soundToUnload.unloadAsync();
+              playerToRemove.remove();
             } catch {
-              // Ignore unload errors
+              // Ignore removal errors
             }
           }
 
@@ -439,7 +441,11 @@ async function speakWithOpenAI(
           resolve();
         }
       });
-    }).catch((playError) => {
+      currentSubscription = subscription;
+
+      console.log('[TTS] Playing audio...');
+      player.play();
+    } catch (playError) {
       console.error('[TTS] Play error:', playError);
       isSpeakingState = false;
       currentSpeakPromiseResolve = null;
@@ -448,7 +454,7 @@ async function speakWithOpenAI(
       }
       options.onError?.(playError as Error);
       reject(playError);
-    });
+    }
   });
 }
 
@@ -524,7 +530,7 @@ async function speakWithExpoSpeech(
   // Configure audio session (only if needed)
   if (!audioModeConfigured) {
     try {
-      await Audio.setAudioModeAsync(PLAYBACK_AUDIO_MODE);
+      await setAudioModeAsync(PLAYBACK_AUDIO_MODE);
       audioModeConfigured = true;
       // Reduced delay - expo-speech is more tolerant
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -588,19 +594,26 @@ async function stopSpeakingInternal(): Promise<void> {
   // Set flag FIRST to prevent callback race condition
   manuallyStoppedFlag = true;
 
-  const soundToStop = currentSound;
-  currentSound = null;
+  // Remove event subscription first to prevent callbacks during cleanup
+  const subscriptionToRemove = currentSubscription;
+  currentSubscription = null;
+  if (subscriptionToRemove) {
+    subscriptionToRemove.remove();
+  }
+
+  const playerToStop = currentPlayer;
+  currentPlayer = null;
 
   // Resolve any pending speak promise before stopping
   const pendingResolve = currentSpeakPromiseResolve;
   currentSpeakPromiseResolve = null;
 
-  if (soundToStop) {
+  if (playerToStop) {
     try {
-      await soundToStop.stopAsync();
-      await soundToStop.unloadAsync();
+      playerToStop.pause();
+      playerToStop.remove();
     } catch {
-      // Ignore errors - sound may already be unloaded
+      // Ignore errors - player may already be removed
     }
   }
 
@@ -629,7 +642,7 @@ async function stopSpeakingInternal(): Promise<void> {
  * Returns only after audio session is fully released and safe for wake word to start
  */
 export async function stopSpeaking(): Promise<void> {
-  const wasPlaying = isSpeakingState || currentSound !== null || speakingMutex;
+  const wasPlaying = isSpeakingState || currentPlayer !== null || speakingMutex;
   console.log('[TTS] stopSpeaking called, wasPlaying:', wasPlaying);
 
   await stopSpeakingInternal();
@@ -687,7 +700,6 @@ function notifyAudioSessionReleased(): void {
   // Capture callback reference NOW to avoid race condition with React effect cleanup
   const callback = onAudioSessionReleasedCallback;
   if (callback) {
-    console.log('[TTS] Notifying audio session released');
     // Use setTimeout to ensure this runs after current call stack
     setTimeout(() => {
       callback();

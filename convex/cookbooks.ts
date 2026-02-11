@@ -160,7 +160,8 @@ export const update = mutation({
 });
 
 /**
- * Get a single cookbook by ID (must be owned by the authenticated user).
+ * Get a single cookbook by ID. Any authenticated user can view any cookbook.
+ * Returns an `isOwner` flag so the UI can conditionally show edit controls.
  */
 export const getById = query({
   args: { cookbookId: v.id('cookbooks') },
@@ -176,7 +177,7 @@ export const getById = query({
     if (!user) return null;
 
     const cookbook = await ctx.db.get(args.cookbookId);
-    if (!cookbook || cookbook.userId !== user._id) return null;
+    if (!cookbook) return null;
 
     const recipes = await ctx.db
       .query('cookbookRecipes')
@@ -186,6 +187,7 @@ export const getById = query({
     return {
       ...cookbook,
       recipeCount: recipes.length,
+      isOwner: cookbook.userId === user._id,
     };
   },
 });
@@ -226,6 +228,7 @@ export const remove = mutation({
 /**
  * Get all recipes in a cookbook, with fields needed by the detail screen.
  * Returns a lightweight projection (no ingredients/instructions).
+ * Any authenticated user can view recipes in any cookbook.
  */
 export const getRecipes = query({
   args: { cookbookId: v.id('cookbooks') },
@@ -233,15 +236,8 @@ export const getRecipes = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
-      .unique();
-
-    if (!user) return [];
-
     const cookbook = await ctx.db.get(args.cookbookId);
-    if (!cookbook || cookbook.userId !== user._id) return [];
+    if (!cookbook) return [];
 
     const cookbookRecipes = await ctx.db
       .query('cookbookRecipes')
@@ -278,7 +274,7 @@ export const getRecipes = query({
 /**
  * Get the most recently cooked recipe in a cookbook.
  * Only returns data when the cookbook has more than 3 recipes
- * AND the user has a post for at least one of them.
+ * AND the cookbook owner has a post for at least one of them.
  * Returns the recipe data for the most recent post, or null.
  */
 export const getRecentlyCooked = query({
@@ -287,15 +283,8 @@ export const getRecentlyCooked = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
 
-    const user = await ctx.db
-      .query('users')
-      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
-      .unique();
-
-    if (!user) return null;
-
     const cookbook = await ctx.db.get(args.cookbookId);
-    if (!cookbook || cookbook.userId !== user._id) return null;
+    if (!cookbook) return null;
 
     // Get all recipe IDs in this cookbook
     const cookbookRecipes = await ctx.db
@@ -310,10 +299,10 @@ export const getRecentlyCooked = query({
       cookbookRecipes.map((cr) => cr.recipeId.toString())
     );
 
-    // Get user posts, newest first
+    // Get cookbook owner's posts, newest first
     const posts = await ctx.db
       .query('posts')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
+      .withIndex('by_user', (q) => q.eq('userId', cookbook.userId))
       .order('desc')
       .collect();
 

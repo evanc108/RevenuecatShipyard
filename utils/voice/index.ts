@@ -24,6 +24,7 @@ export {
   cancelRecording,
   transcribeAudio,
   isTranscriptionAvailable,
+  STT_RECORDING_OPTIONS,
 } from './speechToText';
 
 export { detectIntent, isComplexQuery } from './intentDetection';

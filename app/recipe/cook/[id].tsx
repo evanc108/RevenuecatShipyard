@@ -38,6 +38,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const copy = COOK_MODE_COPY;
 
+/** Timing constants for wake word restart delays (ms) */
+const WAKE_WORD_RESTART_DELAY_MS = 200;
+const AUDIO_SESSION_RELEASE_DELAY_MS = 50;
+
 // --- Ingredient Helpers ---
 const INGREDIENT_IMAGE_SIZE = 44;
 
@@ -451,7 +455,6 @@ export default function CookModeScreen() {
 
   // Wake word detection - "Hey Nom"
   const handleWakeWordDetected = useCallback(async () => {
-    console.log('[CookMode] Hey Nom detected! Activating listening mode');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Mark that we're in a voice interaction to prevent premature wake word restart
@@ -462,15 +465,12 @@ export default function CookModeScreen() {
       await stopSpeakingNow();
 
       // Use cached "Yes?" audio for instant response (pre-cached on mount)
-      console.log('[CookMode] Speaking confirmation...');
-      await speakText('Yes?'); // Uses cache - instant playback!
-      console.log('[CookMode] Confirmation done, starting listening...');
+      await speakText('Yes?');
 
       // Minimal delay then start listening
       await new Promise((resolve) => setTimeout(resolve, 20));
       startListening();
-    } catch (error) {
-      console.error('[CookMode] Error in wake word handler:', error);
+    } catch {
       startListening();
     } finally {
       // Clear the interaction flag after a delay to allow listening to start
@@ -494,7 +494,6 @@ export default function CookModeScreen() {
   // Cleanup all voice features on unmount (stop TTS and wake word)
   useEffect(() => {
     return () => {
-      console.log('[CookMode] Cleaning up - stopping all voice features');
       stopSpeakingNow();
       stopWakeWordListening();
     };
@@ -516,16 +515,11 @@ export default function CookModeScreen() {
       (instruction, index) => `Step ${index + 1}: ${instruction.text}`
     );
 
-    console.log(`[CookMode] Pre-caching ${stepTexts.length} step TTS audio files...`);
-
     // Pre-cache steps only (not ingredients) in background with progress tracking
     precacheTexts(stepTexts, {
-      maxConcurrent: 2, // Conservative to avoid rate limits
+      maxConcurrent: 2,
       onProgress: (cached, total) => {
         setPrecacheProgress({ cached, total });
-        if (cached === total) {
-          console.log('[CookMode] All step TTS audio pre-cached!');
-        }
       },
     });
   }, [recipe]);
@@ -535,7 +529,6 @@ export default function CookModeScreen() {
   useEffect(() => {
     if (isTTSPlaying || voiceState === 'speaking') {
       if (isWakeWordListening || isWakeWordRecording) {
-        console.log('[CookMode] Force stopping wake word - TTS is playing');
         stopWakeWordListening();
       }
     }
@@ -549,17 +542,15 @@ export default function CookModeScreen() {
     const handleAudioSessionReleased = () => {
       // Don't restart if we're in the middle of a voice interaction (e.g., just detected wake word)
       if (isInVoiceInteractionRef.current) {
-        console.log('[CookMode] Audio session released but in voice interaction - skipping wake word restart');
         return;
       }
 
       // Only restart if conditions are right - use small delay to let state settle
       setTimeout(() => {
         if (heyNomEnabled && !isListening && !isSpeaking() && !isInVoiceInteractionRef.current) {
-          console.log('[CookMode] Audio session released - restarting wake word listening');
           startWakeWordListening();
         }
-      }, 50);
+      }, AUDIO_SESSION_RELEASE_DELAY_MS);
     };
 
     onAudioSessionReleased(handleAudioSessionReleased);
@@ -582,7 +573,6 @@ export default function CookModeScreen() {
         }
         // Triple-check using TTS module's actual state before restarting
         if (!isWakeWordListening && voiceState === 'idle' && !isSpeaking()) {
-          console.log('[CookMode] Fallback: Restarting wake word listening after voice interaction');
           startWakeWordListening();
         }
       }, 1000); // Increased to 1000ms as fallback
@@ -596,21 +586,27 @@ export default function CookModeScreen() {
 
   // Stop speaking when step changes and restart wake word
   useEffect(() => {
-    // Use isTTSPlaying which checks both React state AND TTS module state
+    let restartTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
     if (isSpeakingState || isSpeaking()) {
-      console.log('[CookMode] Step changed - stopping current audio');
       stopSpeakingNow().then(() => {
+        if (cancelled) return;
         // Restart wake word after step change stops audio
         if (heyNomEnabled && !isListening) {
-          setTimeout(() => {
+          restartTimer = setTimeout(() => {
             if (!isSpeaking()) {
-              console.log('[CookMode] Restarting wake word after step change');
               startWakeWordListening();
             }
-          }, 200);
+          }, WAKE_WORD_RESTART_DELAY_MS);
         }
       });
     }
+
+    return () => {
+      cancelled = true;
+      if (restartTimer) clearTimeout(restartTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
@@ -647,17 +643,15 @@ export default function CookModeScreen() {
   const handleVoiceToggle = useCallback(async () => {
     // If speaking (check both React state AND TTS module state), stop it first
     if (isSpeakingState || isTTSPlaying) {
-      console.log('[CookMode] Stopping audio on mic button press');
       await stopSpeakingNow();
 
       // Restart wake word after stopping audio via mic button
       if (heyNomEnabled) {
         setTimeout(() => {
           if (!isSpeaking() && !isListening) {
-            console.log('[CookMode] Restarting wake word after mic button stop');
             startWakeWordListening();
           }
-        }, 200);
+        }, WAKE_WORD_RESTART_DELAY_MS);
       }
       return;
     }
@@ -680,19 +674,15 @@ export default function CookModeScreen() {
     // Toggle: if speaking, stop; otherwise start speaking
     // Use isTTSPlaying for accurate detection (not just React state)
     if (isSpeakingState || isTTSPlaying) {
-      console.log('[CookMode] Stop button pressed - stopping audio');
       await stopSpeakingNow();
 
       // Explicitly restart wake word listening after stopping audio via button
-      // Don't rely solely on the callback mechanism - it can have race conditions
       if (heyNomEnabled) {
-        // Small delay to ensure audio session is fully released
         setTimeout(() => {
           if (!isSpeaking() && !isListening) {
-            console.log('[CookMode] Restarting wake word after manual stop');
             startWakeWordListening();
           }
-        }, 200);
+        }, WAKE_WORD_RESTART_DELAY_MS);
       }
       return; // Just stop, don't start new audio
     }
@@ -719,17 +709,15 @@ export default function CookModeScreen() {
     // Toggle: if speaking, stop; otherwise start speaking
     // Check both React state AND TTS module state for accuracy
     if (isSpeakingState || isTTSPlaying) {
-      console.log('[CookMode] Stop button pressed (ingredients) - stopping audio');
       await stopSpeakingNow();
 
       // Explicitly restart wake word listening after stopping audio via button
       if (heyNomEnabled) {
         setTimeout(() => {
           if (!isSpeaking() && !isListening) {
-            console.log('[CookMode] Restarting wake word after manual stop (ingredients)');
             startWakeWordListening();
           }
-        }, 200);
+        }, WAKE_WORD_RESTART_DELAY_MS);
       }
       return;
     }

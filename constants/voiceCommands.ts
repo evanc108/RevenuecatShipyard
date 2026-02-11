@@ -174,6 +174,43 @@ export const FALLBACK_RESPONSES = {
   error: 'Sorry, something went wrong. Please try again.',
 };
 
+/** Template responses for voice assistant commands */
+export const VOICE_RESPONSES = {
+  /** Step navigation */
+  step: (num: number, text: string) => `Step ${num}: ${text}`,
+  goingBack: (num: number, text: string) => `Going back. Step ${num}: ${text}`,
+  startingOver: (text: string) => `Starting over. Step 1: ${text}`,
+  currentStep: (num: number, total: number, text: string) =>
+    `You're on step ${num} of ${total}. ${text}`,
+  ingredientsList: (list: string) => `You'll need: ${list}`,
+  ingredientsAudio: (list: string) => `Ingredients: ${list}`,
+
+  /** Ingredient queries */
+  ingredientNotHeard: "I didn't catch which ingredient you're asking about.",
+  ingredientAmount: (amount: string, name: string) => `You need ${amount} of ${name}.`,
+  ingredientMultipleMatches: (names: string) =>
+    `I found several ingredients that might match: ${names}. Which one do you mean?`,
+  ingredientNotFound: (name: string) =>
+    `I couldn't find ${name} in this recipe's ingredients. Try saying "read ingredients" to hear the full list.`,
+
+  /** Temperature queries */
+  tempCurrentStep: (degrees: string, unit: string) => `This step says ${degrees}${unit}.`,
+  tempCurrentStepHeat: (heat: string) => `This step says to use ${heat}.`,
+  tempOtherStep: (stepNum: number, degrees: string, unit: string) =>
+    `Step ${stepNum} mentions ${degrees}${unit}.`,
+  tempOtherStepHeat: (stepNum: number, heat: string) =>
+    `Step ${stepNum} says to use ${heat}.`,
+  tempNotFound: "I couldn't find specific temperature information in this recipe. Check the current step for cooking instructions.",
+
+  /** Timer */
+  timerSet: (timeText: string) => `Setting a timer for ${timeText}.`,
+  timerNotHeard: "I didn't catch the time. Try saying 'set timer for 5 minutes'.",
+  timerStopped: 'Timer stopped.',
+
+  /** Controls */
+  paused: "Pausing voice assistant. Tap the microphone when you're ready to continue.",
+} as const;
+
 export const COOK_MODE_COPY = {
   title: 'Cook Mode',
   step: 'Step',
