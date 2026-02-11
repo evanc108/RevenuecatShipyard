@@ -7,8 +7,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { KeyboardAwareScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -26,6 +27,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const copy = ONBOARDING_COPY.profileSetup;
   const insets = useSafeAreaInsets();
   const updateProfile = useMutation(api.users.updateProfile);
@@ -100,7 +102,10 @@ export default function ProfileSetupScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Go back"
-        onPress={() => router.back()}
+        onPress={async () => {
+          await signOut();
+          router.replace('/(onboarding)/sign-up');
+        }}
         hitSlop={8}
         style={styles.backButton}
       >

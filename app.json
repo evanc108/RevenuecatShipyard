@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cookwithnom.app",
-      "appleTeamId": "F7K5Y98JBK",
+      "appleTeamId": "XL663Y5PDT",
       "usesAppleSignIn": true,
       "buildNumber": "1",
       "infoPlist": {
@@ -92,6 +92,7 @@
       ],
       "expo-secure-store",
       "expo-audio",
+      "expo-apple-authentication",
       "./plugins/withShareExtension"
     ],
     "experiments": {

@@ -15,6 +15,15 @@ import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
+export const useWarmUpBrowser = () => {
+  useEffect(() => {
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
+};
+
 WebBrowser.maybeCompleteAuthSession();
 import { Image } from 'expo-image';
 import { Icon } from '@/components/ui/Icon';
@@ -29,6 +38,7 @@ type ScreenState = 'form' | 'verify';
 const CODE_LENGTH = 6;
 
 export default function AuthScreen() {
+  useWarmUpBrowser();
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
   const copy = ONBOARDING_COPY.auth;

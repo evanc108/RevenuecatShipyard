@@ -1,19 +1,11 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode } from 'react';
 import {
-  Keyboard,
-  Platform,
   ScrollView,
   StyleSheet,
   View,
   type ScrollViewProps,
   type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 import { Colors, Spacing } from '@/constants/theme';
 
 type KeyboardAwareScrollViewProps = {
@@ -25,8 +17,9 @@ type KeyboardAwareScrollViewProps = {
 };
 
 /**
- * A scroll view with a fixed bottom bar that slides up when keyboard appears.
- * Content does NOT shift — only the bottom bar moves.
+ * A scroll view that adjusts for the keyboard on iOS.
+ * Uses native `automaticallyAdjustKeyboardInsets` to scroll focused
+ * inputs into view. The bottom bar stays fixed — the keyboard covers it.
  */
 export function KeyboardAwareScrollView({
   children,
@@ -35,37 +28,6 @@ export function KeyboardAwareScrollView({
   scrollViewStyle,
   showsVerticalScrollIndicator = false,
 }: KeyboardAwareScrollViewProps) {
-  const insets = useSafeAreaInsets();
-  const bottomBarTranslate = useSharedValue(0);
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        bottomBarTranslate.value = withTiming(-e.endCoordinates.height + insets.bottom, {
-          duration: Platform.OS === 'ios' ? 250 : 0,
-        });
-      }
-    );
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        bottomBarTranslate.value = withTiming(0, {
-          duration: Platform.OS === 'ios' ? 250 : 0,
-        });
-      }
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [insets.bottom, bottomBarTranslate]);
-
-  const bottomBarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: bottomBarTranslate.value }],
-  }));
-
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -78,14 +40,15 @@ export function KeyboardAwareScrollView({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={showsVerticalScrollIndicator}
         keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
       >
         {children}
       </ScrollView>
 
       {bottomBar && (
-        <Animated.View style={[styles.bottomBarContainer, bottomBarAnimatedStyle]}>
+        <View style={styles.bottomBarContainer}>
           {bottomBar}
-        </Animated.View>
+        </View>
       )}
     </View>
   );
