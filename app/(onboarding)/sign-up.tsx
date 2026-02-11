@@ -20,7 +20,7 @@ WebBrowser.maybeCompleteAuthSession();
 import { Icon } from '@/components/ui/Icon';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Radius, Typography } from '@/constants/theme';
 import { getClerkErrorMessage } from '@/utils/clerk-error';
 
 type AuthMode = 'signUp' | 'signIn';
@@ -42,7 +42,11 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
 
   // Generate redirect URL for OAuth - needed for Expo Go on physical devices
-  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
+  const redirectUrl = useMemo(() => {
+    const url = Linking.createURL('sso-callback');
+    console.log('REDIRECT URL:', url);
+    return url;
+  }, []);
 
   const handleSSO = useCallback(
     async (strategy: 'oauth_apple' | 'oauth_google') => {
@@ -148,7 +152,7 @@ export default function AuthScreen() {
           hitSlop={8}
           style={styles.backButton}
         >
-          <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+          <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
         </Pressable>
 
         <Animated.View
@@ -310,10 +314,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   backButton: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-    alignSelf: 'flex-start' as const,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.md,
+    marginTop: Spacing.md,
   },
   headlineContainer: {
     paddingHorizontal: Spacing.lg,

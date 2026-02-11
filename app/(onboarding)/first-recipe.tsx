@@ -1,7 +1,7 @@
 import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Radius, Spacing, Typography } from '@/constants/theme';
 import { Icon } from '@/components/ui/Icon';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -134,7 +134,7 @@ export default function FirstRecipeScreen() {
         hitSlop={8}
         style={styles.backButton}
       >
-        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+        <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
       </Pressable>
 
       <KeyboardAwareScrollView
@@ -206,10 +206,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   backButton: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-    alignSelf: 'flex-start' as const,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.md,
+    marginTop: Spacing.md,
   },
   headlineContainer: {
     paddingHorizontal: Spacing.lg,

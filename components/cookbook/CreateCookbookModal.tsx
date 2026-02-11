@@ -6,9 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Reanimated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useModalAnimation } from '@/hooks/useModalAnimation';
 
@@ -50,6 +49,12 @@ export function CreateCookbookModal({
 
   const isEditMode = editData !== undefined;
 
+  // Smooth keyboard animation using Reanimated
+  const keyboard = useAnimatedKeyboard();
+  const keyboardStyle = useAnimatedStyle(() => ({
+    paddingBottom: keyboard.height.value,
+  }));
+
   // Use shared modal animation
   const { isRendered, backdropOpacity, modalTranslateY } = useModalAnimation({
     visible,
@@ -75,7 +80,7 @@ export function CreateCookbookModal({
         setDescription('');
         setImageUri(null);
       }
-      setTimeout(() => inputRef.current?.focus(), 250);
+      // Note: Auto-focus removed to prevent keyboard from appearing during modal slide animation
     }
   }, [visible, editData]);
 
@@ -129,12 +134,8 @@ export function CreateCookbookModal({
 
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent>
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-          pointerEvents="box-none"
-        >
+      <Reanimated.View style={[styles.fullScreen, keyboardStyle]} pointerEvents="box-none">
+        <View style={styles.container} pointerEvents="box-none">
           {/* Animated Backdrop */}
           <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
             <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
@@ -315,13 +316,16 @@ export function CreateCookbookModal({
               </View>
             </View>
           </Animated.View>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </Reanimated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  fullScreen: {
+    ...StyleSheet.absoluteFillObject,
+  },
   container: {
     flex: 1,
     justifyContent: 'flex-end',

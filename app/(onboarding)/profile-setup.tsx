@@ -20,7 +20,7 @@ import { AvatarSizes } from '@/constants/theme';
 import { PageTurnButton } from '@/components/onboarding/PageTurnButton';
 import { PageIndicator } from '@/components/onboarding/PageIndicator';
 import { ONBOARDING_COPY } from '@/constants/onboarding';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Spacing, Radius, Typography } from '@/constants/theme';
 import { useProfileImageUpload } from '@/hooks/useProfileImageUpload';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -104,7 +104,7 @@ export default function ProfileSetupScreen() {
         hitSlop={8}
         style={styles.backButton}
       >
-        <Icon name="chevron-back" size={28} color={Colors.text.primary} />
+        <Icon name="arrow-back" size={20} color={Colors.text.inverse} strokeWidth={2} />
       </Pressable>
 
       <KeyboardAwareScrollView
@@ -229,10 +229,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   backButton: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-    alignSelf: 'flex-start' as const,
+    width: NAV_BUTTON_SIZE,
+    height: NAV_BUTTON_SIZE,
+    borderRadius: NAV_BUTTON_SIZE / 2,
+    backgroundColor: Colors.text.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.md,
+    marginTop: Spacing.md,
   },
   scrollContent: {
     paddingHorizontal: Spacing.lg,

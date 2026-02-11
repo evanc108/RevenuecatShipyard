@@ -40,6 +40,36 @@ export const list = query({
 });
 
 /**
+ * List all cookbooks for a specific user by userId, with recipe counts.
+ */
+export const listByUser = query({
+  args: {
+    userId: v.id('users'),
+  },
+  handler: async (ctx, args) => {
+    const cookbooks = await ctx.db
+      .query('cookbooks')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .collect();
+
+    const cookbooksWithCounts = await Promise.all(
+      cookbooks.map(async (cookbook) => {
+        const recipes = await ctx.db
+          .query('cookbookRecipes')
+          .withIndex('by_cookbook', (q) => q.eq('cookbookId', cookbook._id))
+          .collect();
+        return {
+          ...cookbook,
+          recipeCount: recipes.length,
+        };
+      })
+    );
+
+    return cookbooksWithCounts;
+  },
+});
+
+/**
  * Create a new cookbook for the authenticated user.
  * Accepts either a Convex storage ID (resolved to URL) or a direct image URL.
  */
@@ -69,14 +99,6 @@ export const create = mutation({
       }
     }
 
-    // Check if this is the user's first cookbook
-    const existingCookbook = await ctx.db
-      .query('cookbooks')
-      .withIndex('by_user', (q) => q.eq('userId', user._id))
-      .first();
-
-    const isFirstCookbook = existingCookbook === null;
-
     const now = Date.now();
     const cookbookId = await ctx.db.insert('cookbooks', {
       userId: user._id,
@@ -86,20 +108,6 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
-
-    // Auto-populate the first cookbook with all existing recipes
-    if (isFirstCookbook) {
-      const allRecipes = await ctx.db.query('recipes').collect();
-      await Promise.all(
-        allRecipes.map((recipe) =>
-          ctx.db.insert('cookbookRecipes', {
-            cookbookId,
-            recipeId: recipe._id,
-            addedAt: now,
-          })
-        )
-      );
-    }
 
     return cookbookId;
   },

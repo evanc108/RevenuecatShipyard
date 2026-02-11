@@ -65,6 +65,9 @@ export const AvatarSizes = {
   xl: 120,
 } as const;
 
+// Navigation button size for consistent header buttons across all screens
+export const NAV_BUTTON_SIZE = 40;
+
 export const AvatarFontSizes = {
   sm: 12,
   md: 18,

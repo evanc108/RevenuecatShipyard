@@ -169,3 +169,71 @@ export const listFollowing = query({
     return users.filter((user): user is NonNullable<typeof user> => user !== null);
   },
 });
+
+/**
+ * Get recent followers for the current user (for notifications).
+ * Returns followers sorted by most recent first with follow timestamp.
+ */
+export const getRecentFollowers = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!currentUser) return [];
+
+    const limit = args.limit ?? 50;
+
+    const follows = await ctx.db
+      .query('follows')
+      .withIndex('by_following', (q) => q.eq('followingId', currentUser._id))
+      .order('desc')
+      .take(limit);
+
+    const followersWithInfo = await Promise.all(
+      follows.map(async (follow) => {
+        const user = await ctx.db.get(follow.followerId);
+        if (!user) return null;
+        return {
+          ...user,
+          followedAt: follow.createdAt,
+        };
+      })
+    );
+
+    return followersWithInfo.filter(
+      (user): user is NonNullable<typeof user> => user !== null
+    );
+  },
+});
+
+/**
+ * Get count of new followers (for notification badge).
+ * In a real app, you'd track "last seen" timestamp to show truly new followers.
+ * For now, returns total follower count.
+ */
+export const getNewFollowerCount = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return 0;
+
+    const currentUser = await ctx.db
+      .query('users')
+      .withIndex('by_clerk_id', (q) => q.eq('clerkId', identity.subject))
+      .unique();
+
+    if (!currentUser) return 0;
+
+    const followers = await ctx.db
+      .query('follows')
+      .withIndex('by_following', (q) => q.eq('followingId', currentUser._id))
+      .collect();
+
+    return followers.length;
+  },
+});

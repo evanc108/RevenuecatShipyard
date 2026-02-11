@@ -78,6 +78,7 @@ const CARD_WIDTH_RATIO = 0.90;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 const DOT_SIZE = 6;
 const DOT_ACTIVE_WIDTH = 18;
+const MAX_VISIBLE_DOTS = 6;
 
 // Card carousel appearance
 const SCALE_STEP = 0.05;
@@ -295,11 +296,18 @@ const AddCookbookCarouselCard = memo(function AddCookbookCarouselCard({
 
 // --- Pagination Dot ---
 
+type ExtendedPaginationDotProps = PaginationDotProps & {
+  isEdgeDot: boolean;
+  totalCount: number;
+};
+
 const PaginationDot = memo(function PaginationDot({
   index,
   translateX,
   cardStep,
-}: PaginationDotProps): React.ReactElement {
+  isEdgeDot,
+  totalCount,
+}: ExtendedPaginationDotProps): React.ReactElement {
   const animatedStyle = useAnimatedStyle(() => {
     const activeIndex = -translateX.value / cardStep;
     const distance = Math.abs(index - activeIndex);
@@ -310,16 +318,89 @@ const PaginationDot = memo(function PaginationDot({
       [DOT_ACTIVE_WIDTH, DOT_SIZE],
       Extrapolation.CLAMP,
     );
-    const dotOpacity = interpolate(
+
+    // Edge dots in overflow mode get smaller and more transparent
+    let dotOpacity = interpolate(
       distance,
       [0, 1],
       [1, 0.3],
       Extrapolation.CLAMP,
     );
 
+    // Scale down edge dots when there's overflow
+    let scale = 1;
+    if (isEdgeDot && totalCount > MAX_VISIBLE_DOTS) {
+      scale = 0.7;
+      dotOpacity = dotOpacity * 0.5;
+    }
+
     return {
       width: dotWidth,
       opacity: dotOpacity,
+      transform: [{ scale }],
+    };
+  });
+
+  return <Animated.View style={[styles.dot, animatedStyle]} />;
+});
+
+// --- Animated Sliding Dot (for overflow) ---
+
+type AnimatedSlidingDotProps = {
+  displayIndex: number;
+  translateX: SharedValue<number>;
+  cardStep: number;
+  totalCount: number;
+};
+
+const AnimatedSlidingDot = memo(function AnimatedSlidingDot({
+  displayIndex,
+  translateX,
+  cardStep,
+  totalCount,
+}: AnimatedSlidingDotProps): React.ReactElement {
+  const animatedStyle = useAnimatedStyle(() => {
+    const activeIndex = -translateX.value / cardStep;
+
+    // Calculate window start: keep active dot centered when possible
+    const halfWindow = Math.floor(MAX_VISIBLE_DOTS / 2);
+    let windowStart = Math.round(activeIndex) - halfWindow;
+    windowStart = Math.max(0, windowStart);
+    windowStart = Math.min(windowStart, totalCount - MAX_VISIBLE_DOTS);
+
+    const actualIndex = windowStart + displayIndex;
+    const distance = Math.abs(actualIndex - activeIndex);
+
+    const dotWidth = interpolate(
+      distance,
+      [0, 1],
+      [DOT_ACTIVE_WIDTH, DOT_SIZE],
+      Extrapolation.CLAMP,
+    );
+
+    let dotOpacity = interpolate(
+      distance,
+      [0, 1],
+      [1, 0.3],
+      Extrapolation.CLAMP,
+    );
+
+    // Edge dots get smaller to indicate continuation
+    const isFirstDot = displayIndex === 0;
+    const isLastDot = displayIndex === MAX_VISIBLE_DOTS - 1;
+    const hasMoreBefore = windowStart > 0;
+    const hasMoreAfter = windowStart + MAX_VISIBLE_DOTS < totalCount;
+
+    let scale = 1;
+    if ((isFirstDot && hasMoreBefore) || (isLastDot && hasMoreAfter)) {
+      scale = 0.6;
+      dotOpacity = dotOpacity * 0.4;
+    }
+
+    return {
+      width: dotWidth,
+      opacity: dotOpacity,
+      transform: [{ scale }],
     };
   });
 
@@ -335,14 +416,35 @@ function PaginationDots({
 }: PaginationDotsProps): React.ReactElement | null {
   if (count <= 1) return null;
 
+  if (count <= MAX_VISIBLE_DOTS) {
+    return (
+      <View style={styles.dotsContainer}>
+        {Array.from({ length: count }, (_, i) => (
+          <PaginationDot
+            key={i}
+            index={i}
+            translateX={translateX}
+            cardStep={cardStep}
+            isEdgeDot={false}
+            totalCount={count}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  // For overflow: show sliding window of dots
+  const visibleDotIndices = Array.from({ length: MAX_VISIBLE_DOTS }, (_, i) => i);
+
   return (
     <View style={styles.dotsContainer}>
-      {Array.from({ length: count }, (_, i) => (
-        <PaginationDot
-          key={i}
-          index={i}
+      {visibleDotIndices.map((displayIndex) => (
+        <AnimatedSlidingDot
+          key={displayIndex}
+          displayIndex={displayIndex}
           translateX={translateX}
           cardStep={cardStep}
+          totalCount={count}
         />
       ))}
     </View>
@@ -412,8 +514,8 @@ const GridAddCard = memo(function GridAddCard({
         style={styles.gridAddGradient}
       />
 
-      {/* Bottom-left label */}
-      <View style={styles.gridAddBottom}>
+      {/* Top-left label */}
+      <View style={styles.gridAddTop}>
         <Text style={styles.gridAddTitle}>{'Add\nCookbook'}</Text>
       </View>
     </Pressable>
@@ -741,14 +843,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '92%',
     height: '65%',
-    top: '8%',
+    top: '25%',
     left: '4%',
   },
   gridAddImage: {
     position: 'absolute',
     width: '88%',
     height: '80%',
-    top: '8%',
+    top: '20%',
     left: '6%',
   },
   gridAddGradient: {
@@ -760,9 +862,9 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
   },
-  gridAddBottom: {
+  gridAddTop: {
     position: 'absolute',
-    bottom: Spacing.lg,
+    top: Spacing.lg,
     left: Spacing.md,
   },
   gridAddTitle: {

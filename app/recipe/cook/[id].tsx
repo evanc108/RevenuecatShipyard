@@ -6,7 +6,8 @@ import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 import { useWakeWord } from '@/hooks/useWakeWord';
-import { isSpeaking, precacheCommonResponses, precacheTexts } from '@/utils/voice';
+import { getIngredientImageUrl } from '@/utils/ingredientImage';
+import { isSpeaking, onAudioSessionReleased, precacheCommonResponses, precacheTexts } from '@/utils/voice';
 import { useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -74,14 +75,6 @@ function getIngredientCategory(category?: string, name?: string): IngredientCate
   return 'other';
 }
 
-function getIngredientImageUrl(name: string): string {
-  const mainName = name.split(/[,(]/)[0].trim();
-  const formatted = mainName
-    .split(' ')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-  return `https://www.themealdb.com/images/ingredients/${encodeURIComponent(formatted)}-Small.png`;
-}
 
 // --- Voice Button Component ---
 const VoiceButton = memo(function VoiceButton({
@@ -452,10 +445,17 @@ export default function CookModeScreen() {
     enabled: true,
   });
 
+  // Check if TTS is actually playing - combines React state AND TTS module state
+  // This ensures accurate detection whether TTS was triggered by voice command or button
+  const isTTSPlaying = isSpeakingState || isSpeaking();
+
   // Wake word detection - "Hey Nom"
   const handleWakeWordDetected = useCallback(async () => {
     console.log('[CookMode] Hey Nom detected! Activating listening mode');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Mark that we're in a voice interaction to prevent premature wake word restart
+    isInVoiceInteractionRef.current = true;
 
     try {
       // FIRST: Stop any currently playing audio immediately
@@ -472,11 +472,13 @@ export default function CookModeScreen() {
     } catch (error) {
       console.error('[CookMode] Error in wake word handler:', error);
       startListening();
+    } finally {
+      // Clear the interaction flag after a delay to allow listening to start
+      setTimeout(() => {
+        isInVoiceInteractionRef.current = false;
+      }, 500);
     }
   }, [startListening, speakText, stopSpeakingNow]);
-
-  // Check if TTS is actually playing (not just React state)
-  const isTTSPlaying = isSpeakingState || isSpeaking();
 
   const {
     isWakeWordListening,
@@ -539,19 +541,51 @@ export default function CookModeScreen() {
     }
   }, [isTTSPlaying, voiceState, isWakeWordListening, isWakeWordRecording, stopWakeWordListening]);
 
-  // Restart wake word listening after voice interaction completes
+  // Track if we're in the middle of a voice interaction to prevent premature wake word restart
+  const isInVoiceInteractionRef = useRef(false);
+
+  // Register callback for when audio session is released - this is the reliable trigger for wake word restart
+  useEffect(() => {
+    const handleAudioSessionReleased = () => {
+      // Don't restart if we're in the middle of a voice interaction (e.g., just detected wake word)
+      if (isInVoiceInteractionRef.current) {
+        console.log('[CookMode] Audio session released but in voice interaction - skipping wake word restart');
+        return;
+      }
+
+      // Only restart if conditions are right - use small delay to let state settle
+      setTimeout(() => {
+        if (heyNomEnabled && !isListening && !isSpeaking() && !isInVoiceInteractionRef.current) {
+          console.log('[CookMode] Audio session released - restarting wake word listening');
+          startWakeWordListening();
+        }
+      }, 50);
+    };
+
+    onAudioSessionReleased(handleAudioSessionReleased);
+
+    return () => {
+      onAudioSessionReleased(null);
+    };
+  }, [heyNomEnabled, isListening, startWakeWordListening]);
+
+  // Fallback: Restart wake word listening after voice interaction completes (backup if callback doesn't fire)
   useEffect(() => {
     // Only restart if truly idle and not speaking
     // Also check isTTSPlaying which uses the actual TTS module state
     if (heyNomEnabled && voiceState === 'idle' && !isListening && !isSpeakingState && !isWakeWordRecording && !isTTSPlaying) {
-      // Longer delay to ensure TTS audio session has fully released
+      // Longer delay as fallback - the callback approach is primary
       const timer = setTimeout(() => {
+        // Skip if we're in the middle of a voice interaction
+        if (isInVoiceInteractionRef.current) {
+          return;
+        }
         // Triple-check using TTS module's actual state before restarting
         if (!isWakeWordListening && voiceState === 'idle' && !isSpeaking()) {
-          console.log('[CookMode] Restarting wake word listening after voice interaction');
+          console.log('[CookMode] Fallback: Restarting wake word listening after voice interaction');
           startWakeWordListening();
         }
-      }, 800); // Increased to 800ms to ensure audio session is fully released
+      }, 1000); // Increased to 1000ms as fallback
       return () => clearTimeout(timer);
     }
   }, [heyNomEnabled, voiceState, isListening, isSpeakingState, isWakeWordListening, isWakeWordRecording, isTTSPlaying, startWakeWordListening]);
@@ -866,10 +900,10 @@ export default function CookModeScreen() {
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isSpeakingState ? 'Stop reading' : 'Read current step'}
+              accessibilityLabel={isTTSPlaying ? 'Stop reading' : 'Read current step'}
               style={[
                 styles.actionButton,
-                isSpeakingState && styles.actionButtonActive,
+                isTTSPlaying && styles.actionButtonActive,
               ]}
               onPress={handleReadStep}
             >
@@ -877,18 +911,18 @@ export default function CookModeScreen() {
                 <Loading size="button" />
               ) : (
                 <Icon
-                  name={isSpeakingState ? 'close' : 'volume-2'}
+                  name={isTTSPlaying ? 'close' : 'volume-2'}
                   size={20}
-                  color={isSpeakingState ? Colors.text.inverse : Colors.accent}
+                  color={isTTSPlaying ? Colors.text.inverse : Colors.accent}
                 />
               )}
               <Text
                 style={[
                   styles.actionButtonText,
-                  isSpeakingState && styles.actionButtonTextActive,
+                  isTTSPlaying && styles.actionButtonTextActive,
                 ]}
               >
-                {isLoadingTTS ? 'Loading...' : isSpeakingState ? 'Stop' : 'Read Step'}
+                {isLoadingTTS ? 'Loading...' : isTTSPlaying ? 'Stop' : 'Read Step'}
               </Text>
             </Pressable>
           </View>
@@ -900,7 +934,7 @@ export default function CookModeScreen() {
           onClose={() => setShowIngredients(false)}
           ingredients={recipe.ingredients}
           onToggleRead={handleReadIngredients}
-          isSpeaking={isSpeakingState}
+          isSpeaking={isTTSPlaying}
           isLoading={isLoadingTTS}
           maxHeight={screenHeight * 0.8}
           bottomInset={insets.bottom}

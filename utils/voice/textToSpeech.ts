@@ -290,6 +290,9 @@ let isSpeakingState = false;
 let currentSound: Audio.Sound | null = null;
 let speakingMutex = false; // Prevent concurrent speak operations
 let audioModeConfigured = false; // Track if audio mode is already set
+let manuallyStoppedFlag = false; // Track if audio was manually stopped to prevent callback race
+let currentSpeakPromiseResolve: (() => void) | null = null; // Track current speak promise for manual stop
+let onAudioSessionReleasedCallback: (() => void) | null = null; // Callback when audio session is fully released
 
 /**
  * Speak text using OpenAI TTS API with expo-av playback
@@ -384,9 +387,13 @@ async function speakWithOpenAI(
 
   // Create and play sound with expo-av
   isSpeakingState = true;
+  manuallyStoppedFlag = false; // Reset flag for new audio
   options.onStart?.();
 
   return new Promise((resolve, reject) => {
+    // Store resolve so we can call it from stopSpeaking if manually stopped
+    currentSpeakPromiseResolve = resolve;
+
     Audio.Sound.createAsync(
       { uri: audioUri },
       { shouldPlay: true, volume: 1.0 }
@@ -395,9 +402,15 @@ async function speakWithOpenAI(
       console.log('[TTS] Playing audio...');
 
       sound.setOnPlaybackStatusUpdate(async (status) => {
+        // Skip callback if audio was manually stopped - prevents race condition
+        if (manuallyStoppedFlag) {
+          return;
+        }
+
         if (status.isLoaded && status.didJustFinish) {
-          console.log('[TTS] Audio finished');
+          console.log('[TTS] Audio finished naturally');
           isSpeakingState = false;
+          currentSpeakPromiseResolve = null;
           const soundToUnload = currentSound;
           currentSound = null;
 
@@ -415,15 +428,17 @@ async function speakWithOpenAI(
             LegacyFileSystem.deleteAsync(audioUri, { idempotent: true }).catch(() => {});
           }
 
-          // Minimal delay - just enough for audio session
-          await new Promise((r) => setTimeout(r, 20));
+          // Delay to ensure audio session is fully released before wake word can restart
+          await new Promise((r) => setTimeout(r, 100));
           options.onDone?.();
+          notifyAudioSessionReleased();
           resolve();
         }
       });
     }).catch((playError) => {
       console.error('[TTS] Play error:', playError);
       isSpeakingState = false;
+      currentSpeakPromiseResolve = null;
       if (shouldCleanup) {
         LegacyFileSystem.deleteAsync(audioUri, { idempotent: true }).catch(() => {});
       }
@@ -517,6 +532,8 @@ async function speakWithExpoSpeech(
 
   return new Promise((resolve, reject) => {
     isSpeakingState = true;
+    manuallyStoppedFlag = false;
+    currentSpeakPromiseResolve = resolve;
     console.log('[TTS] Speaking:', text.substring(0, 50) + '...');
 
     Speech.speak(text, {
@@ -528,23 +545,32 @@ async function speakWithExpoSpeech(
         options.onStart?.();
       },
       onDone: () => {
+        // Skip if manually stopped
+        if (manuallyStoppedFlag) return;
+
         console.log('[TTS] Speech done');
         isSpeakingState = false;
-        // Minimal delay
+        currentSpeakPromiseResolve = null;
+        // Delay to ensure audio session release
         setTimeout(() => {
           options.onDone?.();
+          notifyAudioSessionReleased();
           resolve();
-        }, 20);
+        }, 100);
       },
       onError: (error) => {
         console.error('[TTS] Speech error:', error);
         isSpeakingState = false;
+        currentSpeakPromiseResolve = null;
         options.onError?.(error as Error);
         reject(error);
       },
       onStopped: () => {
+        // This is called when manually stopped
+        if (manuallyStoppedFlag) return; // Already handled by stopSpeakingInternal
         console.log('[TTS] Speech stopped');
         isSpeakingState = false;
+        currentSpeakPromiseResolve = null;
         resolve();
       },
     });
@@ -555,8 +581,15 @@ async function speakWithExpoSpeech(
  * Stop current speech (internal - doesn't reset mutex)
  */
 async function stopSpeakingInternal(): Promise<void> {
+  // Set flag FIRST to prevent callback race condition
+  manuallyStoppedFlag = true;
+
   const soundToStop = currentSound;
   currentSound = null;
+
+  // Resolve any pending speak promise before stopping
+  const pendingResolve = currentSpeakPromiseResolve;
+  currentSpeakPromiseResolve = null;
 
   if (soundToStop) {
     try {
@@ -575,16 +608,41 @@ async function stopSpeakingInternal(): Promise<void> {
     }
     isSpeakingState = false;
   }
+
+  // Wait for audio session to fully release before resolving
+  // This ensures wake word can properly acquire the audio session
+  await new Promise((r) => setTimeout(r, 150));
+
+  // Resolve the pending promise after cleanup is complete
+  if (pendingResolve) {
+    console.log('[TTS] Audio stopped manually, resolving promise');
+    pendingResolve();
+  }
 }
 
 /**
  * Stop current speech (public API)
+ * Returns only after audio session is fully released and safe for wake word to start
  */
 export async function stopSpeaking(): Promise<void> {
+  const wasPlaying = isSpeakingState || currentSound !== null || speakingMutex;
+  console.log('[TTS] stopSpeaking called, wasPlaying:', wasPlaying);
+
   await stopSpeakingInternal();
   speakingMutex = false;
   // Reset audio mode flag so next recording can reconfigure the audio session
   audioModeConfigured = false;
+
+  // Only delay and notify if something was actually playing
+  // This prevents false notifications when stopSpeaking is called defensively
+  if (wasPlaying) {
+    // Additional delay to ensure iOS audio session is fully released
+    await new Promise((r) => setTimeout(r, 100));
+    console.log('[TTS] stopSpeaking complete - audio session released');
+    notifyAudioSessionReleased();
+  } else {
+    console.log('[TTS] stopSpeaking complete - nothing was playing');
+  }
 }
 
 /**
@@ -608,4 +666,25 @@ export async function isSpeechAvailable(): Promise<boolean> {
   return await Speech.isSpeakingAsync()
     .then(() => true)
     .catch(() => false);
+}
+
+/**
+ * Register a callback to be called when audio session is fully released
+ * This is the safe point to restart wake word listening
+ */
+export function onAudioSessionReleased(callback: (() => void) | null): void {
+  onAudioSessionReleasedCallback = callback;
+}
+
+/**
+ * Internal: Notify that audio session is released
+ */
+function notifyAudioSessionReleased(): void {
+  if (onAudioSessionReleasedCallback) {
+    console.log('[TTS] Notifying audio session released');
+    // Use setTimeout to ensure this runs after current call stack
+    setTimeout(() => {
+      onAudioSessionReleasedCallback?.();
+    }, 0);
+  }
 }

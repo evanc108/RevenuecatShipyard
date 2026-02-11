@@ -30,7 +30,7 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
 
   // Generate redirect URL for OAuth - needed for Expo Go on physical devices
-  const redirectUrl = useMemo(() => Linking.createURL('/'), []);
+  const redirectUrl = useMemo(() => Linking.createURL('sso-callback'), []);
 
   const onSignIn = async () => {
     if (!isLoaded) return;

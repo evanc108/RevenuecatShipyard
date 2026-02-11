@@ -67,6 +67,14 @@ export const COPY = {
     recipeCount: (count: number) => (count === 1 ? '1 recipe' : `${count} recipes`),
     emptyTitle: 'No Cookbooks Yet',
     emptySubtitle: 'Create your first cookbook to start organizing recipes',
+    options: {
+      editCookbook: 'Edit Cookbook',
+      deleteCookbook: 'Delete Cookbook',
+      cancel: 'Cancel',
+      deleteConfirmTitle: 'Delete Cookbook?',
+      deleteConfirmMessage: 'This will permanently delete this cookbook and remove all recipes from it.',
+      delete: 'Delete',
+    },
   },
   errors: {
     generic: 'Something went wrong. Please try again.',
@@ -437,6 +445,13 @@ export const COPY = {
       feed: 'Feed',
       following: 'Following',
     },
+  },
+  suggestedUsers: {
+    title: 'Search Users',
+    searchPlaceholder: 'Search users...',
+    noResults: 'No users found',
+    emptyTitle: 'No Suggestions',
+    emptySubtitle: 'Check back later for new people to follow',
   },
   comments: {
     title: 'Comments',

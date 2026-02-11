@@ -4,7 +4,7 @@ import { RecipeOptionsSheet } from '@/components/cookbook/RecipeOptionsSheet';
 import { Icon } from '@/components/ui/Icon';
 import { Loading } from '@/components/ui/Loading';
 import { COPY } from '@/constants/copy';
-import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Colors, NAV_BUTTON_SIZE, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useAddModal } from '@/context/AddModalContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -14,26 +14,26 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions
+	Dimensions,
+	Pressable,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TextInput,
+	View,
+	useWindowDimensions
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withSpring,
-  withTiming,
-  type SharedValue
+	Extrapolation,
+	interpolate,
+	useAnimatedStyle,
+	useSharedValue,
+	withDelay,
+	withSequence,
+	withSpring,
+	withTiming,
+	type SharedValue
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -81,13 +81,13 @@ type CookbookRecipe = {
 
 // --- Constants ---
 
-const SEARCH_ICON_SIZE = 48;
+const SEARCH_ICON_SIZE = 40;
 const STROKE_FILL_PRIMARY = '#EEEEF3';
 const STROKE_FILL_SECONDARY = '#F2F2F6';
 const SWIPE_VELOCITY_THRESHOLD = 500;
 
 // Main card hugs left wall — wider so info text is visible
-const CARD_WIDTH_RATIO = 0.68;
+const CARD_WIDTH_RATIO = 0.64;
 const SCALE_STEP = 0.1;
 // Ghost card offset (peeks right + drops down behind main)
 const GHOST_OFFSET_X = 160;
@@ -411,18 +411,30 @@ const addCardStyles = StyleSheet.create({
 	}
 });
 
-// --- Pagination Dot ---
+// --- Pagination Dots ---
+
+const MAX_VISIBLE_DOTS = 6;
+
+type PaginationDotsProps = {
+	count: number;
+	translateX: SharedValue<number>;
+	cardStep: number;
+};
 
 type PaginationDotProps = {
 	index: number;
 	translateX: SharedValue<number>;
 	cardStep: number;
+	isEdgeDot: boolean;
+	totalCount: number;
 };
 
 const PaginationDot = memo(function PaginationDot({
 	index,
 	translateX,
-	cardStep
+	cardStep,
+	isEdgeDot,
+	totalCount
 }: PaginationDotProps): React.ReactElement {
 	const animatedStyle = useAnimatedStyle(() => {
 		const activeIndex = -translateX.value / cardStep;
@@ -434,14 +446,144 @@ const PaginationDot = memo(function PaginationDot({
 			[DOT_ACTIVE_WIDTH, DOT_SIZE],
 			Extrapolation.CLAMP
 		);
-		const dotOpacity = interpolate(
+
+		// Edge dots in overflow mode get smaller and more transparent
+		let dotOpacity = interpolate(
 			distance,
 			[0, 1],
 			[1, 0.3],
 			Extrapolation.CLAMP
 		);
 
-		return { width: dotWidth, opacity: dotOpacity };
+		// Scale down edge dots when there's overflow
+		let scale = 1;
+		if (isEdgeDot && totalCount > MAX_VISIBLE_DOTS) {
+			scale = 0.7;
+			dotOpacity = dotOpacity * 0.5;
+		}
+
+		return { width: dotWidth, opacity: dotOpacity, transform: [{ scale }] };
+	});
+
+	return <Animated.View style={[styles.dot, animatedStyle]} />;
+});
+
+const PaginationDots = memo(function PaginationDots({
+	count,
+	translateX,
+	cardStep
+}: PaginationDotsProps): React.ReactElement | null {
+	if (count <= 1) return null;
+
+	if (count <= MAX_VISIBLE_DOTS) {
+		return (
+			<View style={styles.dotsRow}>
+				{Array.from({ length: count }, (_, i) => (
+					<PaginationDot
+						key={i}
+						index={i}
+						translateX={translateX}
+						cardStep={cardStep}
+						isEdgeDot={false}
+						totalCount={count}
+					/>
+				))}
+			</View>
+		);
+	}
+
+	// For overflow: show sliding window of dots
+	return (
+		<PaginationDotsAnimated
+			count={count}
+			translateX={translateX}
+			cardStep={cardStep}
+		/>
+	);
+});
+
+// Animated sliding window for many dots
+const PaginationDotsAnimated = memo(function PaginationDotsAnimated({
+	count,
+	translateX,
+	cardStep
+}: PaginationDotsProps): React.ReactElement {
+	// We show MAX_VISIBLE_DOTS with edge dots scaled down
+	const visibleDotIndices = useMemo(() => {
+		return Array.from({ length: MAX_VISIBLE_DOTS }, (_, i) => i);
+	}, []);
+
+	return (
+		<View style={styles.dotsRow}>
+			{visibleDotIndices.map((displayIndex) => (
+				<AnimatedSlidingDot
+					key={displayIndex}
+					displayIndex={displayIndex}
+					translateX={translateX}
+					cardStep={cardStep}
+					totalCount={count}
+				/>
+			))}
+		</View>
+	);
+});
+
+type AnimatedSlidingDotProps = {
+	displayIndex: number;
+	translateX: SharedValue<number>;
+	cardStep: number;
+	totalCount: number;
+};
+
+const AnimatedSlidingDot = memo(function AnimatedSlidingDot({
+	displayIndex,
+	translateX,
+	cardStep,
+	totalCount
+}: AnimatedSlidingDotProps): React.ReactElement {
+	const animatedStyle = useAnimatedStyle(() => {
+		const activeIndex = -translateX.value / cardStep;
+
+		// Calculate window start: keep active dot centered when possible
+		const halfWindow = Math.floor(MAX_VISIBLE_DOTS / 2);
+		let windowStart = Math.round(activeIndex) - halfWindow;
+		windowStart = Math.max(0, windowStart);
+		windowStart = Math.min(windowStart, totalCount - MAX_VISIBLE_DOTS);
+
+		const actualIndex = windowStart + displayIndex;
+		const distance = Math.abs(actualIndex - activeIndex);
+
+		const dotWidth = interpolate(
+			distance,
+			[0, 1],
+			[DOT_ACTIVE_WIDTH, DOT_SIZE],
+			Extrapolation.CLAMP
+		);
+
+		let dotOpacity = interpolate(
+			distance,
+			[0, 1],
+			[1, 0.3],
+			Extrapolation.CLAMP
+		);
+
+		// Edge dots get smaller to indicate continuation
+		const isFirstDot = displayIndex === 0;
+		const isLastDot = displayIndex === MAX_VISIBLE_DOTS - 1;
+		const hasMoreBefore = windowStart > 0;
+		const hasMoreAfter = windowStart + MAX_VISIBLE_DOTS < totalCount;
+
+		let scale = 1;
+		if ((isFirstDot && hasMoreBefore) || (isLastDot && hasMoreAfter)) {
+			scale = 0.6;
+			dotOpacity = dotOpacity * 0.4;
+		}
+
+		return {
+			width: dotWidth,
+			opacity: dotOpacity,
+			transform: [{ scale }]
+		};
 	});
 
 	return <Animated.View style={[styles.dot, animatedStyle]} />;
@@ -760,13 +902,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel="Go back"
+						style={styles.backButton}
 						onPress={() => router.back()}
 						hitSlop={12}
 					>
 						<Icon
 							name="arrow-back"
-							size={24}
-							color={Colors.text.primary}
+							size={20}
+							color={Colors.text.inverse}
+							strokeWidth={2}
 						/>
 					</Pressable>
 				</View>
@@ -790,13 +934,15 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					<Pressable
 						accessibilityRole="button"
 						accessibilityLabel="Go back"
+						style={styles.backButton}
 						onPress={() => router.back()}
 						hitSlop={12}
 					>
 						<Icon
 							name="arrow-back"
-							size={24}
-							color={Colors.text.primary}
+							size={20}
+							color={Colors.text.inverse}
+							strokeWidth={2}
 						/>
 					</Pressable>
 
@@ -1012,17 +1158,12 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					</View>
 
 					{/* Pagination dots — below header, only in card mode */}
-					{viewMode === 'card' && sortedRecipes.length > 1 ? (
-						<View style={styles.dotsRow}>
-							{sortedRecipes.map((recipe, idx) => (
-								<PaginationDot
-									key={recipe._id}
-									index={idx}
-									translateX={translateX}
-									cardStep={cardStep}
-								/>
-							))}
-						</View>
+					{viewMode === 'card' ? (
+						<PaginationDots
+							count={sortedRecipes.length}
+							translateX={translateX}
+							cardStep={cardStep}
+						/>
 					) : null}
 
 					{/* Cards section */}
@@ -1178,13 +1319,13 @@ export default function CookbookDetailScreen(): React.ReactElement {
 				</View>
 			)}
 
-			{/* Bottom screen gradient fade */}
+			{/* Bottom screen gradient fade - subtle white */}
 			<View style={styles.bottomFadeContainer} pointerEvents="none">
 				<LinearGradient
 					colors={[
-						'transparent',
-						'rgba(0,0,0,0.02)',
-						'rgba(0,0,0,0.06)'
+						'rgba(255,255,255,0)',
+						'rgba(255,255,255,0.4)',
+						'rgba(255,255,255,0.8)'
 					]}
 					locations={[0, 0.5, 1]}
 					style={styles.bottomFadeGradient}
@@ -1208,14 +1349,11 @@ export default function CookbookDetailScreen(): React.ReactElement {
 					pointerEvents="none"
 				>
 					<Animated.View style={successIconAnimatedStyle}>
-						<View style={styles.successIconCircle}>
-							<Icon
-								name="check"
-								size={40}
-								color={Colors.background.primary}
-								strokeWidth={3}
-							/>
-						</View>
+						<Image
+							source={require('@/assets/images/loading_icon.svg')}
+							style={styles.successLoadingIcon}
+							contentFit="contain"
+						/>
 					</Animated.View>
 				</Animated.View>
 			) : null}
@@ -1242,6 +1380,14 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between'
+	},
+	backButton: {
+		width: NAV_BUTTON_SIZE,
+		height: NAV_BUTTON_SIZE,
+		borderRadius: NAV_BUTTON_SIZE / 2,
+		backgroundColor: Colors.text.primary,
+		alignItems: 'center',
+		justifyContent: 'center'
 	},
 	headerActions: {
 		flexDirection: 'row',
@@ -1487,10 +1633,10 @@ const styles = StyleSheet.create({
 	// Bottom screen gradient fade
 	bottomFadeContainer: {
 		position: 'absolute',
-		bottom: 0,
+		bottom: -40,
 		left: 0,
 		right: 0,
-		height: 120
+		height: 140
 	},
 	bottomFadeGradient: {
 		flex: 1
@@ -1506,17 +1652,13 @@ const styles = StyleSheet.create({
 	// Success overlay
 	successOverlay: {
 		...StyleSheet.absoluteFillObject,
-		backgroundColor: 'rgba(255,255,255,0.97)',
+		backgroundColor: '#FFFFFF',
 		alignItems: 'center',
 		justifyContent: 'center',
 		zIndex: 999
 	},
-	successIconCircle: {
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		backgroundColor: Colors.semantic.success,
-		alignItems: 'center',
-		justifyContent: 'center'
+	successLoadingIcon: {
+		width: 200,
+		height: 200
 	}
 });
