@@ -97,7 +97,7 @@ export default function GoalsScreen() {
         <View
           style={[styles.bottomLeft, { paddingBottom: insets.bottom + Spacing.sm }]}
         >
-          <PageIndicator current={5} />
+          <PageIndicator current={2} total={3} />
           <Pressable onPress={handleSkip} hitSlop={8}>
             <Text style={styles.skipText}>{copy.skip}</Text>
           </Pressable>

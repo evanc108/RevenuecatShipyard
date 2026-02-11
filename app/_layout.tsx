@@ -168,7 +168,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       } else if (inOnboardingGroup) {
         // Signed in and in onboarding group
         const screen = segments[1];
-        const preAuthScreens = ['welcome', 'info', 'sign-up', 'sign-up-email'];
+        const preAuthScreens = ['welcome', 'info', 'sign-up', 'terms', 'privacy'];
         const onPreAuthScreen = typeof screen === 'string' && preAuthScreens.includes(screen);
 
         if (hasOnboarded) {

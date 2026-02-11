@@ -85,7 +85,7 @@ export default function ProfileSetupScreen() {
       style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.sm }]}
     >
       <View style={styles.bottomLeft}>
-        <PageIndicator current={4} total={7} />
+        <PageIndicator current={1} total={3} />
       </View>
       <PageTurnButton
         label="Next >"
