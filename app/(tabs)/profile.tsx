@@ -413,7 +413,7 @@ export default function ProfileScreen(): React.ReactElement {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[3]}
+        stickyHeaderIndices={[2]}
       >
         {/* Header - scrolls with content */}
         <View style={styles.header}>
