@@ -288,11 +288,15 @@ export default function ProfileScreen(): React.ReactElement {
   // Cookbooks from Convex
   const cookbooks = useQuery(api.cookbooks.list);
   const createCookbookMutation = useMutation(api.cookbooks.create);
+  const updateCookbookMutation = useMutation(api.cookbooks.update);
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('cookbooks');
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editCookbookId, setEditCookbookId] = useState<Id<'cookbooks'> | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('slider');
   const [optionsSheetVisible, setOptionsSheetVisible] = useState(false);
   const [selectedCookbook, setSelectedCookbook] = useState<{ id: Id<'cookbooks'>; name: string } | null>(null);
@@ -331,9 +335,34 @@ export default function ProfileScreen(): React.ReactElement {
   }, []);
 
   const handleEditCookbook = useCallback((cookbookId: Id<'cookbooks'>) => {
-    // Navigate to edit screen or open edit modal
-    router.push(`/cookbook/${cookbookId}/edit`);
-  }, [router]);
+    setEditCookbookId(cookbookId);
+    setOptionsSheetVisible(false);
+    setSelectedCookbook(null);
+    setEditModalVisible(true);
+  }, []);
+
+  const editCookbookData = editCookbookId
+    ? cookbooks?.find((c) => c._id === editCookbookId)
+    : undefined;
+
+  const handleUpdateCookbook = useCallback(
+    async (name: string, description?: string, _imageUri?: string) => {
+      if (!editCookbookId) return;
+      setIsUpdating(true);
+      try {
+        await updateCookbookMutation({
+          cookbookId: editCookbookId,
+          name,
+          description,
+        });
+        setEditModalVisible(false);
+        setEditCookbookId(null);
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [editCookbookId, updateCookbookMutation]
+  );
 
   const handlePostPress = useCallback((recipeId: string) => {
     router.push(`/recipe/${recipeId}`);
@@ -718,6 +747,21 @@ export default function ProfileScreen(): React.ReactElement {
         onClose={() => setCreateModalVisible(false)}
         onSubmit={handleCreateCookbook}
         isLoading={isCreating}
+      />
+
+      <CreateCookbookModal
+        visible={editModalVisible}
+        onClose={() => {
+          setEditModalVisible(false);
+          setEditCookbookId(null);
+        }}
+        onSubmit={handleUpdateCookbook}
+        isLoading={isUpdating}
+        editData={
+          editCookbookData
+            ? { name: editCookbookData.name, description: editCookbookData.description }
+            : undefined
+        }
       />
 
       <CookbookOptionsSheet

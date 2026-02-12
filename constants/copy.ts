@@ -99,7 +99,7 @@ export const COPY = {
     dietary: 'Dietary',
     equipment: 'Equipment',
     alreadyExists: 'Recipe already in database - added to your collection',
-    rateThisRecipe: 'Rate this recipe:',
+    rateThisRecipe: 'Rate this recipe',
     communityAverage: (rating: number) => `Community average: ${rating.toFixed(1)} stars`,
     status: {
       idle: 'Ready',
@@ -384,7 +384,7 @@ export const COPY = {
   recipeDetail: {
     title: 'Recipe',
     notFound: 'Recipe not found',
-    rateThisRecipe: 'Rate this recipe:',
+    rateThisRecipe: 'Rate this recipe',
     communityAverage: (rating: number) => `Community average: ${rating.toFixed(1)} stars`,
     by: 'By',
     ingredients: 'Ingredients',
