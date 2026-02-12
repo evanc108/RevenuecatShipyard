@@ -1,5 +1,3 @@
-import '@/components/share-extension'; // side-effect: registers AppRegistry component for share extension
-
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -25,7 +23,6 @@ import { AddModalProvider } from '@/context/AddModalContext';
 import { ShareIntentProvider } from '@/context/ShareIntentContext';
 import { AddPantryItemModal } from '@/components/features/pantry/AddPantryItemModal';
 import { GenerateMealPlanModal } from '@/components/features/pantry/GenerateMealPlanModal';
-import { useCookbookCacheSync } from '@/hooks/useCookbookCacheSync';
 import { configureRevenueCat, identifyUser } from '@/lib/revenuecat/client';
 import { useSubscriptionStore } from '@/stores/useSubscriptionStore';
 import Purchases, { type CustomerInfo } from 'react-native-purchases';
@@ -104,9 +101,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
     return () => clearTimeout(timeout);
   }, [isSignedIn, isLoaded, convexUser, router]);
-
-  // Sync cookbooks to App Groups for the share extension
-  useCookbookCacheSync();
 
   // Initialize RevenueCat and identify user
   useEffect(() => {

@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/ui/Avatar';
 import { CommentSection } from '@/components/ui/CommentSection';
+import { ImageCarousel } from '@/components/ui/ImageCarousel';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -32,6 +33,7 @@ type FeedPostProps = {
   tasteRating: number;
   presentationRating: number;
   notes?: string;
+  imageUrls?: string[];
   createdAt: number;
   likeCount?: number;
   commentCount?: number;
@@ -83,6 +85,7 @@ export const FeedPost = memo(function FeedPost({
   tasteRating,
   presentationRating,
   notes,
+  imageUrls,
   createdAt,
   likeCount: initialLikeCount = 0,
   commentCount: initialCommentCount = 0,
@@ -205,30 +208,41 @@ export const FeedPost = memo(function FeedPost({
         accessibilityLabel={`View ${recipe.title} recipe`}
         onPress={handleRecipePress}
       >
-        <View
-          style={[
-            styles.imageContainer,
-            !recipe.imageUrl && { backgroundColor: fallbackBg },
-          ]}
-        >
-          {recipe.imageUrl ? (
-            <Image
-              source={{ uri: recipe.imageUrl }}
-              style={styles.image}
-              contentFit="cover"
-              transition={200}
-              cachePolicy="memory-disk"
+        {imageUrls && imageUrls.length > 0 ? (
+          <View style={{ marginHorizontal: Spacing.md }}>
+            <ImageCarousel
+              imageUrls={imageUrls}
+              width={IMAGE_WIDTH}
+              height={IMAGE_HEIGHT}
+              borderRadius={Radius.md}
             />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Ionicons
-                name="restaurant-outline"
-                size={48}
-                color={Colors.text.tertiary}
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.imageContainer,
+              !recipe.imageUrl && { backgroundColor: fallbackBg },
+            ]}
+          >
+            {recipe.imageUrl ? (
+              <Image
+                source={{ uri: recipe.imageUrl }}
+                style={styles.image}
+                contentFit="cover"
+                transition={200}
+                cachePolicy="memory-disk"
               />
-            </View>
-          )}
-        </View>
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons
+                  name="restaurant-outline"
+                  size={48}
+                  color={Colors.text.tertiary}
+                />
+              </View>
+            )}
+          </View>
+        )}
       </Pressable>
 
       {/* Notes */}

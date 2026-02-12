@@ -9,7 +9,6 @@
  */
 
 import { useAddModal } from '@/context/AddModalContext';
-import { usePendingShareImports } from '@/hooks/usePendingShareImports';
 import { useShareHandler } from '@/hooks/useShareHandler';
 import {
   createContext,
@@ -35,17 +34,6 @@ export function ShareIntentProvider({
 }: ShareIntentProviderProps): React.ReactElement {
   const { pendingUrl, clearPendingUrl } = useShareHandler();
   const { openModal } = useAddModal();
-
-  // When a pending import URL is read from App Groups, open AddModal
-  const handlePendingUrl = useCallback(
-    (url: string) => {
-      openModal({ initialUrl: url });
-    },
-    [openModal]
-  );
-
-  // Pick up pending imports written by the share extension
-  usePendingShareImports(handlePendingUrl);
 
   // Handle incoming URLs from share handler (deep links)
   useEffect(() => {

@@ -11,6 +11,7 @@ export const create = mutation({
     tasteRating: v.number(),
     presentationRating: v.number(),
     notes: v.optional(v.string()),
+    imageStorageIds: v.optional(v.array(v.id('_storage'))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -37,6 +38,19 @@ export const create = mutation({
     const recipe = await ctx.db.get(args.recipeId);
     if (!recipe) throw new Error('Recipe not found');
 
+    // Resolve image storage IDs to URLs
+    let imageUrls: string[] | undefined;
+    if (args.imageStorageIds && args.imageStorageIds.length > 0) {
+      const urls = await Promise.all(
+        args.imageStorageIds.map(async (storageId) => {
+          const url = await ctx.storage.getUrl(storageId);
+          if (!url) throw new Error('Failed to resolve storage URL');
+          return url;
+        })
+      );
+      imageUrls = urls;
+    }
+
     const postId = await ctx.db.insert('posts', {
       userId: currentUser._id,
       recipeId: args.recipeId,
@@ -44,6 +58,7 @@ export const create = mutation({
       tasteRating,
       presentationRating,
       notes: args.notes,
+      imageUrls,
       createdAt: Date.now(),
     });
 
@@ -261,6 +276,7 @@ export const update = mutation({
     tasteRating: v.number(),
     presentationRating: v.number(),
     notes: v.optional(v.string()),
+    imageStorageIds: v.optional(v.array(v.id('_storage'))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -290,11 +306,25 @@ export const update = mutation({
       throw new Error('Ratings must be between 1 and 5');
     }
 
+    // Resolve image storage IDs to URLs if provided
+    let imageUrls: string[] | undefined;
+    if (args.imageStorageIds && args.imageStorageIds.length > 0) {
+      const urls = await Promise.all(
+        args.imageStorageIds.map(async (storageId) => {
+          const url = await ctx.storage.getUrl(storageId);
+          if (!url) throw new Error('Failed to resolve storage URL');
+          return url;
+        })
+      );
+      imageUrls = urls;
+    }
+
     await ctx.db.patch(args.postId, {
       easeRating,
       tasteRating,
       presentationRating,
       notes: args.notes,
+      ...(imageUrls !== undefined && { imageUrls }),
     });
 
     return { success: true };

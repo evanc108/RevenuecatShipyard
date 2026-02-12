@@ -54,6 +54,7 @@ type FeedPostData = {
   tasteRating: number;
   presentationRating: number;
   notes?: string;
+  imageUrls?: string[];
   createdAt: number;
   user: {
     _id: Id<'users'>;
@@ -501,6 +502,7 @@ function FeedContent({ onFindPeople, searchQuery, onSaveSuccess }: { onFindPeopl
         tasteRating={item.tasteRating}
         presentationRating={item.presentationRating}
         notes={item.notes}
+        imageUrls={item.imageUrls}
         createdAt={item.createdAt}
         likeCount={item.likeCount}
         commentCount={item.commentCount}
