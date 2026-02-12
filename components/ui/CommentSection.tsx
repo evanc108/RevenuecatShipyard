@@ -1,12 +1,14 @@
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
+  ScrollView,
   Pressable,
   Modal,
-  KeyboardAvoidingView,
+  Animated,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Alert,
@@ -23,7 +25,8 @@ import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MODAL_HEIGHT = SCREEN_HEIGHT * (2 / 3);
+const SHEET_HEIGHT = SCREEN_HEIGHT * (2 / 3);
+const SLIDE_DURATION = 300;
 
 type CommentUser = {
   _id: Id<'users'>;
@@ -119,6 +122,49 @@ export const CommentSection = memo(function CommentSection({
   const [commentText, setCommentText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Slide animation for the sheet inside the Modal
+  const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+
+  useEffect(() => {
+    if (visible) {
+      slideAnim.setValue(SHEET_HEIGHT);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: SLIDE_DURATION,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, slideAnim]);
+
+  // Track keyboard height so input stays above the keyboard
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleClose = useCallback(() => {
+    Keyboard.dismiss();
+    Animated.timing(slideAnim, {
+      toValue: SHEET_HEIGHT,
+      duration: SLIDE_DURATION,
+      useNativeDriver: true,
+    }).start(() => onClose());
+  }, [slideAnim, onClose]);
+
   const commentsData = useQuery(
     api.postComments.list,
     visible ? { postId } : 'skip'
@@ -195,96 +241,112 @@ export const CommentSection = memo(function CommentSection({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
-      {/* Backdrop */}
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      <View style={styles.modalContainer}>
+        {/* Backdrop — visible immediately via fade */}
+        <Pressable style={styles.backdrop} onPress={handleClose} />
 
-      {/* Sheet */}
-      <View style={styles.sheet}>
-        {/* Drag handle */}
-        <View style={styles.handleRow}>
-          <View style={styles.handle} />
-        </View>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerSpacer} />
-          <Text style={styles.headerTitle}>{COPY.comments.title}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close comments"
-            style={styles.closeButton}
-            onPress={onClose}
-          >
-            <Icon name="close" size={22} color={Colors.text.primary} strokeWidth={2} />
-          </Pressable>
-        </View>
-
-        {/* Comments List */}
-        <View style={styles.listContainer}>
-          <FlashList<Comment>
-            data={comments}
-            renderItem={renderComment}
-            keyExtractor={keyExtractor}
-            ListEmptyComponent={ListEmptyComponent}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-          />
-        </View>
-
-        {/* Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
+        {/* Sheet — slides up independently */}
+        <Animated.View
+          style={[
+            styles.sheet,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
-          <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
-            <TextInput
-              style={styles.input}
-              placeholder={COPY.comments.placeholder}
-              placeholderTextColor={Colors.text.tertiary}
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-              maxLength={500}
-              editable={!isPosting}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={COPY.comments.post}
-              style={[
-                styles.postButton,
-                (commentText.trim().length === 0 || isPosting) &&
-                  styles.postButtonDisabled,
-              ]}
-              onPress={handlePost}
-              disabled={commentText.trim().length === 0 || isPosting}
-            >
-              {isPosting ? (
-                <ActivityIndicator size="small" color={Colors.text.inverse} />
-              ) : (
-                <Text style={styles.postButtonText}>{COPY.comments.post}</Text>
-              )}
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
+          <ScrollView
+            scrollEnabled={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.sheetInner}
+          >
+            {/* Drag handle */}
+            <View style={styles.handleRow}>
+              <View style={styles.handle} />
+            </View>
+
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerSpacer} />
+              <Text style={styles.headerTitle}>{COPY.comments.title}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close comments"
+                style={styles.closeButton}
+                onPress={handleClose}
+              >
+                <Icon name="close" size={22} color={Colors.text.primary} strokeWidth={2} />
+              </Pressable>
+            </View>
+
+            {/* Comments List */}
+            <View style={styles.listContainer}>
+              <FlashList<Comment>
+                data={comments}
+                renderItem={renderComment}
+                keyExtractor={keyExtractor}
+                ListEmptyComponent={ListEmptyComponent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
+                contentContainerStyle={styles.listContent}
+              />
+            </View>
+
+            {/* Input */}
+            <View style={[styles.inputContainer, { paddingBottom: keyboardHeight > 0 ? keyboardHeight + Spacing.sm : Math.max(insets.bottom, Spacing.sm) + Spacing.sm }]}>
+              <TextInput
+                style={styles.input}
+                placeholder={COPY.comments.placeholder}
+                placeholderTextColor={Colors.text.tertiary}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+                maxLength={500}
+                editable={!isPosting}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={COPY.comments.post}
+                style={[
+                  styles.postButton,
+                  (commentText.trim().length === 0 || isPosting) &&
+                    styles.postButtonDisabled,
+                ]}
+                onPress={handlePost}
+                disabled={commentText.trim().length === 0 || isPosting}
+              >
+                {isPosting ? (
+                  <ActivityIndicator size="small" color={Colors.text.inverse} />
+                ) : (
+                  <Text style={styles.postButtonText}>{COPY.comments.post}</Text>
+                )}
+              </Pressable>
+            </View>
+          </ScrollView>
+        </Animated.View>
       </View>
     </Modal>
   );
 });
 
 const styles = StyleSheet.create({
-  backdrop: {
+  modalContainer: {
     flex: 1,
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.background.overlay,
   },
   sheet: {
-    height: MODAL_HEIGHT,
+    height: SHEET_HEIGHT,
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
+  },
+  sheetInner: {
+    flex: 1,
   },
   handleRow: {
     alignItems: 'center',
