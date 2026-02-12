@@ -272,6 +272,8 @@ export default defineSchema({
     presentationRating: v.number(), // How did it look?
     // Optional user notes
     notes: v.optional(v.string()),
+    // Optional user-uploaded photos (resolved URLs from Convex storage)
+    imageUrls: v.optional(v.array(v.string())),
     // Timestamps
     createdAt: v.number(),
   })

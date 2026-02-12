@@ -8,6 +8,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 type ProfilePostCardProps = {
   recipeTitle: string;
   recipeImageUrl?: string | null;
+  imageUrls?: string[];
   easeRating: number;
   tasteRating: number;
   presentationRating: number;
@@ -50,6 +51,7 @@ function formatRelativeDate(timestamp: number): string {
 export const ProfilePostCard = memo(function ProfilePostCard({
   recipeTitle,
   recipeImageUrl,
+  imageUrls,
   easeRating,
   tasteRating,
   presentationRating,
@@ -59,6 +61,7 @@ export const ProfilePostCard = memo(function ProfilePostCard({
   onMenuPress,
 }: ProfilePostCardProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(recipeTitle);
+  const displayImageUrl = (imageUrls && imageUrls.length > 0 ? imageUrls[0] : recipeImageUrl) ?? null;
 
   return (
     <Pressable
@@ -68,10 +71,10 @@ export const ProfilePostCard = memo(function ProfilePostCard({
       onPress={onPress}
     >
       {/* Image */}
-      <View style={[styles.imageContainer, !recipeImageUrl && { backgroundColor: fallbackBg }]}>
-        {recipeImageUrl ? (
+      <View style={[styles.imageContainer, !displayImageUrl && { backgroundColor: fallbackBg }]}>
+        {displayImageUrl ? (
           <Image
-            source={{ uri: recipeImageUrl }}
+            source={{ uri: displayImageUrl }}
             style={styles.image}
             contentFit="cover"
             transition={200}

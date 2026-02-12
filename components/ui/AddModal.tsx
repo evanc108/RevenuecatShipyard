@@ -7,6 +7,7 @@ import { useAddModal } from '@/context/AddModalContext';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useBackgroundExtraction } from '@/hooks/useBackgroundExtraction';
+import { usePostImageUpload, MAX_POST_IMAGES } from '@/hooks/usePostImageUpload';
 import { useSubscription, type PaywallFeature } from '@/hooks/useSubscription';
 import { MODAL_ANIMATION, useModalAnimation } from '@/hooks/useModalAnimation';
 import { usePendingUploadsStore } from '@/stores/usePendingUploadsStore';
@@ -140,6 +141,10 @@ export function AddModal(): React.ReactElement {
 	const [presentationRating, setPresentationRating] = useState(0);
 	const [shareNotes, setShareNotes] = useState('');
 	const [shareIsLoading, setShareIsLoading] = useState(false);
+	const [selectedImages, setSelectedImages] = useState<string[]>([]);
+
+	// Post image upload
+	const { pickImages, uploadImages, isUploading: isImageUploading } = usePostImageUpload();
 
 	// User's recipes for share view
 	const userRecipes = useQuery(api.recipes.listSaved);
@@ -185,6 +190,7 @@ export function AddModal(): React.ReactElement {
 		setTasteRating(0);
 		setPresentationRating(0);
 		setShareNotes('');
+		setSelectedImages([]);
 		setShowPaywall(false);
 	}, []);
 
@@ -337,6 +343,17 @@ export function AddModal(): React.ReactElement {
 		}, 1800);
 	};
 
+	const handlePickPhotos = async () => {
+		const uris = await pickImages(selectedImages.length);
+		if (uris && uris.length > 0) {
+			setSelectedImages((prev) => [...prev, ...uris].slice(0, MAX_POST_IMAGES));
+		}
+	};
+
+	const handleRemovePhoto = (index: number) => {
+		setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+	};
+
 	const handleSharePost = async () => {
 		if (
 			!selectedRecipeId ||
@@ -349,12 +366,21 @@ export function AddModal(): React.ReactElement {
 
 		setShareIsLoading(true);
 		try {
+			let imageStorageIds: Array<Id<'_storage'>> | undefined;
+			if (selectedImages.length > 0) {
+				const uploaded = await uploadImages(selectedImages);
+				if (uploaded.length > 0) {
+					imageStorageIds = uploaded.map((u) => u.storageId);
+				}
+			}
+
 			await createPost({
 				recipeId: selectedRecipeId,
 				easeRating,
 				tasteRating,
 				presentationRating,
-				notes: shareNotes.trim() || undefined
+				notes: shareNotes.trim() || undefined,
+				imageStorageIds,
 			});
 			closeModal();
 		} catch (error) {
@@ -838,6 +864,65 @@ export function AddModal(): React.ReactElement {
 					onChange={setPresentationRating}
 					disabled={shareIsLoading}
 				/>
+			</View>
+
+			{/* Photos */}
+			<View style={styles.inputGroup}>
+				<Text style={styles.inputLabel}>{copy.sharePost.addPhotos}</Text>
+				{selectedImages.length > 0 ? (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						style={styles.photoStripContainer}
+						contentContainerStyle={styles.photoStripContent}
+					>
+						{selectedImages.map((uri, index) => (
+							<View key={`${uri}-${index}`} style={styles.photoThumbWrapper}>
+								<Image
+									source={{ uri }}
+									style={styles.photoThumb}
+									contentFit="cover"
+									transition={200}
+									cachePolicy="memory-disk"
+								/>
+								<Pressable
+									style={styles.photoRemoveButton}
+									onPress={() => handleRemovePhoto(index)}
+									hitSlop={6}
+									accessibilityLabel={copy.sharePost.removePhoto}
+									disabled={shareIsLoading}
+								>
+									<Icon name="close-circle" size={22} color={Colors.text.inverse} />
+								</Pressable>
+							</View>
+						))}
+						{selectedImages.length < MAX_POST_IMAGES && (
+							<Pressable
+								style={styles.photoAddMoreButton}
+								onPress={handlePickPhotos}
+								disabled={shareIsLoading}
+								accessibilityLabel={copy.sharePost.addPhotos}
+							>
+								<Icon name="add" size={28} color={Colors.text.tertiary} />
+							</Pressable>
+						)}
+					</ScrollView>
+				) : (
+					<Pressable
+						style={styles.photoPickerButton}
+						onPress={handlePickPhotos}
+						disabled={shareIsLoading}
+						accessibilityLabel={copy.sharePost.addPhotos}
+					>
+						<Icon name="camera-outline" size={24} color={Colors.text.tertiary} />
+						<Text style={styles.photoPickerText}>{copy.sharePost.addPhotos}</Text>
+					</Pressable>
+				)}
+				{selectedImages.length > 0 && (
+					<Text style={styles.photoCount}>
+						{selectedImages.length}/{MAX_POST_IMAGES}
+					</Text>
+				)}
 			</View>
 
 			{/* Notes */}
@@ -1729,6 +1814,64 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'center',
 		padding: Spacing.md
+	},
+	photoStripContainer: {
+		marginTop: Spacing.xs,
+		marginHorizontal: -Spacing.lg,
+	},
+	photoStripContent: {
+		paddingHorizontal: Spacing.lg,
+		gap: Spacing.sm,
+	},
+	photoThumbWrapper: {
+		width: 80,
+		height: 80,
+		borderRadius: Radius.sm,
+		overflow: 'hidden',
+		position: 'relative',
+	},
+	photoThumb: {
+		width: '100%',
+		height: '100%',
+	},
+	photoRemoveButton: {
+		position: 'absolute',
+		top: 4,
+		right: 4,
+	},
+	photoAddMoreButton: {
+		width: 80,
+		height: 80,
+		borderRadius: Radius.sm,
+		borderWidth: 1,
+		borderColor: Colors.border,
+		borderStyle: 'dashed',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: Colors.background.secondary,
+	},
+	photoPickerButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: Spacing.sm,
+		backgroundColor: Colors.background.secondary,
+		borderRadius: Radius.md,
+		borderWidth: 1,
+		borderColor: Colors.border,
+		borderStyle: 'dashed',
+		paddingVertical: Spacing.lg,
+		marginTop: Spacing.xs,
+	},
+	photoPickerText: {
+		...Typography.body,
+		color: Colors.text.tertiary,
+	},
+	photoCount: {
+		...Typography.caption,
+		color: Colors.text.tertiary,
+		marginTop: Spacing.xs,
+		textAlign: 'right',
 	},
 	successContainer: {
 		alignItems: 'center',

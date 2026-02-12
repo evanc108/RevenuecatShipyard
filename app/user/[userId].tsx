@@ -375,6 +375,7 @@ export default function UserProfileScreen(): React.ReactElement {
                     key={post._id}
                     recipeTitle={post.recipe?.title ?? 'Unknown Recipe'}
                     recipeImageUrl={post.recipe?.imageUrl}
+                    imageUrls={post.imageUrls}
                     easeRating={post.easeRating}
                     tasteRating={post.tasteRating}
                     presentationRating={post.presentationRating}
@@ -397,6 +398,7 @@ export default function UserProfileScreen(): React.ReactElement {
                   >
                     <PostGridItem
                       imageUrl={post.recipe?.imageUrl}
+                      imageUrls={post.imageUrls}
                       title={post.recipe?.title ?? 'Unknown Recipe'}
                       onPress={() => post.recipe && handlePostPress(post.recipe._id)}
                     />

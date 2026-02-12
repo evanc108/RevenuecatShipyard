@@ -7,6 +7,7 @@ import { Colors, Spacing } from '@/constants/theme';
 
 type PostGridItemProps = {
   imageUrl?: string | null;
+  imageUrls?: string[];
   title: string;
   onPress: () => void;
   onMenuPress?: () => void;
@@ -28,11 +29,13 @@ function getPastelForTitle(title: string): string {
 
 export const PostGridItem = memo(function PostGridItem({
   imageUrl,
+  imageUrls,
   title,
   onPress,
   onMenuPress,
 }: PostGridItemProps): React.ReactElement {
   const fallbackBg = getPastelForTitle(title);
+  const displayImageUrl = (imageUrls && imageUrls.length > 0 ? imageUrls[0] : imageUrl) ?? null;
 
   return (
     <Pressable
@@ -41,10 +44,10 @@ export const PostGridItem = memo(function PostGridItem({
       style={styles.container}
       onPress={onPress}
     >
-      <View style={[styles.imageContainer, !imageUrl && { backgroundColor: fallbackBg }]}>
-        {imageUrl ? (
+      <View style={[styles.imageContainer, !displayImageUrl && { backgroundColor: fallbackBg }]}>
+        {displayImageUrl ? (
           <Image
-            source={{ uri: imageUrl }}
+            source={{ uri: displayImageUrl }}
             style={styles.image}
             contentFit="cover"
             transition={200}

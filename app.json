@@ -92,8 +92,7 @@
       ],
       "expo-secure-store",
       "expo-audio",
-      "expo-apple-authentication",
-      "./plugins/withShareExtension"
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
